@@ -1,8 +1,7 @@
 import { Page, Locator, expect } from '@playwright/test';
-import { healSelector, getAvailableSelectOptions } from '../../../ConfigurationAgents/ia-testing/agents/core/healer-agents';
+import { healSelector, getAvailableSelectOptions, healOptionSelector } from '../../../ConfigurationAgents/ia-testing/agents/core/healer-agents';
 import { resolveSmartValue } from './test-data-resolver';
 import { waitForUIStability } from './smart-ui-detector';
-import { healSelector, getAvailableSelectOptions, healOptionSelector } from '../../../ConfigurationAgents/ia-testing/agents/core/healer-agents';
 
 // 🔥 VALIDAR QUE LA PÁGINA SIGA VIVA
 function isPageAlive(page: Page): boolean {
@@ -57,7 +56,7 @@ async function waitForVisible(locator: Locator, timeout = 15000): Promise<boolea
 }
 
 // 🔥 MANEJO AUTOMÁTICO DE MODALES (mejorado)
-let modalHandled = false; // Bandera para evitar repetir confirmación
+let modalHandled = false;
 
 async function handleModalIfPresent(page: Page): Promise<boolean> {
   if (page.isClosed()) return false;
@@ -70,7 +69,6 @@ async function handleModalIfPresent(page: Page): Promise<boolean> {
         console.log('🤖 Modal detectado → auto confirmación');
         await confirmBtn.first().click({ force: true });
         modalHandled = true;
-        // Esperar a que el modal desaparezca
         await modal.first().waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
         await page.waitForTimeout(500);
         return true;
@@ -143,14 +141,12 @@ export async function smartClick(page: Page, selector: string) {
                       selector.toLowerCase().includes('confirm') ||
                       selector === 'Confirmar';
 
-    // Si es un botón de confirmar y ya manejamos un modal, saltamos este clic
     if (isConfirm && modalHandled) {
       console.log('🤖 Confirmación ya manejada por modal, omitiendo clic redundante');
-      modalHandled = false; // Reset para futuros flujos
+      modalHandled = false;
       return;
     }
 
-    // Intentar manejar modal antes del clic (por si acaso)
     const modalClicked = await handleModalIfPresent(page);
     if (modalClicked && isConfirm) {
       console.log('🤖 Confirmación manejada en pre-click, omitiendo clic normal');
@@ -158,7 +154,6 @@ export async function smartClick(page: Page, selector: string) {
       return;
     }
 
-    // Comportamiento normal
     const locator = await resolveLocator(page, selector);
     const isVisible = await waitForVisible(locator, 10000);
     if (!isVisible) throw new Error(`Elemento no visible para click: ${selector}`);
@@ -169,30 +164,26 @@ export async function smartClick(page: Page, selector: string) {
       await locator.click({ force: true, timeout: 10000 });
     } catch (e) {
       console.log(`⚠️ Click falló → healing: ${selector}`);
-	  // Si parece un selector de opción, intentar healing específico
-if (selector.includes('option') || selector.includes('getByRole')) {
-  const optionMatch = selector.match(/['"]([^'"]+)['"]/);
-  const optionText = optionMatch ? optionMatch[1] : selector;
-  const healedOption = await healOptionSelector(page, selector, optionText);
-  if (healedOption) {
-    const healedLocator = page.locator(healedOption);
-    await waitForVisible(healedLocator);
-    await healedLocator.click({ force: true });
-    return;
-  }
-}
+      // Healing específico para opciones
+      if (selector.includes('option') || selector.includes('getByRole')) {
+        const optionMatch = selector.match(/['"]([^'"]+)['"]/);
+        const optionText = optionMatch ? optionMatch[1] : selector;
+        const healedOption = await healOptionSelector(page, selector, optionText);
+        if (healedOption) {
+          const healedLocator = page.locator(healedOption);
+          await waitForVisible(healedLocator);
+          await healedLocator.click({ force: true });
+          return;
+        }
+      }
       const healed = await healSelector(page, selector, 'click');
       if (!healed) throw e;
       const healedLocator = page.locator(healed);
       await waitForVisible(healedLocator);
       await healedLocator.click({ force: true });
-
-
     }
 
-    // Esperar estabilidad después del clic (importante para navegaciones)
     await waitForPageStability(page);
-
   }, selector);
 }
 
@@ -210,14 +201,12 @@ async function isComboboxOrAutocomplete(page: Page, locator: Locator): Promise<b
  * Espera a que aparezca el menú de opciones después de escribir en un combobox
  */
 async function waitForAutocompleteOptions(page: Page, timeout = 5000): Promise<void> {
-  // Esperar a que aparezca algún rol 'option' o elemento con clase de sugerencia
   const optionSelector = '[role="option"], .suggestions, .autocomplete-results, .ui-menu-item';
   await page.waitForSelector(optionSelector, { timeout, state: 'visible' }).catch(() => {});
-  // Pequeña pausa para estabilizar
   await page.waitForTimeout(300);
 }
 
-// ✅ INPUT ROBUSTO
+// ✅ INPUT ROBUSTO (sin Enter automático)
 export async function smartFill(page: Page, selector: string, value: string) {
   const smartValue = resolveSmartValue(selector, value);
   await retryAction(page, async () => {
@@ -231,7 +220,6 @@ export async function smartFill(page: Page, selector: string, value: string) {
       await locator.fill('');
       await locator.type(smartValue, { delay: 30 });
 
-      // Si es combobox, esperar opciones pero NO presionar Enter
       if (await isComboboxOrAutocomplete(page, locator)) {
         await waitForAutocompleteOptions(page);
         console.log(`🔍 Combobox detectado. Opciones disponibles, esperando interacción del usuario.`);
@@ -247,7 +235,6 @@ export async function smartFill(page: Page, selector: string, value: string) {
       await locator.type(smartValue, { delay: 30 });
       if (await isComboboxOrAutocomplete(page, locator)) {
         await waitForAutocompleteOptions(page);
-        // Tampoco presionamos Enter aquí
       }
     }
     await waitForPageStability(page);
