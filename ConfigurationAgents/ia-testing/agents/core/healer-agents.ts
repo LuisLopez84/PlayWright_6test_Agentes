@@ -199,3 +199,15 @@ export async function getAvailableSelectOptions(page: Page, selector: string): P
     return [];
   }
 }
+
+export async function healOptionSelector(page: Page, originalSelector: string, optionText: string): Promise<string | null> {
+  // Intentar localizar por texto exacto dentro de cualquier rol 'option'
+  const option = page.getByRole('option', { name: optionText });
+  if (await option.count() > 0) return `page.getByRole('option', { name: '${optionText}' })`;
+
+  // Buscar por texto parcial
+  const partial = page.getByText(optionText, { exact: false });
+  if (await partial.count() > 0) return `page.getByText('${optionText}')`;
+
+  return null;
+}

@@ -2,6 +2,7 @@ import { Page, Locator, expect } from '@playwright/test';
 import { healSelector, getAvailableSelectOptions } from '../../../ConfigurationAgents/ia-testing/agents/core/healer-agents';
 import { resolveSmartValue } from './test-data-resolver';
 import { waitForUIStability } from './smart-ui-detector';
+import { healSelector, getAvailableSelectOptions, healOptionSelector } from '../../../ConfigurationAgents/ia-testing/agents/core/healer-agents';
 
 // 🔥 VALIDAR QUE LA PÁGINA SIGA VIVA
 function isPageAlive(page: Page): boolean {
@@ -168,17 +169,52 @@ export async function smartClick(page: Page, selector: string) {
       await locator.click({ force: true, timeout: 10000 });
     } catch (e) {
       console.log(`⚠️ Click falló → healing: ${selector}`);
+	  // Si parece un selector de opción, intentar healing específico
+if (selector.includes('option') || selector.includes('getByRole')) {
+  const optionMatch = selector.match(/['"]([^'"]+)['"]/);
+  const optionText = optionMatch ? optionMatch[1] : selector;
+  const healedOption = await healOptionSelector(page, selector, optionText);
+  if (healedOption) {
+    const healedLocator = page.locator(healedOption);
+    await waitForVisible(healedLocator);
+    await healedLocator.click({ force: true });
+    return;
+  }
+}
       const healed = await healSelector(page, selector, 'click');
       if (!healed) throw e;
       const healedLocator = page.locator(healed);
       await waitForVisible(healedLocator);
       await healedLocator.click({ force: true });
+
+
     }
 
     // Esperar estabilidad después del clic (importante para navegaciones)
     await waitForPageStability(page);
 
   }, selector);
+}
+
+/**
+ * Detecta si un elemento es un combobox o input con autocompletado
+ */
+async function isComboboxOrAutocomplete(page: Page, locator: Locator): Promise<boolean> {
+  const role = await locator.getAttribute('role');
+  const ariaAutocomplete = await locator.getAttribute('aria-autocomplete');
+  const type = await locator.getAttribute('type');
+  return role === 'combobox' || ariaAutocomplete === 'list' || type === 'search';
+}
+
+/**
+ * Espera a que aparezca el menú de opciones después de escribir en un combobox
+ */
+async function waitForAutocompleteOptions(page: Page, timeout = 5000): Promise<void> {
+  // Esperar a que aparezca algún rol 'option' o elemento con clase de sugerencia
+  const optionSelector = '[role="option"], .suggestions, .autocomplete-results, .ui-menu-item';
+  await page.waitForSelector(optionSelector, { timeout, state: 'visible' }).catch(() => {});
+  // Pequeña pausa para estabilizar
+  await page.waitForTimeout(300);
 }
 
 // ✅ INPUT ROBUSTO
@@ -194,6 +230,12 @@ export async function smartFill(page: Page, selector: string, value: string) {
       await locator.click({ force: true });
       await locator.fill('');
       await locator.type(smartValue, { delay: 30 });
+
+      // Si es combobox, esperar opciones pero NO presionar Enter
+      if (await isComboboxOrAutocomplete(page, locator)) {
+        await waitForAutocompleteOptions(page);
+        console.log(`🔍 Combobox detectado. Opciones disponibles, esperando interacción del usuario.`);
+      }
     } catch (e) {
       console.log(`⚠️ Fill falló → healing: ${selector}`);
       const healed = await healSelector(page, selector, 'fill', smartValue);
@@ -203,6 +245,10 @@ export async function smartFill(page: Page, selector: string, value: string) {
       await locator.click({ force: true });
       await locator.fill('');
       await locator.type(smartValue, { delay: 30 });
+      if (await isComboboxOrAutocomplete(page, locator)) {
+        await waitForAutocompleteOptions(page);
+        // Tampoco presionamos Enter aquí
+      }
     }
     await waitForPageStability(page);
   }, selector);

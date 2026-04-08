@@ -20,6 +20,11 @@ export function parseRecording(filePath: string) {
       });
       continue;
     }
+	// Ignorar presiones de teclas no relevantes (CapsLock, Shift, etc.)
+const ignorePress = line.match(/\.press\(['"`](CapsLock|Shift|Control|Alt|Meta|Tab|Enter)['"`]\)/);
+if (ignorePress) {
+  continue; // No agregar steps por estas acciones
+}
 
     // 🔥 SELECT OPTION (CRÍTICO - DEBE IR ANTES QUE OTROS PATRONES)
     const selectOption = line.match(/\.selectOption\(['"`](.*?)['"`]\)/);
@@ -50,6 +55,23 @@ export function parseRecording(filePath: string) {
       });
       continue;
     }
+
+	// Dentro de parseRecording, añadir un patrón para option con strong:
+const optionStrongClick = line.match(/getByRole\(['"`]option['"`],\s*{\s*name:\s*['"`](.*?)['"`]\s*}\)\.getByRole\(['"`]strong['"`]\)\.click/);
+if (optionStrongClick) {
+  steps.push({
+    action: "click",
+    target: optionStrongClick[1],
+    raw: line,
+    locator: {
+      type: "role",
+      role: "option",
+      name: optionStrongClick[1]
+    },
+    selector: `page.getByRole('option', { name: '${optionStrongClick[1]}' }).getByRole('strong')`
+  });
+  continue;
+}
 
     // 🔥 ROLE CLICK
     const roleClick = line.match(/getByRole\(['"`](.*?)['"`],\s*{\s*name:\s*['"`](.*?)['"`]\s*}\)\.click/);

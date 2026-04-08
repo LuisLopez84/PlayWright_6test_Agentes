@@ -76,17 +76,20 @@ test('${name}', async ({ page }) => {
 
     // 🔹 CLICK
     if (step.action === 'click') {
-      if (!selector) continue;
-      code += `
+  if (!selector) continue;
+  code += `
   await smartClick(page, \`${selector}\`);`;
-    }
+}
 
     // 🔹 INPUT / FILL
-    else if (step.action === 'input' || step.action === 'fill') {
-      if (!selector) continue;
-      code += `
-  await smartFill(page, \`${selector}\`, '${value}');`;
-    }
+    // Dentro del bucle de steps, en la parte de 'input / fill':
+else if (step.action === 'input' || step.action === 'fill') {
+  if (!selector) continue;
+  code += `
+  await smartFill(page, \`${selector}\`, '${value}');
+  // Esperar estabilidad después de escribir (especialmente combos)
+  await page.waitForTimeout(500);`;
+}
   }
 
   code += `
