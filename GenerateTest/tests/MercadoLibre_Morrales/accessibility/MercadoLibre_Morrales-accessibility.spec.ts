@@ -2,8 +2,8 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
-test('accessibility Homebanking_Pruebas001', async ({ page }) => {
-  await page.goto('https://homebanking-demo-tests.netlify.app');
+test('accessibility MercadoLibre_Morrales', async ({ page }) => {
+  await page.goto('https://www.mercadolibre.com.co');
   const results = await new AxeBuilder({ page }).analyze();
   console.log("Violations:", results.violations.length);
 });
