@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { Page } from '@playwright/test';
+import { closeAnyModal } from './modal-handler';
 
 export async function smartGoto(page: Page, testName: string = 'GLOBAL') {
 
@@ -35,6 +36,9 @@ export async function smartGoto(page: Page, testName: string = 'GLOBAL') {
 
     // 🔥 ESTABILIZAR UI (CRÍTICO PARA MENÚS Y LOGIN)
     await page.waitForTimeout(1000);
+
+    // 🔥 CERRAR MODALES QUE PUEDAN BLOQUEAR LA INTERACCIÓN (ubicación, cookies, etc.)
+    await closeAnyModal(page);
 
   } catch (e) {
     console.error('❌ smartGoto error:', e);

@@ -2,6 +2,7 @@ import { Page, Locator, expect } from '@playwright/test';
 import { healSelector, getAvailableSelectOptions, healOptionSelector } from '../../../ConfigurationAgents/ia-testing/agents/core/healer-agents';
 import { resolveSmartValue } from './test-data-resolver';
 import { waitForUIStability } from './smart-ui-detector';
+import { closeAnyModal } from './modal-handler';
 
 function isPageAlive(page: Page): boolean {
   return !page.isClosed();
@@ -79,15 +80,12 @@ async function waitForPageStability(page: Page, options: { waitForNetworkIdle?: 
   const waitForLoad = options.waitForLoad !== false;
   const waitForNetworkIdle = options.waitForNetworkIdle !== false;
   const promises: Promise<any>[] = [];
-  if (waitForLoad) {
-    promises.push(page.waitForLoadState('load', { timeout: 15000 }).catch(() => {}));
-  }
-  if (waitForNetworkIdle) {
-    promises.push(page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {}));
-  }
+  if (waitForLoad) promises.push(page.waitForLoadState('load', { timeout: 15000 }).catch(() => {}));
+  if (waitForNetworkIdle) promises.push(page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {}));
   await Promise.race(promises).catch(() => {});
   await page.waitForTimeout(500);
   await handleModalIfPresent(page);
+  await closeAnyModal(page);
 }
 
 async function retryAction(page: Page, fn: () => Promise<void>, selector: string, retries = 2) {
@@ -164,6 +162,7 @@ export async function smartClick(page: Page, selector: string) {
     }
     await waitForPageStability(page);
     await waitForNavigationAfterClick(page, selector);
+	await closeAnyModal(page);
   }, selector);
 }
 
@@ -209,6 +208,7 @@ export async function smartFill(page: Page, selector: string, value: string) {
       }
     }
     await waitForPageStability(page);
+	await closeAnyModal(page);
   }, selector);
 }
 
