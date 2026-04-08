@@ -17,10 +17,10 @@ export default defineConfig({
   outputDir: 'test-results',
   fullyParallel: true,
   workers: 4,
-  timeout: 60000,
+  timeout: 120000,
 
   expect: {
-    timeout: 10000
+    timeout: 15000
   },
 
   reporter: [

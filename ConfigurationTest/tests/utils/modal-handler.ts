@@ -8,9 +8,9 @@ export async function closeAnyModal(page: Page): Promise<boolean> {
     { selector: 'button:has-text("Agregar ubicación")', action: async (btn: any) => { await btn.click({ force: true }); console.log('🤖 Modal ubicación cerrado (agregar)'); } },
     { selector: 'button:has-text("Aceptar cookies")', action: async (btn: any) => { await btn.click({ force: true }); console.log('🍪 Cookies aceptadas'); } },
     { selector: 'button:has-text("Accept cookies")', action: async (btn: any) => { await btn.click({ force: true }); console.log('🍪 Cookies accepted'); } },
-    { selector: '[role="dialog"] button:has-text("Cerrar")', action: async (btn: any) => { await btn.click({ force: true }); } },
-    { selector: '.modal button:has-text("Cerrar")', action: async (btn: any) => { await btn.click({ force: true }); } },
-    { selector: '[aria-label="Close"]', action: async (btn: any) => { await btn.click({ force: true }); } }
+    { selector: '[role="dialog"] button:has-text("Cerrar")', action: async (btn: any) => { await btn.click({ force: true }); console.log('🤖 Dialog cerrado'); } },
+    { selector: '.modal button:has-text("Cerrar")', action: async (btn: any) => { await btn.click({ force: true }); console.log('🤖 Modal cerrado'); } },
+    { selector: '[aria-label="Close"]', action: async (btn: any) => { await btn.click({ force: true }); console.log('🤖 Close button clicked'); } }
   ];
   for (const h of handlers) {
     try {
@@ -26,6 +26,7 @@ export async function closeAnyModal(page: Page): Promise<boolean> {
   const modalDialog = page.locator('[role="dialog"], .modal');
   if (await modalDialog.count() > 0 && await modalDialog.first().isVisible().catch(() => false)) {
     await page.mouse.click(10, 10);
+    console.log('🤖 Modal cerrado haciendo clic fuera');
     closed = true;
   }
   return closed;

@@ -3,6 +3,7 @@ import { healSelector, getAvailableSelectOptions, healOptionSelector } from '../
 import { resolveSmartValue } from './test-data-resolver';
 import { waitForUIStability } from './smart-ui-detector';
 import { closeAnyModal } from './modal-handler';
+import { openai } from '../../../ConfigurationAgents/ia-testing/utils/openai-client';
 
 function isPageAlive(page: Page): boolean {
   return !page.isClosed();
@@ -120,6 +121,27 @@ async function waitForNavigationAfterClick(page: Page, selector: string) {
   }
 }
 
+// 🔥 Función de healing con IA
+async function healWithAI(page: Page, originalSelector: string, action: string, value?: string): Promise<string | null> {
+  if (!openai || !openai.chat) return null;
+  try {
+    const html = (await page.content()).substring(0, 4000);
+    const prompt = `Eres un experto en automatización. El selector "${originalSelector}" falló para la acción "${action}" (valor: ${value || 'N/A'}).
+Analiza el siguiente HTML y devuelve UN SOLO selector robusto (puede ser getByRole, getByTestId, getByText, CSS, etc.) que funcione en Playwright.
+HTML: ${html}
+Devuelve solo el selector, sin explicaciones.`;
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.1,
+    });
+    return response.choices[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.log('❌ Error en IA healing:', e);
+    return null;
+  }
+}
+
 export async function smartClick(page: Page, selector: string) {
   await retryAction(page, async () => {
     await waitForUIStability(page);
@@ -143,6 +165,7 @@ export async function smartClick(page: Page, selector: string) {
       await locator.click({ force: true, timeout: 10000 });
     } catch (e) {
       console.log(`⚠️ Click falló → healing: ${selector}`);
+      // 1. Healing específico para opciones
       if (selector.includes('option') || selector.includes('getByRole')) {
         const optionMatch = selector.match(/['"]([^'"]+)['"]/);
         const optionText = optionMatch ? optionMatch[1] : selector;
@@ -154,15 +177,29 @@ export async function smartClick(page: Page, selector: string) {
           return;
         }
       }
+      // 2. Healing genérico (selector engine)
       const healed = await healSelector(page, selector, 'click');
-      if (!healed) throw e;
-      const healedLocator = page.locator(healed);
-      await waitForVisible(healedLocator);
-      await healedLocator.click({ force: true });
+      if (healed) {
+        const healedLocator = page.locator(healed);
+        await waitForVisible(healedLocator);
+        await healedLocator.click({ force: true });
+        return;
+      }
+      // 3. Último recurso: IA
+      console.log(`🧠 Usando IA para healing de selector: ${selector}`);
+      const aiSelector = await healWithAI(page, selector, 'click');
+      if (aiSelector) {
+        const healedLocator = page.locator(aiSelector);
+        if (await healedLocator.count() > 0 && await healedLocator.first().isVisible().catch(() => false)) {
+          await healedLocator.first().click({ force: true });
+          return;
+        }
+      }
+      throw e;
     }
     await waitForPageStability(page);
     await waitForNavigationAfterClick(page, selector);
-	await closeAnyModal(page);
+    await closeAnyModal(page);
   }, selector);
 }
 
@@ -208,7 +245,7 @@ export async function smartFill(page: Page, selector: string, value: string) {
       }
     }
     await waitForPageStability(page);
-	await closeAnyModal(page);
+    await closeAnyModal(page);
   }, selector);
 }
 
