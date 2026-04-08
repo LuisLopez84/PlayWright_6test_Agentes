@@ -20,23 +20,20 @@ export function parseRecording(filePath: string) {
       });
       continue;
     }
-	// Ignorar presiones de teclas no relevantes (CapsLock, Shift, etc.)
-const ignorePress = line.match(/\.press\(['"`](CapsLock|Shift|Control|Alt|Meta|Tab|Enter)['"`]\)/);
-if (ignorePress) {
-  continue; // No agregar steps por estas acciones
-}
 
-    // 🔥 SELECT OPTION (CRÍTICO - DEBE IR ANTES QUE OTROS PATRONES)
+    // Ignorar presiones de teclas no relevantes (CapsLock, Shift, etc.)
+    const ignorePress = line.match(/\.press\(['"`](CapsLock|Shift|Control|Alt|Meta|Tab|Enter)['"`]\)/);
+    if (ignorePress) {
+      continue;
+    }
+
+    // 🔥 SELECT OPTION
     const selectOption = line.match(/\.selectOption\(['"`](.*?)['"`]\)/);
     if (selectOption) {
-      // Extraer el selector del locator o getByRole
       let selector = '';
       let target = '';
-
-      // Buscar locator o getByRole antes del selectOption
       const locatorMatch = line.match(/locator\(['"`](.*?)['"`]\)/);
       const roleMatch = line.match(/getByRole\(['"`](.*?)['"`],\s*{\s*name:\s*['"`](.*?)['"`]\s*}\)/);
-
       if (locatorMatch) {
         selector = locatorMatch[1];
         target = selector;
@@ -44,7 +41,6 @@ if (ignorePress) {
         selector = `getByRole('${roleMatch[1]}', { name: '${roleMatch[2]}' })`;
         target = roleMatch[2];
       }
-
       steps.push({
         action: "select",
         target: target,
@@ -56,22 +52,18 @@ if (ignorePress) {
       continue;
     }
 
-	// Dentro de parseRecording, añadir un patrón para option con strong:
-const optionStrongClick = line.match(/getByRole\(['"`]option['"`],\s*{\s*name:\s*['"`](.*?)['"`]\s*}\)\.getByRole\(['"`]strong['"`]\)\.click/);
-if (optionStrongClick) {
-  steps.push({
-    action: "click",
-    target: optionStrongClick[1],
-    raw: line,
-    locator: {
-      type: "role",
-      role: "option",
-      name: optionStrongClick[1]
-    },
-    selector: `page.getByRole('option', { name: '${optionStrongClick[1]}' }).getByRole('strong')`
-  });
-  continue;
-}
+    // 🔥 OPTION + STRONG CLICK
+    const optionStrongClick = line.match(/getByRole\(['"`]option['"`],\s*{\s*name:\s*['"`](.*?)['"`]\s*}\)\.getByRole\(['"`]strong['"`]\)\.click/);
+    if (optionStrongClick) {
+      steps.push({
+        action: "click",
+        target: optionStrongClick[1],
+        raw: line,
+        locator: { type: "role", role: "option", name: optionStrongClick[1] },
+        selector: `page.getByRole('option', { name: '${optionStrongClick[1]}' }).getByRole('strong')`
+      });
+      continue;
+    }
 
     // 🔥 ROLE CLICK
     const roleClick = line.match(/getByRole\(['"`](.*?)['"`],\s*{\s*name:\s*['"`](.*?)['"`]\s*}\)\.click/);
@@ -80,16 +72,8 @@ if (optionStrongClick) {
         action: "click",
         target: roleClick[2],
         raw: line,
-        locator: {
-          type: "role",
-          role: roleClick[1],
-          name: roleClick[2]
-        },
-        selector: buildPlaywrightSelector({
-          type: "role",
-          role: roleClick[1],
-          name: roleClick[2]
-        })
+        locator: { type: "role", role: roleClick[1], name: roleClick[2] },
+        selector: buildPlaywrightSelector({ type: "role", role: roleClick[1], name: roleClick[2] })
       });
       continue;
     }
@@ -102,16 +86,8 @@ if (optionStrongClick) {
         target: roleFill[2],
         value: roleFill[3],
         raw: line,
-        locator: {
-          type: "role",
-          role: roleFill[1],
-          name: roleFill[2]
-        },
-        selector: buildPlaywrightSelector({
-          type: "role",
-          role: roleFill[1],
-          name: roleFill[2]
-        })
+        locator: { type: "role", role: roleFill[1], name: roleFill[2] },
+        selector: buildPlaywrightSelector({ type: "role", role: roleFill[1], name: roleFill[2] })
       });
       continue;
     }
@@ -123,14 +99,8 @@ if (optionStrongClick) {
         action: "click",
         target: textClick[1],
         raw: line,
-        locator: {
-          type: "text",
-          text: textClick[1]
-        },
-        selector: buildPlaywrightSelector({
-          type: "text",
-          text: textClick[1]
-        })
+        locator: { type: "text", text: textClick[1] },
+        selector: buildPlaywrightSelector({ type: "text", text: textClick[1] })
       });
       continue;
     }
@@ -142,14 +112,8 @@ if (optionStrongClick) {
         action: "click",
         target: locatorClick[1],
         raw: line,
-        locator: {
-          type: "css",
-          selector: locatorClick[1]
-        },
-        selector: buildPlaywrightSelector({
-          type: "css",
-          selector: locatorClick[1]
-        })
+        locator: { type: "css", selector: locatorClick[1] },
+        selector: buildPlaywrightSelector({ type: "css", selector: locatorClick[1] })
       });
       continue;
     }
@@ -162,36 +126,26 @@ if (optionStrongClick) {
         target: locatorFill[1],
         value: locatorFill[2],
         raw: line,
-        locator: {
-          type: "css",
-          selector: locatorFill[1]
-        },
-        selector: buildPlaywrightSelector({
-          type: "css",
-          selector: locatorFill[1]
-        })
+        locator: { type: "css", selector: locatorFill[1] },
+        selector: buildPlaywrightSelector({ type: "css", selector: locatorFill[1] })
       });
       continue;
     }
-  }
 
-      // 🔥 GETBYTESTID CLICK
+    // 🔥 GETBYTESTID CLICK (nuevo)
     const testIdClick = line.match(/getByTestId\(['"`](.*?)['"`]\)\.click/);
     if (testIdClick) {
       steps.push({
         action: "click",
         target: testIdClick[1],
         raw: line,
-        locator: {
-          type: "testid",
-          testId: testIdClick[1]
-        },
+        locator: { type: "testid", testId: testIdClick[1] },
         selector: `page.getByTestId('${testIdClick[1]}')`
       });
       continue;
     }
 
-    // 🔥 GETBYTESTID FILL
+    // 🔥 GETBYTESTID FILL (nuevo)
     const testIdFill = line.match(/getByTestId\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
     if (testIdFill) {
       steps.push({
@@ -199,14 +153,12 @@ if (optionStrongClick) {
         target: testIdFill[1],
         value: testIdFill[2],
         raw: line,
-        locator: {
-          type: "testid",
-          testId: testIdFill[1]
-        },
+        locator: { type: "testid", testId: testIdFill[1] },
         selector: `page.getByTestId('${testIdFill[1]}')`
       });
       continue;
     }
+  }
 
   return steps;
 }

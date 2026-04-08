@@ -3,12 +3,10 @@ import { healSelector, getAvailableSelectOptions, healOptionSelector } from '../
 import { resolveSmartValue } from './test-data-resolver';
 import { waitForUIStability } from './smart-ui-detector';
 
-// 🔥 VALIDAR QUE LA PÁGINA SIGA VIVA
 function isPageAlive(page: Page): boolean {
   return !page.isClosed();
 }
 
-// 🔥 Builder base inteligente
 function buildSmartLocator(page: Page, selector: string): Locator {
   if (!selector) throw new Error('Selector vacío');
   const clean = selector.trim();
@@ -17,13 +15,12 @@ function buildSmartLocator(page: Page, selector: string): Locator {
   return page.getByText(clean, { exact: false });
 }
 
-// 🔥 Resolver universal con múltiples estrategias
 async function resolveLocator(page: Page, selector: string): Promise<Locator> {
   if (!isPageAlive(page)) {
     throw new Error(`🚨 Page cerrada antes de resolver selector: ${selector}`);
   }
 
-    const strategies = [
+  const strategies = [
     () => page.getByRole('button', { name: selector }),
     () => page.getByRole('link', { name: selector }),
     () => page.getByRole('textbox', { name: selector }),
@@ -31,10 +28,9 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
     () => page.getByLabel(selector),
     () => page.getByPlaceholder(selector),
     () => page.getByText(selector, { exact: false }),
-    () => page.getByTestId(selector),        // ← NUEVO
+    () => page.getByTestId(selector),
     () => buildSmartLocator(page, selector)
   ];
-
 
   for (const fn of strategies) {
     try {
@@ -45,16 +41,6 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
   return buildSmartLocator(page, selector);
 }
 
-async function waitForNavigationAfterClick(page: Page, selector: string) {
-  const navigationKeywords = ['comprar', 'continuar', 'ingresar', 'login', 'submit', 'pagar'];
-  const shouldWait = navigationKeywords.some(keyword => selector.toLowerCase().includes(keyword));
-  if (shouldWait) {
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await page.waitForTimeout(1000);
-  }
-}
-
-// 🔥 Espera robusta REAL
 async function waitForVisible(locator: Locator, timeout = 15000): Promise<boolean> {
   try {
     await locator.waitFor({ state: 'attached', timeout });
@@ -66,7 +52,6 @@ async function waitForVisible(locator: Locator, timeout = 15000): Promise<boolea
   }
 }
 
-// 🔥 MANEJO AUTOMÁTICO DE MODALES (mejorado)
 let modalHandled = false;
 
 async function handleModalIfPresent(page: Page): Promise<boolean> {
@@ -89,40 +74,27 @@ async function handleModalIfPresent(page: Page): Promise<boolean> {
   return false;
 }
 
-// 🔥 Espera de estabilidad de página
 async function waitForPageStability(page: Page, options: { waitForNetworkIdle?: boolean, waitForLoad?: boolean } = {}) {
   if (page.isClosed()) return;
-
   const waitForLoad = options.waitForLoad !== false;
   const waitForNetworkIdle = options.waitForNetworkIdle !== false;
-
   const promises: Promise<any>[] = [];
-
   if (waitForLoad) {
     promises.push(page.waitForLoadState('load', { timeout: 15000 }).catch(() => {}));
   }
   if (waitForNetworkIdle) {
     promises.push(page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {}));
   }
-
   await Promise.race(promises).catch(() => {});
   await page.waitForTimeout(500);
   await handleModalIfPresent(page);
 }
 
-// 🔥 REINTENTO UNIVERSAL INTELIGENTE
-async function retryAction(
-  page: Page,
-  fn: () => Promise<void>,
-  selector: string,
-  retries = 2
-) {
+async function retryAction(page: Page, fn: () => Promise<void>, selector: string, retries = 2) {
   let lastError;
   for (let i = 0; i <= retries; i++) {
     try {
-      if (page.isClosed()) {
-        throw new Error(`🚨 Page cerrada antes de ejecutar: ${selector}`);
-      }
+      if (page.isClosed()) throw new Error(`🚨 Page cerrada antes de ejecutar: ${selector}`);
       await fn();
       return;
     } catch (e) {
@@ -135,47 +107,44 @@ async function retryAction(
       try {
         await page.waitForLoadState('domcontentloaded', { timeout: 3000 });
       } catch {}
-      if (!page.isClosed()) {
-        await new Promise(res => setTimeout(res, 300));
-      }
+      if (!page.isClosed()) await new Promise(res => setTimeout(res, 300));
     }
   }
   throw lastError;
 }
 
-// ✅ CLICK ULTRA ROBUSTO (con manejo especial para confirmaciones)
+async function waitForNavigationAfterClick(page: Page, selector: string) {
+  const navigationKeywords = ['comprar', 'continuar', 'ingresar', 'login', 'submit', 'pagar', 'siguiente'];
+  const shouldWait = navigationKeywords.some(keyword => selector.toLowerCase().includes(keyword));
+  if (shouldWait) {
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+  }
+}
+
 export async function smartClick(page: Page, selector: string) {
   await retryAction(page, async () => {
     await waitForUIStability(page);
-
-    const isConfirm = selector.toLowerCase().includes('confirmar') ||
-                      selector.toLowerCase().includes('confirm') ||
-                      selector === 'Confirmar';
-
+    const isConfirm = selector.toLowerCase().includes('confirmar') || selector.toLowerCase().includes('confirm') || selector === 'Confirmar';
     if (isConfirm && modalHandled) {
       console.log('🤖 Confirmación ya manejada por modal, omitiendo clic redundante');
       modalHandled = false;
       return;
     }
-
     const modalClicked = await handleModalIfPresent(page);
     if (modalClicked && isConfirm) {
       console.log('🤖 Confirmación manejada en pre-click, omitiendo clic normal');
       modalHandled = false;
       return;
     }
-
     const locator = await resolveLocator(page, selector);
     const isVisible = await waitForVisible(locator, 10000);
     if (!isVisible) throw new Error(`Elemento no visible para click: ${selector}`);
-
     await locator.scrollIntoViewIfNeeded().catch(() => {});
-
     try {
       await locator.click({ force: true, timeout: 10000 });
     } catch (e) {
       console.log(`⚠️ Click falló → healing: ${selector}`);
-      // Healing específico para opciones
       if (selector.includes('option') || selector.includes('getByRole')) {
         const optionMatch = selector.match(/['"]([^'"]+)['"]/);
         const optionText = optionMatch ? optionMatch[1] : selector;
@@ -193,15 +162,11 @@ export async function smartClick(page: Page, selector: string) {
       await waitForVisible(healedLocator);
       await healedLocator.click({ force: true });
     }
-
     await waitForPageStability(page);
+    await waitForNavigationAfterClick(page, selector);
   }, selector);
+}
 
-          await waitForNavigationAfterClick(page, selector);
-
-/**
- * Detecta si un elemento es un combobox o input con autocompletado
- */
 async function isComboboxOrAutocomplete(page: Page, locator: Locator): Promise<boolean> {
   const role = await locator.getAttribute('role');
   const ariaAutocomplete = await locator.getAttribute('aria-autocomplete');
@@ -209,16 +174,12 @@ async function isComboboxOrAutocomplete(page: Page, locator: Locator): Promise<b
   return role === 'combobox' || ariaAutocomplete === 'list' || type === 'search';
 }
 
-/**
- * Espera a que aparezca el menú de opciones después de escribir en un combobox
- */
 async function waitForAutocompleteOptions(page: Page, timeout = 5000): Promise<void> {
   const optionSelector = '[role="option"], .suggestions, .autocomplete-results, .ui-menu-item';
   await page.waitForSelector(optionSelector, { timeout, state: 'visible' }).catch(() => {});
   await page.waitForTimeout(300);
 }
 
-// ✅ INPUT ROBUSTO (sin Enter automático)
 export async function smartFill(page: Page, selector: string, value: string) {
   const smartValue = resolveSmartValue(selector, value);
   await retryAction(page, async () => {
@@ -226,12 +187,10 @@ export async function smartFill(page: Page, selector: string, value: string) {
     let locator = await resolveLocator(page, selector);
     const isVisible = await waitForVisible(locator);
     if (!isVisible) throw new Error(`Elemento no visible para fill: ${selector}`);
-
     try {
       await locator.click({ force: true });
       await locator.fill('');
       await locator.type(smartValue, { delay: 30 });
-
       if (await isComboboxOrAutocomplete(page, locator)) {
         await waitForAutocompleteOptions(page);
         console.log(`🔍 Combobox detectado. Opciones disponibles, esperando interacción del usuario.`);
@@ -253,15 +212,12 @@ export async function smartFill(page: Page, selector: string, value: string) {
   }, selector);
 }
 
-// ✅ SELECT UNIVERSAL
 export async function smartSelect(page: Page, selector: string, value: string) {
   await retryAction(page, async () => {
     await waitForUIStability(page);
-
     let locator = await resolveLocator(page, selector);
     const isVisible = await waitForVisible(locator);
     if (!isVisible) throw new Error(`Elemento no visible para select: ${selector}`);
-
     try {
       const tagName = await locator.evaluate(el => el.tagName).catch(() => '');
       if (tagName === 'SELECT') {
@@ -301,13 +257,9 @@ export async function smartSelect(page: Page, selector: string, value: string) {
         throw e;
       }
     }
-
     console.log(`⏳ Esperando estabilidad después de select en: ${selector}`);
     await waitForPageStability(page, { waitForLoad: true, waitForNetworkIdle: true });
-
-    if (page.isClosed()) {
-      throw new Error(`🚨 Page cerrada después de select en ${selector}`);
-    }
+    if (page.isClosed()) throw new Error(`🚨 Page cerrada después de select en ${selector}`);
     await page.waitForTimeout(500);
   }, selector);
 }
