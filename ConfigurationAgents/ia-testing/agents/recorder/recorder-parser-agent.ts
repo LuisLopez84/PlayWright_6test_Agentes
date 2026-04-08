@@ -175,5 +175,38 @@ if (optionStrongClick) {
     }
   }
 
+      // 🔥 GETBYTESTID CLICK
+    const testIdClick = line.match(/getByTestId\(['"`](.*?)['"`]\)\.click/);
+    if (testIdClick) {
+      steps.push({
+        action: "click",
+        target: testIdClick[1],
+        raw: line,
+        locator: {
+          type: "testid",
+          testId: testIdClick[1]
+        },
+        selector: `page.getByTestId('${testIdClick[1]}')`
+      });
+      continue;
+    }
+
+    // 🔥 GETBYTESTID FILL
+    const testIdFill = line.match(/getByTestId\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
+    if (testIdFill) {
+      steps.push({
+        action: "input",
+        target: testIdFill[1],
+        value: testIdFill[2],
+        raw: line,
+        locator: {
+          type: "testid",
+          testId: testIdFill[1]
+        },
+        selector: `page.getByTestId('${testIdFill[1]}')`
+      });
+      continue;
+    }
+
   return steps;
 }

@@ -23,7 +23,7 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
     throw new Error(`🚨 Page cerrada antes de resolver selector: ${selector}`);
   }
 
-  const strategies = [
+    const strategies = [
     () => page.getByRole('button', { name: selector }),
     () => page.getByRole('link', { name: selector }),
     () => page.getByRole('textbox', { name: selector }),
@@ -31,8 +31,10 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
     () => page.getByLabel(selector),
     () => page.getByPlaceholder(selector),
     () => page.getByText(selector, { exact: false }),
+    () => page.getByTestId(selector),        // ← NUEVO
     () => buildSmartLocator(page, selector)
   ];
+
 
   for (const fn of strategies) {
     try {
@@ -41,6 +43,15 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
     } catch {}
   }
   return buildSmartLocator(page, selector);
+}
+
+async function waitForNavigationAfterClick(page: Page, selector: string) {
+  const navigationKeywords = ['comprar', 'continuar', 'ingresar', 'login', 'submit', 'pagar'];
+  const shouldWait = navigationKeywords.some(keyword => selector.toLowerCase().includes(keyword));
+  if (shouldWait) {
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(1000);
+  }
 }
 
 // 🔥 Espera robusta REAL
@@ -185,7 +196,8 @@ export async function smartClick(page: Page, selector: string) {
 
     await waitForPageStability(page);
   }, selector);
-}
+
+          await waitForNavigationAfterClick(page, selector);
 
 /**
  * Detecta si un elemento es un combobox o input con autocompletado

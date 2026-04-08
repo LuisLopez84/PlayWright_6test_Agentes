@@ -60,6 +60,13 @@ async function tryLocalStrategies(page: Page, original: string): Promise<string 
       if (await page.locator(selector).count() > 0) return selector;
     }
 
+	    // testid
+    const testIdMatch = original.match(/data-testid=['"](.+?)['"]/);
+    if (testIdMatch) {
+      const selector = `[data-testid="${testIdMatch[1]}"]`;
+      if (await page.locator(selector).count() > 0) return selector;
+    }
+
     // inputs similares
     const inputs = page.locator('input');
     const count = await inputs.count();
