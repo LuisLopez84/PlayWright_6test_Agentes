@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+
+# Playwright outputs
+test-results/
+playwright-report/
+reports/
+storage/
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Generated test files (opcional, si se regeneran siempre)
+GenerateTest/tests/**/screenshots/
+GenerateTest/tests/**/videos/
+GenerateTest/tests/**/test-results/
+
+# Large recordings (si son pesados, mejor no versionarlos)
+BoxRecordings/recordings/*.mp4
+BoxRecordings/recordings/*.webm
+BoxRecordings/network/*.json

@@ -1,0 +1,35 @@
+{
+  "name": "playwright-enterprise-template",
+  "version": "1.0.0",
+  "scripts": {
+    "record": "ts-node ConfigurationAgents/ia-testing/scripts/start-recorder.ts",
+    "generate": "ts-node -r tsconfig-paths/register ConfigurationAgents/ia-testing/scripts/run-agents.ts",
+    "bdd": "npx playwright-bdd test",
+    "test": "npm run generate && npm run bdd && node ConfigurationAgents/ia-testing/scripts/split-reports.js && npm run generate:api",
+    "generate:api": "ts-node ConfigurationAgents/ia-testing/scripts/generate-api-after-run.ts",
+    "generate-api-test": "ts-node ConfigurationAgents/ia-testing/scripts/generate-api-test.ts",
+    "test:smoke": "npm run generate && npm run bdd && npx playwright test --grep @smoke",
+    "test:all": "npx playwright test",
+    "report": "npx playwright show-report",
+    "pw:record": "npx playwright codegen",
+    "reports-index": "node ConfigurationAgents/ia-testing/scripts/generate-reports-index.js"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.8.2",
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^25.5.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@playwright/mcp": "^0.0.68",
+    "dotenv": "^17.3.1",
+    "openai": "^6.32.0",
+    "playwright-bdd": "^8.5.0"
+  },
+  "overrides": {
+    "@cucumber/cucumber": "9.0.0"
+  }
+}

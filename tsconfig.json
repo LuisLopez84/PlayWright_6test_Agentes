@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "esModuleInterop": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+
+    "baseUrl": ".",
+    "paths": {
+      "@utils/*": ["ConfigurationTest/tests/utils/*"],
+      "@pages/*": ["ConfigurationTest/tests/pages/*"],
+      "@config/*": ["ConfigurationTest/tests/config/*"]
+    }
+  }
+}
