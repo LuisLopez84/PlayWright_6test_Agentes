@@ -338,22 +338,22 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 25,
-      "lastUsed": "2026-04-10T19:32:07.666Z"
+      "successCount": 26,
+      "lastUsed": "2026-04-10T19:35:11.718Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "Ingresar",
-      "successCount": 25,
-      "lastUsed": "2026-04-10T19:32:25.096Z"
+      "successCount": 26,
+      "lastUsed": "2026-04-10T19:35:30.711Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
     {
       "selector": "text=Salir",
-      "successCount": 19,
-      "lastUsed": "2026-04-10T19:32:43.663Z"
+      "successCount": 20,
+      "lastUsed": "2026-04-10T19:35:50.300Z"
     },
     {
       "selector": "¡Bienvenido! Inicio de sesión",
@@ -361,7 +361,13 @@
       "lastUsed": "2026-04-10T16:54:06.296Z"
     }
   ],
-  "https://homebanking-demo-tests.netlify.app/|click|Transferencias": [],
+  "https://homebanking-demo-tests.netlify.app/|click|Transferencias": [
+    {
+      "selector": "Transferencias",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T19:36:08.267Z"
+    }
+  ],
   "https://homebanking-demo-tests.netlify.app/|select|#source-account": [
     {
       "selector": "#source-account",
