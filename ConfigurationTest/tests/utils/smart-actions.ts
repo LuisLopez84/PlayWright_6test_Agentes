@@ -128,12 +128,12 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
  * Espera a que un locator sea visible, intentando scroll si es necesario.
  * @returns true si es visible, false si agotó el tiempo
  */
-async function waitForVisible(locator: Locator, timeout = 15000): Promise<boolean> {
+async function waitForVisible(locator: Locator, timeout = 10000): Promise<boolean> {
   try {
-    await locator.waitFor({ state: 'attached', timeout: Math.min(timeout, 10000) });
+    await locator.waitFor({ state: 'attached', timeout: Math.min(timeout, 5000) });
     // Intentar scroll antes de verificar visibilidad
-    await locator.first().scrollIntoViewIfNeeded({ timeout: 3000 }).catch(() => {});
-    await expect(locator.first()).toBeVisible({ timeout: Math.min(timeout, 8000) });
+    await locator.first().scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+    await expect(locator.first()).toBeVisible({ timeout: Math.min(timeout, 5000) });
     return true;
   } catch {
     console.log(`⚠️ Elemento no visible tras ${timeout}ms (con scroll)`);
@@ -184,9 +184,9 @@ async function waitForNavigationAfterClick(page: Page, selector: string): Promis
   const normalized = selector.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   if (NAVIGATION_TRIGGERS.some(kw => normalized.includes(kw))) {
     // Esperar que la red se calme (timeout corto para no bloquear SPAs con polling)
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    // Pausa extra para que SPAs rendericen el nuevo estado (sidebar, menú, etc.)
-    await page.waitForTimeout(1500);
+    await page.waitForLoadState('networkidle', { timeout: 3000 }).catch(() => {});
+    // Pausa mínima para que SPAs rendericen el nuevo estado (sidebar, menú, etc.)
+    await page.waitForTimeout(800);
   }
 }
 
@@ -219,16 +219,10 @@ async function waitForPageStability(
   opts: { waitForNetworkIdle?: boolean; waitForLoad?: boolean } = {},
 ): Promise<void> {
   if (!isPageAlive(page)) return;
-  const promises: Promise<void>[] = [];
-  if (opts.waitForLoad !== false)
-    promises.push(page.waitForLoadState('load', { timeout: 15000 }).catch(() => {}));
-  if (opts.waitForNetworkIdle !== false)
-    promises.push(page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {}));
-  // Esperar que al menos una condición se cumpla (la más rápida)
-  await Promise.race(promises).catch(() => {});
-  await page.waitForTimeout(500);
-  // handleModalIfPresent se llama SOLO desde smartClick cuando isConfirm=true,
-  // no de forma automática aquí (evita confirmar modales de ayuda/doc inesperadamente)
+  // Pausa corta fija — waitForLoadState ya se hace en waitForNavigationAfterClick
+  // para evitar acumular hasta 15s de timeout por networkidle en cada acción
+  await page.waitForTimeout(300);
+  // handleModalIfPresent se llama SOLO desde smartClick cuando isConfirm=true
   await closeAnyModal(page);
 }
 
@@ -283,7 +277,7 @@ Solo el selector, sin código ni explicación.`;
 export async function smartClick(page: Page, selector: string): Promise<void> {
   await retryAction(page, async () => {
     await waitForUIStability(page);
-    await waitForOverlayToDisappear(page, 5000);
+    await waitForOverlayToDisappear(page, 2000);
 
     // ── [1] Auto-confirmar modales SOLO cuando el selector es una acción de confirmación ──
     // No auto-confirmar en acciones genéricas (click en inputs, links de nav, etc.)
