@@ -1,7 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
 import { defineBddConfig } from 'playwright-bdd';
-import { config as env } from './ConfigurationTest/tests/config/environment';
-import 'tsconfig-paths/register';
 
 const bddTestDir = defineBddConfig({
 features: 'GenerateTest/features/**/*.feature',
@@ -36,7 +34,12 @@ export default defineConfig({
     screenshot: 'on',
     video: 'on',
     actionTimeout: 15000,
-    navigationTimeout: 30000
+    navigationTimeout: 30000,
+    // Evita detección de bot (sitios como MercadoLibre bloquean el UA por defecto de Playwright)
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+    launchOptions: {
+      args: ['--disable-blink-features=AutomationControlled'],
+    },
   },
 
   projects: [
@@ -49,42 +52,48 @@ export default defineConfig({
 
   // 🔥 UI Chromium (spec.ts)
   {
-  name: 'ui-chromium',
-  testDir: './GenerateTest/tests',
-  testMatch: [
-  'GenerateTest/tests/**/*.spec.ts'
-],
-testIgnore: ['**/api/**/*.spec.ts'],
-  use: {
-    ...devices['Desktop Chrome']
-  }
-},
+    name: 'ui-chromium',
+    testDir: './GenerateTest/tests',
+    testMatch: ['GenerateTest/tests/**/*.spec.ts'],
+    testIgnore: [
+      '**/api/**/*.spec.ts',
+      '**/performance/**/*.spec.ts',
+      '**/accessibility/**/*.spec.ts',
+      '**/security/**/*.spec.ts',
+      '**/visual/**/*.spec.ts',
+    ],
+    use: { ...devices['Desktop Chrome'] }
+  },
 
-// 🔥 UI Firefox (spec.ts)
+  // 🔥 UI Firefox (spec.ts)
   {
-  name: 'ui-firefox',
-  testDir: './GenerateTest/tests',
-  testMatch: [
-  'GenerateTest/tests/**/*.spec.ts'
-],
-testIgnore: ['**/api/**/*.spec.ts'],
-  use: {
-    ...devices['Desktop Firefox']
-  }
-},
+    name: 'ui-firefox',
+    testDir: './GenerateTest/tests',
+    testMatch: ['GenerateTest/tests/**/*.spec.ts'],
+    testIgnore: [
+      '**/api/**/*.spec.ts',
+      '**/performance/**/*.spec.ts',
+      '**/accessibility/**/*.spec.ts',
+      '**/security/**/*.spec.ts',
+      '**/visual/**/*.spec.ts',
+    ],
+    use: { ...devices['Desktop Firefox'] }
+  },
 
-// 🔥 UI Webkit Safari (spec.ts)
+  // 🔥 UI Webkit Safari (spec.ts)
   {
-  name: 'ui-webkit',
-  testDir: './GenerateTest/tests',
-  testMatch: [
-  'GenerateTest/tests/**/*.spec.ts'
-],
-testIgnore: ['**/api/**/*.spec.ts'],
-  use: {
-    ...devices['Desktop Safari']
-  }
-},
+    name: 'ui-webkit',
+    testDir: './GenerateTest/tests',
+    testMatch: ['GenerateTest/tests/**/*.spec.ts'],
+    testIgnore: [
+      '**/api/**/*.spec.ts',
+      '**/performance/**/*.spec.ts',
+      '**/accessibility/**/*.spec.ts',
+      '**/security/**/*.spec.ts',
+      '**/visual/**/*.spec.ts',
+    ],
+    use: { ...devices['Desktop Safari'] }
+  },
 
   // 🔥 BDD (features)
   {

@@ -2,8 +2,8 @@
   "https://www.mercadolibre.com.co/|click|Electrónica, Audio y Video": [
     {
       "selector": "Electrónica, Audio y Video",
-      "successCount": 7,
-      "lastUsed": "2026-04-10T13:28:48.066Z"
+      "successCount": 13,
+      "lastUsed": "2026-04-10T15:26:17.850Z"
     }
   ],
   "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=6604c434-5a96-4b87-9a2f-0e6d6c60576c|click|Cables de Audio y Video": [
@@ -165,6 +165,62 @@
       "selector": "login-link",
       "successCount": 1,
       "lastUsed": "2026-04-10T13:29:33.505Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=ce99ff6e-103a-49bb-a260-5f3c49e22736|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:14:37.131Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=ad6f2159-2dbf-43f8-9682-dd2a07d15039|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:17:31.313Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=10c80123-b023-4ff6-8934-06a7ec20cd2e|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:19:11.273Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=7754daf8-7730-4888-a51c-67ff00cd3206|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:23:02.295Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=a360ec31-3bc8-472b-949d-927c3129ac65|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:24:47.671Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=39bb8d78-4496-410f-b7b0-ef0d19df1027|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:26:21.812Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/adaptador-hdmi-a-rca-savefree-para-tv-resolucion-1080p-negro/p/MCO36581187?pdp_filters=item_id:MCO1688670021#is_advertising=true&searchVariation=MCO36581187&backend_model=search-backend&position=1&search_layout=grid&type=pad&tracking_id=63ca8742-31f3-4df5-9eb8-5ddb1aee20be&ad_domain=VQCATCORE_LST&ad_position=1&ad_click_id=ZGQ5NmIxNjUtYjc3Zi00YzJkLWEwM2EtOTcyMGQ5OTU2YTM4|click|Agregar al carrito": [
+    {
+      "selector": "Agregar al carrito",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:32:06.654Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/adaptador-hdmi-a-rca-savefree-para-tv-resolucion-1080p-negro/p/MCO36581187?pdp_filters=item_id:MCO1688670021#is_advertising=true&searchVariation=MCO36581187&backend_model=search-backend&position=1&search_layout=grid&type=pad&tracking_id=172234fc-d965-4043-8400-983aa1b15a0b&ad_domain=VQCATCORE_LST&ad_position=1&ad_click_id=MDZhYzlhY2QtZDg0Yi00MWZhLWE5MzktMjVkODYwYzlmZTIz|click|Agregar al carrito": [
+    {
+      "selector": "Agregar al carrito",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:35:37.095Z"
     }
   ]
 }
