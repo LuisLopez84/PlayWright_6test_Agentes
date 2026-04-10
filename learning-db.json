@@ -2,8 +2,8 @@
   "https://www.mercadolibre.com.co/|click|Electrónica, Audio y Video": [
     {
       "selector": "Electrónica, Audio y Video",
-      "successCount": 13,
-      "lastUsed": "2026-04-10T15:26:17.850Z"
+      "successCount": 16,
+      "lastUsed": "2026-04-10T15:45:49.785Z"
     }
   ],
   "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=6604c434-5a96-4b87-9a2f-0e6d6c60576c|click|Cables de Audio y Video": [
@@ -221,6 +221,104 @@
       "selector": "Agregar al carrito",
       "successCount": 1,
       "lastUsed": "2026-04-10T15:35:37.095Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=51cd9b84-c73b-46b6-a290-f9eecca66d76|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:42:14.751Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/electronica-audio-video/cables/cables-audio-video/#CATEGORY_ID=MCO113156&S=hc_electronica-audio-y-video&c_tracking_id=c89596e0-34f3-11f1-8747-83a22e37fe1c|click|Más tarde": [
+    {
+      "selector": "Más tarde",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:42:35.559Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/electronica-audio-video/cables/cables-audio-video/#CATEGORY_ID=MCO113156&S=hc_electronica-audio-y-video&c_tracking_id=c89596e0-34f3-11f1-8747-83a22e37fe1c|click|Adaptador Conversor": [
+    {
+      "selector": "Adaptador Conversor",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:42:46.469Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/adaptador-conversor-convertidor-hdmi-macho-a-vga-hembra/p/MCO35228283#polycard_client=search_best-seller-categories&tracking_id=84b899b8-e6d6-4310-8a96-fb1566c30175&wid=MCO1460968065&sid=search|click|Agregar al carrito": [
+    {
+      "selector": "Agregar al carrito",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:43:04.541Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=c418d8b3-6968-46c0-a50e-9752271cc453|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:44:23.656Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/electronica-audio-video/cables/cables-audio-video/#CATEGORY_ID=MCO113156&S=hc_electronica-audio-y-video&c_tracking_id=1e7143c0-34f4-11f1-b5e9-d106e4f03bbd|click|Más tarde": [
+    {
+      "selector": "Más tarde",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:44:34.347Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/electronica-audio-video/cables/cables-audio-video/#CATEGORY_ID=MCO113156&S=hc_electronica-audio-y-video&c_tracking_id=1e7143c0-34f4-11f1-b5e9-d106e4f03bbd|click|Adaptador Conversor": [
+    {
+      "selector": "Adaptador Conversor",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:44:39.617Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/adaptador-conversor-convertidor-hdmi-macho-a-vga-hembra/p/MCO35228283#polycard_client=search_best-seller-categories&tracking_id=4bd50c0a-8d49-4830-883c-1e3b923d7594&wid=MCO2830901622&sid=search|click|Agregar al carrito": [
+    {
+      "selector": "Agregar al carrito",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:44:57.294Z"
+    }
+  ],
+  "https://www.mercadolibre.com/jms/mco/lgz/msl/login/H4sIAAAAAAAEAy2PzW4CMQyE3yVn1EWp6KI99gl66QmhyE28i1Xnh8QLrRDvjnfhZo_nm0luhvNEycl_QTMYCMF5qGI2pjDImGt0FPQQWaVGgq_V58UCFSIK1maG2xI0YfhEhZaoEbihmmCWkxs5X1Vbu1Sj5vBPuQTsrvhzIdTrCrz8Fc8zNnUoROkCTMGtbQpPWcWTSGlD10VkemPobHz__rLF3Dda3MRJBf9rBqkzamQpTB6Ecno-_8Put9ve9r0Ou53da2pAz5RQ_3o43h9rynCjFgEAAA/notregistered|click|login-link": [
+    {
+      "selector": "login-link",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:45:03.701Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/c/electronica-audio-y-video#c_id=/home/categories/element&c_category_id=MCO1000&c_uid=1402f14a-fa96-480a-bae0-91d8b83234be|click|Cables de Audio y Video": [
+    {
+      "selector": "Cables de Audio y Video",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:45:56.483Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/electronica-audio-video/cables/cables-audio-video/#CATEGORY_ID=MCO113156&S=hc_electronica-audio-y-video&c_tracking_id=5887b7b0-34f4-11f1-8e1a-bd9ebbe03798|click|Más tarde": [
+    {
+      "selector": "Más tarde",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:46:02.874Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/electronica-audio-video/cables/cables-audio-video/#CATEGORY_ID=MCO113156&S=hc_electronica-audio-y-video&c_tracking_id=5887b7b0-34f4-11f1-8e1a-bd9ebbe03798|click|Adaptador Conversor": [
+    {
+      "selector": "Adaptador Conversor",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:46:06.519Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/adaptador-conversor-convertidor-hdmi-macho-a-vga-hembra/p/MCO35228283#polycard_client=search_best-seller-categories&tracking_id=67ec1999-eb49-44ca-97a8-81e9ee65c209&wid=MCO1460968065&sid=search|click|Agregar al carrito": [
+    {
+      "selector": "Agregar al carrito",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:46:13.760Z"
+    }
+  ],
+  "https://www.mercadolibre.com/jms/mco/lgz/msl/login/H4sIAAAAAAAEAy2PTa7CMAyE75I1ekXVg6IuuQE7JIQik7jFwk1C4vIjxN1xCzt7PN9M8jIcewpWnglNa8B76yCLWZjEIF3MgyWvh4FVKiT4W12cLJBhQMFcTPuagnr0W1RoiuqAC6oJRjnbjuNdtblLNSoWH8oFYHvH041QrzPw82e8jljUoRCFGzB5O7cp3EcVzyKptFU1INMfQ1WP-7L7b8x7ocVFrGRwF9NKHlEjU2JyIBTD9_nrerNcNnXT6LBa1RtN9eiYAupfD8f3BxrCZZcWAQAA/notregistered|click|login-link": [
+    {
+      "selector": "login-link",
+      "successCount": 1,
+      "lastUsed": "2026-04-10T15:46:16.603Z"
     }
   ]
 }
