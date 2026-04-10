@@ -16,7 +16,8 @@ export default defineConfig({
   testDir: './',
   outputDir: 'test-results',
   fullyParallel: true,
-  workers: 4,
+  workers: process.env.CI ? 4 : 8, // Más workers en local
+  retries: 2, // Reintentar tests fallidos automáticamente
   timeout: 120000,
 
   expect: {

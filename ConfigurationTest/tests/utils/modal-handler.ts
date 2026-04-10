@@ -22,7 +22,6 @@ export async function closeAnyModal(page: Page): Promise<boolean> {
       }
     } catch (e) {}
   }
-  // Si hay un modal sin botón visible, intentar hacer clic fuera
   const modalDialog = page.locator('[role="dialog"], .modal');
   if (await modalDialog.count() > 0 && await modalDialog.first().isVisible().catch(() => false)) {
     await page.mouse.click(10, 10);

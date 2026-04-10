@@ -4,7 +4,6 @@ import { Action } from '../../types/action.types';
 export async function resolveDataConflicts(actions: Action[]): Promise<Action[]> {
   const resolved = [...actions];
 
-  // 🔥 Identificar selects con valores duplicados
   const selectIndices: number[] = [];
   for (let i = 0; i < resolved.length; i++) {
     if (resolved[i].type === 'select') {
@@ -17,7 +16,6 @@ export async function resolveDataConflicts(actions: Action[]): Promise<Action[]>
     const current = resolved[idx];
     const currentValue = current.value;
 
-    // Buscar el mismo valor en selects anteriores (puede ser el mismo elemento)
     for (let j = i - 1; j >= 0; j--) {
       const prevIdx = selectIndices[j];
       const prev = resolved[prevIdx];
@@ -41,7 +39,7 @@ async function generateAlternativeValue(original: string): Promise<string> {
   if (match) {
     const prefix = match[1];
     const num = parseInt(match[2]);
-    const newNum = num === 1 ? 2 : num - 1; // alterna entre 1 y 2
+    const newNum = num === 1 ? 2 : num - 1;
     return `${prefix}${newNum.toString().padStart(match[2].length, '0')}`;
   }
   if (/^\d+$/.test(original)) {

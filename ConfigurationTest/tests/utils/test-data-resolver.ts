@@ -1,42 +1,50 @@
-const usedValues: Record<string, string> = {};
+import { openai } from '../../../ConfigurationAgents/ia-testing/utils/openai-client';
 
-export function resolveSmartValue(selector: string, value: string): string {
+const usedValues: Record<string, string[]> = {};
 
-  // 🔥 Si ya se usó ese valor en otro campo similar → cambiarlo
-  if (usedValues[selector] === value) {
+export async function resolveSmartValue(selector: string, value: string): Promise<string> {
+  const key = selector;
+  const used = usedValues[key] || [];
 
-    const alt = generateAlternative(value);
-
-    usedValues[selector] = alt;
-    return alt;
+  if (used.includes(value)) {
+    console.log(`🤖 Dato duplicado para "${selector}" -> generando nuevo con IA`);
+    const newValue = await generateDynamicData(selector, value);
+    if (!usedValues[key]) usedValues[key] = [];
+    usedValues[key].push(newValue);
+    return newValue;
   }
 
-  // 🔥 Evitar duplicados entre campos relacionados
-  for (const key in usedValues) {
-    if (usedValues[key] === value && key !== selector) {
-
-      const alt = generateAlternative(value);
-
-      usedValues[selector] = alt;
-      return alt;
-    }
-  }
-
-  usedValues[selector] = value;
+  if (!usedValues[key]) usedValues[key] = [];
+  usedValues[key].push(value);
   return value;
 }
 
-function generateAlternative(value: string): string {
+async function generateDynamicData(selector: string, originalValue: string): Promise<string> {
+  let fieldType = 'texto genérico';
+  const lowerSelector = selector.toLowerCase();
+  if (lowerSelector.includes('email') || lowerSelector.includes('correo')) fieldType = 'correo electrónico';
+  else if (lowerSelector.includes('user') || lowerSelector.includes('usuario')) fieldType = 'nombre de usuario';
+  else if (lowerSelector.includes('password') || lowerSelector.includes('contraseña')) fieldType = 'contraseña segura';
+  else if (lowerSelector.includes('nombre') || lowerSelector.includes('name')) fieldType = 'nombre completo';
+  else if (lowerSelector.includes('tel') || lowerSelector.includes('phone')) fieldType = 'número de teléfono colombiano';
+  else if (lowerSelector.includes('direccion') || lowerSelector.includes('address')) fieldType = 'dirección';
+  else if (lowerSelector.includes('fecha')) fieldType = 'fecha (YYYY-MM-DD)';
+  else if (lowerSelector.includes('tarjeta') || lowerSelector.includes('card')) fieldType = 'número de tarjeta de crédito (solo dígitos)';
 
-  // 🔥 patrón tipo ACC001 → ACC002 → ACC003
-  const match = value.match(/(\D+)(\d+)/);
-
-  if (match) {
-    const prefix = match[1];
-    const num = parseInt(match[2]) + 1;
-    return `${prefix}${num.toString().padStart(match[2].length, '0')}`;
+  try {
+    const prompt = `Genera un valor realista y único para un campo de tipo "${fieldType}".
+    No repitas el valor "${originalValue}". Devuelve SOLO el valor, sin explicaciones.`;
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.7,
+      max_tokens: 50,
+    });
+    let newValue = response.choices[0]?.message?.content?.trim() || `${originalValue}_${Date.now()}`;
+    newValue = newValue.replace(/^["']|["']$/g, '');
+    return newValue;
+  } catch (error) {
+    console.log(`⚠️ Error generando dato con IA, usando fallback: ${error}`);
+    return `${originalValue}_${Date.now()}`;
   }
-
-  // fallback genérico
-  return value + '_ALT';
 }

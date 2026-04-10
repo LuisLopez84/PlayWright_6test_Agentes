@@ -4,6 +4,7 @@ import { resolveSmartValue } from './test-data-resolver';
 import { waitForUIStability } from './smart-ui-detector';
 import { closeAnyModal } from './modal-handler';
 import { openai } from '../../../ConfigurationAgents/ia-testing/utils/openai-client';
+import { learningStore } from '../../../ConfigurationAgents/ia-testing/agents/core/learning-store';
 
 function isPageAlive(page: Page): boolean {
   return !page.isClosed();
@@ -121,7 +122,6 @@ async function waitForNavigationAfterClick(page: Page, selector: string) {
   }
 }
 
-// 🔥 Función de healing con IA
 async function healWithAI(page: Page, originalSelector: string, action: string, value?: string): Promise<string | null> {
   if (!openai || !openai.chat) return null;
   try {
@@ -157,14 +157,31 @@ export async function smartClick(page: Page, selector: string) {
       modalHandled = false;
       return;
     }
+
+    const url = page.url();
+    const signature = { url, action: 'click', targetText: selector };
+    const learnedSelector = learningStore.getBestSelector(signature);
+    if (learnedSelector) {
+      const learnedLocator = page.locator(learnedSelector);
+      if (await learnedLocator.count() > 0 && await learnedLocator.first().isVisible().catch(() => false)) {
+        console.log(`📚 Usando selector aprendido: ${learnedSelector}`);
+        await learnedLocator.first().click({ force: true });
+        learningStore.recordSuccess(signature, learnedSelector);
+        return;
+      }
+    }
+
     const locator = await resolveLocator(page, selector);
     const isVisible = await waitForVisible(locator, 10000);
     if (!isVisible) throw new Error(`Elemento no visible para click: ${selector}`);
     await locator.scrollIntoViewIfNeeded().catch(() => {});
     try {
       await locator.click({ force: true, timeout: 10000 });
+      learningStore.recordSuccess(signature, selector);
     } catch (e) {
       console.log(`⚠️ Click falló → healing: ${selector}`);
+      learningStore.recordFailure(signature, selector);
+
       // 1. Healing específico para opciones
       if (selector.includes('option') || selector.includes('getByRole')) {
         const optionMatch = selector.match(/['"]([^'"]+)['"]/);
@@ -174,24 +191,27 @@ export async function smartClick(page: Page, selector: string) {
           const healedLocator = page.locator(healedOption);
           await waitForVisible(healedLocator);
           await healedLocator.click({ force: true });
+          learningStore.recordSuccess(signature, healedOption);
           return;
         }
       }
-      // 2. Healing genérico (selector engine)
+      // 2. Healing genérico
       const healed = await healSelector(page, selector, 'click');
       if (healed) {
         const healedLocator = page.locator(healed);
         await waitForVisible(healedLocator);
         await healedLocator.click({ force: true });
+        learningStore.recordSuccess(signature, healed);
         return;
       }
-      // 3. Último recurso: IA
+      // 3. IA
       console.log(`🧠 Usando IA para healing de selector: ${selector}`);
       const aiSelector = await healWithAI(page, selector, 'click');
       if (aiSelector) {
         const healedLocator = page.locator(aiSelector);
         if (await healedLocator.count() > 0 && await healedLocator.first().isVisible().catch(() => false)) {
           await healedLocator.first().click({ force: true });
+          learningStore.recordSuccess(signature, aiSelector);
           return;
         }
       }
@@ -217,9 +237,25 @@ async function waitForAutocompleteOptions(page: Page, timeout = 5000): Promise<v
 }
 
 export async function smartFill(page: Page, selector: string, value: string) {
-  const smartValue = resolveSmartValue(selector, value);
+  const smartValue = await resolveSmartValue(selector, value); // ✅ await agregado
   await retryAction(page, async () => {
     await waitForUIStability(page);
+
+    const url = page.url();
+    const signature = { url, action: 'fill', targetText: selector };
+    const learnedSelector = learningStore.getBestSelector(signature);
+    if (learnedSelector) {
+      const learnedLocator = page.locator(learnedSelector);
+      if (await learnedLocator.count() > 0 && await learnedLocator.first().isVisible().catch(() => false)) {
+        console.log(`📚 Usando selector aprendido para fill: ${learnedSelector}`);
+        await learnedLocator.first().click({ force: true });
+        await learnedLocator.first().fill('');
+        await learnedLocator.first().type(smartValue, { delay: 30 });
+        learningStore.recordSuccess(signature, learnedSelector);
+        return;
+      }
+    }
+
     let locator = await resolveLocator(page, selector);
     const isVisible = await waitForVisible(locator);
     if (!isVisible) throw new Error(`Elemento no visible para fill: ${selector}`);
@@ -231,8 +267,10 @@ export async function smartFill(page: Page, selector: string, value: string) {
         await waitForAutocompleteOptions(page);
         console.log(`🔍 Combobox detectado. Opciones disponibles, esperando interacción del usuario.`);
       }
+      learningStore.recordSuccess(signature, selector); // ✅ éxito solo al final del try
     } catch (e) {
       console.log(`⚠️ Fill falló → healing: ${selector}`);
+      learningStore.recordFailure(signature, selector);
       const healed = await healSelector(page, selector, 'fill', smartValue);
       if (!healed) throw e;
       locator = page.locator(healed);
@@ -243,6 +281,7 @@ export async function smartFill(page: Page, selector: string, value: string) {
       if (await isComboboxOrAutocomplete(page, locator)) {
         await waitForAutocompleteOptions(page);
       }
+      learningStore.recordSuccess(signature, healed);
     }
     await waitForPageStability(page);
     await closeAnyModal(page);
@@ -252,6 +291,20 @@ export async function smartFill(page: Page, selector: string, value: string) {
 export async function smartSelect(page: Page, selector: string, value: string) {
   await retryAction(page, async () => {
     await waitForUIStability(page);
+
+    const url = page.url();
+    const signature = { url, action: 'select', targetText: selector };
+    const learnedSelector = learningStore.getBestSelector(signature);
+    if (learnedSelector) {
+      const learnedLocator = page.locator(learnedSelector);
+      if (await learnedLocator.count() > 0 && await learnedLocator.first().isVisible().catch(() => false)) {
+        console.log(`📚 Usando selector aprendido para select: ${learnedSelector}`);
+        await learnedLocator.first().selectOption({ value });
+        learningStore.recordSuccess(signature, learnedSelector);
+        return;
+      }
+    }
+
     let locator = await resolveLocator(page, selector);
     const isVisible = await waitForVisible(locator);
     if (!isVisible) throw new Error(`Elemento no visible para select: ${selector}`);
@@ -270,8 +323,10 @@ export async function smartSelect(page: Page, selector: string, value: string) {
         await option.waitFor({ state: 'visible', timeout: 10000 });
         await option.click();
       }
+      learningStore.recordSuccess(signature, selector);
     } catch (e) {
       console.log(`⚠️ Select falló → healing: ${selector} con valor ${value}`);
+      learningStore.recordFailure(signature, selector);
       const options = await getAvailableSelectOptions(page, selector);
       if (options.length > 0) {
         const alternative = options.find(opt => opt !== value);
@@ -280,6 +335,7 @@ export async function smartSelect(page: Page, selector: string, value: string) {
           await locator.selectOption({ value: alternative }).catch(async () => {
             await locator.selectOption({ label: alternative });
           });
+          learningStore.recordSuccess(signature, `${selector}[value=${alternative}]`);
           return;
         }
       }
@@ -290,6 +346,7 @@ export async function smartSelect(page: Page, selector: string, value: string) {
         await healedLocator.selectOption({ value }).catch(async () => {
           await healedLocator.selectOption({ label: value });
         });
+        learningStore.recordSuccess(signature, healed);
       } else {
         throw e;
       }
