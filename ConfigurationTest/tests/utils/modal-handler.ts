@@ -85,26 +85,12 @@ export async function closeAnyModal(page: Page): Promise<boolean> {
     } catch {}
   }
 
-  // ── Dialog/modal genérico: clic fuera para cerrar ──
-  if (!closed) {
-    try {
-      const modalDialog = page.locator('[role="dialog"]:visible, [aria-modal="true"]:visible');
-      if (await modalDialog.count() > 0) {
-        // Intentar ESC primero (más seguro que clic fuera)
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(300);
-        // Si sigue visible, clic en esquina
-        const stillVisible = await modalDialog.first().isVisible().catch(() => false);
-        if (stillVisible) {
-          await page.mouse.click(10, 10);
-          console.log('🤖 Modal/overlay cerrado con Escape + clic fuera');
-        } else {
-          console.log('🤖 Modal/overlay cerrado con Escape');
-        }
-        closed = true;
-      }
-    } catch {}
-  }
+  // NOTA: El fallback genérico de Escape sobre [role="dialog"] fue ELIMINADO intencionalmente.
+  // Razón: los modales de CONFIRMACIÓN DE TRANSACCIÓN (transferir, pagar, confirmar) son
+  // [role="dialog"] legítimos que NO deben cerrarse automáticamente — deben ser
+  // manejados por handleModalIfPresent() dentro de smartClick() cuando el selector
+  // es una acción de confirmación explícita.
+  // Solo cerrar modales que tienen botones de dismiss explícitos (DISMISS_PATTERNS).
 
   return closed;
 }

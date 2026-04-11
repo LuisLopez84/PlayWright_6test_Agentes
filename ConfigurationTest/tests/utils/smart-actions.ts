@@ -200,8 +200,10 @@ async function handleModalIfPresent(page: Page): Promise<boolean> {
   const visible = await modal.first().isVisible().catch(() => false);
   if (!visible) return false;
 
+  // Incluir también textos de botones de confirmación de transacciones financieras
+  // (el app puede etiquetar el botón del modal como "TRANSFERIR", "Enviar", "Pagar", etc.)
   const confirmBtn = modal.getByRole('button', {
-    name: /confirmar|aceptar|ok|accept|continue|continuar/i,
+    name: /confirmar|confirm|aceptar|accept|ok|continuar|continue|transferir|transfer|enviar|send|pagar|pay|procesar|process|ejecutar|execute/i,
   });
   if (await confirmBtn.count() > 0) {
     console.log('🤖 Modal de confirmación detectado → auto-confirmar');
