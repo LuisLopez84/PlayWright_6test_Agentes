@@ -11,12 +11,7 @@ export function generateUITest(name: string, steps: any[]) {
   const uniqueSteps: any[] = [];
   const seen = new Set();
   for (const step of steps) {
-    let key;
-    if (step.action === 'select' || step.action === 'selectOption') {
-      key = `${step.action}-${step.selector || step.target}-${step.value}`;
-    } else {
-      key = `${step.action}-${step.selector || step.target}-${step.value}`;
-    }
+    const key = `${step.action}-${step.selector || step.target}-${step.value ?? ''}`;
     if (!seen.has(key)) {
       seen.add(key);
       uniqueSteps.push(step);
@@ -33,14 +28,21 @@ test('${name}', async ({ page }) => {
   await smartGoto(page, '${name}');
 `;
 
-  for (const step of uniqueSteps) {
+  let i = 0;
+  while (i < uniqueSteps.length) {
+    const step = uniqueSteps[i];
+    const nextStep = uniqueSteps[i + 1];
+
+    // ── SELECT ──────────────────────────────────────────────────
     if (step.action === 'select' || step.action === 'selectOption') {
       let selector = step.selector || step.target;
       const value = step.value || '';
-      if (!selector || !value) continue;
-      selector = normalizeSelector(selector);
-      code += `
+      if (selector && value) {
+        selector = normalizeSelector(selector);
+        code += `
   await smartSelect(page, \`${selector}\`, '${value}');`;
+      }
+      i++;
       continue;
     }
 
@@ -48,25 +50,62 @@ test('${name}', async ({ page }) => {
     const selector = normalizeSelector(rawSelector);
     const value = step.value || '';
 
+    // ── CLICK seguido de VERIFY → patrón "confirm + toast transitorio" ──
+    // Se inicia smartWaitForText EN PARALELO con smartClick para capturar
+    // toasts que aparecen y desaparecen DURANTE el procesamiento post-click.
+    // Ejemplo: click 'Confirmar' → transfer POST → toast 'Transferencia realizada' (2-3s) → form reset
+    // Sin paralelismo el toast ya desapareció cuando smartWaitForText empieza.
+    if (step.action === 'click' && nextStep?.action === 'verify') {
+      if (!selector) { i++; continue; }
+      const verifyTarget = normalizeSelector(nextStep.selector || nextStep.target || '');
+      if (!verifyTarget) { i++; continue; }
+
+      code += `
+  // Capturar toast transitorio en paralelo con el click de confirmación.
+  // smartWaitForText empieza a escuchar ANTES de que el click se ejecute,
+  // garantizando que detecta el mensaje aunque desaparezca rápidamente.
+  await Promise.all([
+    smartWaitForText(page, \`${verifyTarget}\`, 20000),
+    smartClick(page, \`${selector}\`),
+  ]);`;
+
+      i += 2; // consumir tanto el click como el verify
+      continue;
+    }
+
+    // ── CLICK simple ──────────────────────────────────────────────
     if (step.action === 'click') {
-      if (!selector) continue;
+      if (!selector) { i++; continue; }
       code += `
   await smartClick(page, \`${selector}\`);`;
-    } else if (step.action === 'input' || step.action === 'fill') {
-      if (!selector) continue;
+      i++;
+      continue;
+    }
+
+    // ── FILL / INPUT ──────────────────────────────────────────────
+    if (step.action === 'input' || step.action === 'fill') {
+      if (!selector) { i++; continue; }
       code += `
   await smartFill(page, \`${selector}\`, '${value}');
   await page.waitForTimeout(500);`;
-    } else if (step.action === 'verify') {
-      // Texto de resultado asíncrono — esperar que aparezca (smartWaitForText ya valida internamente).
-      // No se añade expect().toBeVisible() adicional porque los toast/popups son transitorios
-      // y pueden desaparecer antes de que el assertion extra se ejecute.
-      const verifyTarget = step.selector || step.target || '';
-      if (!verifyTarget) continue;
-      code += `
-  // Verificar mensaje de resultado (texto asíncrono post-acción — puede ser toast transitorio)
-  await smartWaitForText(page, \`${verifyTarget}\`, 15000);`;
+      i++;
+      continue;
     }
+
+    // ── VERIFY standalone (no precedido de click) ─────────────────
+    // Texto de resultado asíncrono sin click previo en el mismo paso.
+    // Timeout 15s para cubrir respuestas lentas del servidor/backend.
+    if (step.action === 'verify') {
+      const verifyTarget = step.selector || step.target || '';
+      if (!verifyTarget) { i++; continue; }
+      code += `
+  // Verificar mensaje de resultado (texto asíncrono — puede ser toast transitorio)
+  await smartWaitForText(page, \`${verifyTarget}\`, 15000);`;
+      i++;
+      continue;
+    }
+
+    i++;
   }
 
   code += `

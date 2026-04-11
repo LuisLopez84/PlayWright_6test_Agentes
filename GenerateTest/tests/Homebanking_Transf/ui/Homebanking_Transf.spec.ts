@@ -21,7 +21,11 @@ test('Homebanking_Transf', async ({ page }) => {
   await smartFill(page, `Descripción (opcional)`, 'cloud 002');
   await page.waitForTimeout(500);
   await smartClick(page, `Transferir`);
-  await smartClick(page, `Confirmar`);
-  // Verificar mensaje de resultado (texto asíncrono post-acción — puede ser toast transitorio)
-  await smartWaitForText(page, `Transferencia realizada`, 15000);
+  // Capturar toast transitorio en paralelo con el click de confirmación.
+  // smartWaitForText empieza a escuchar ANTES de que el click se ejecute,
+  // garantizando que detecta el mensaje aunque desaparezca rápidamente.
+  await Promise.all([
+    smartWaitForText(page, `Transferencia realizada`, 20000),
+    smartClick(page, `Confirmar`),
+  ]);
 });
