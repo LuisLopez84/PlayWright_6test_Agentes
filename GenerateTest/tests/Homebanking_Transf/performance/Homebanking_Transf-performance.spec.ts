@@ -1,7 +1,7 @@
 
 import { test, expect } from '@playwright/test';
 
-test('performance Homebanking_Transfer', async ({ page }) => {
+test('performance Homebanking_Transf', async ({ page }) => {
   const start = Date.now();
   await page.goto('https://homebanking-demo-tests.netlify.app');
   const load = Date.now() - start;

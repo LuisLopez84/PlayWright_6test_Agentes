@@ -275,6 +275,14 @@ Solo el selector, sin código ni explicación.`;
 // SMART CLICK
 // ─────────────────────────────────────────────
 export async function smartClick(page: Page, selector: string): Promise<void> {
+  // ── Safety net: si el selector es un texto de resultado asíncrono,
+  //    redirigir a smartWaitForText en lugar de intentar un click ──
+  if (isResultTextRuntime(selector)) {
+    console.log(`🔍 Selector "${selector}" detectado como texto de resultado → usando smartWaitForText`);
+    await smartWaitForText(page, selector);
+    return;
+  }
+
   await retryAction(page, async () => {
     await waitForUIStability(page);
     await waitForOverlayToDisappear(page, 2000);
@@ -503,6 +511,153 @@ export async function smartFill(page: Page, selector: string, value: string): Pr
     await waitForPageStability(page);
     await closeAnyModal(page);
   }, selector);
+}
+
+// ─────────────────────────────────────────────
+// SMART WAIT FOR TEXT  (verificación de resultado asíncrono)
+// ─────────────────────────────────────────────
+
+/**
+ * Patrones de texto que son mensajes de resultado/confirmación asíncronos.
+ * Cuando el recorder graba un click sobre este tipo de texto, en realidad
+ * el tester estaba verificando que el mensaje apareció — no haciendo click.
+ * Sincronizado con recorder-parser-agent.ts::isResultText().
+ */
+const RESULT_TEXT_PATTERNS_RUNTIME: RegExp[] = [
+  /transferencia\s+realizada/i,
+  /operaci[oó]n\s+(exitosa|completada|realizada|aprobada)/i,
+  /pago\s+(exitoso|realizado|confirmado|aprobado)/i,
+  /\bexitosa?\b/i,
+  /\bcompletad[ao]\b/i,
+  /\bconfirmad[ao]\b/i,
+  /\bprocesad[ao]\b/i,
+  /\baprobad[ao]\b/i,
+  /\bguardad[ao]\b/i,
+  /\benviad[ao]\b/i,
+  /\b[eé]xito\b/i,
+  /\bcorrect[ao]\b/i,
+  /\bfinalizado\b/i,
+  /\bregistrad[ao]\b/i,
+  /\bsuccess(ful)?\b/i,
+  /\bcompleted?\b/i,
+  /\bconfirmed?\b/i,
+  /\bapproved?\b/i,
+  /\bprocessed?\b/i,
+  /\bsaved?\b/i,
+  /\bsubmitted?\b/i,
+  /\bdone\b/i,
+  /transaction\s+complete/i,
+  /payment\s+(successful|confirmed|processed)/i,
+  /✓|✅|☑/,
+];
+
+function isResultTextRuntime(text: string): boolean {
+  if (text.trim().length < 5) return false;
+  const isAction = /^(transferir|confirmar|aceptar|cancelar|volver|siguiente|anterior|cerrar|salir|ingresar|login|submit|ok|sí|si|no|yes|guardar|enviar|buscar|filtrar|limpiar|nuevo|agregar|editar|eliminar|ver|detalles)$/i.test(text.trim());
+  if (isAction) return false;
+  return RESULT_TEXT_PATTERNS_RUNTIME.some(p => p.test(text));
+}
+
+/**
+ * Espera a que un texto de resultado/confirmación sea visible en el DOM.
+ * Usa 4 estrategias en cascada: waitForSelector → getByText → palabras clave → IA.
+ * Timeout largo (15s por defecto) para cubrir respuestas lentas del servidor.
+ *
+ * Transversal: aplica para cualquier webapp en cualquier idioma.
+ */
+export async function smartWaitForText(
+  page: Page,
+  text: string,
+  timeout = 15000,
+): Promise<void> {
+  if (!isPageAlive(page)) return;
+  console.log(`🔍 Esperando texto resultado: "${text}" (timeout: ${timeout}ms)`);
+
+  // ── Estrategia 1: :text() selector nativo de Playwright ──
+  try {
+    await page.waitForSelector(`:text("${text}")`, { state: 'visible', timeout });
+    await expect(page.getByText(text, { exact: false })).toBeVisible({ timeout: 5000 });
+    console.log(`✅ Texto resultado encontrado: "${text}"`);
+    return;
+  } catch {}
+
+  // ── Estrategia 2: getByText parcial ──
+  try {
+    const loc = page.getByText(text, { exact: false });
+    await loc.waitFor({ state: 'visible', timeout: Math.min(timeout, 8000) });
+    console.log(`✅ Texto resultado encontrado (parcial): "${text}"`);
+    return;
+  } catch {}
+
+  // ── Estrategia 3: palabras clave del texto — de ÚLTIMA a PRIMERA (más específica primero) ──
+  // Importante: iterar en reversa para evitar falsos positivos.
+  // Ej: "Transferencia realizada" → probar "realizada" ANTES que "Transferencia"
+  // porque "Transferencia" también está en el nav "Transferencias" (falso positivo).
+  const words = text.split(/\s+/).filter(w => w.length > 5).reverse();
+  for (const word of words) {
+    try {
+      const loc = page.getByText(word, { exact: false });
+      if (await loc.count() > 0) {
+        await loc.first().waitFor({ state: 'visible', timeout: 5000 });
+        // Verificar que el elemento encontrado realmente contiene texto de resultado
+        // y no es un elemento de navegación (nav, sidebar, breadcrumb)
+        const tag = await loc.first().evaluate((el: Element) => {
+          const parent = el.closest('nav, [role="navigation"], header, aside, .sidebar, .menu');
+          return parent ? 'nav-element' : el.tagName.toLowerCase();
+        }).catch(() => 'unknown');
+        if (tag === 'nav-element') {
+          console.log(`⚠️ Keyword "${word}" encontrada en elemento de navegación — omitiendo`);
+          continue;
+        }
+        console.log(`✅ Texto resultado encontrado por palabra clave "${word}": "${text}"`);
+        return;
+      }
+    } catch {}
+  }
+
+  // ── Estrategia 4: IA — detectar mensaje de éxito en el DOM actual ──
+  if (openai) {
+    try {
+      const html = await page.evaluate(
+        () => document.body?.innerHTML?.substring(0, 4000) || ''
+      ).catch(() => '');
+
+      const prompt = `Eres QA experto en Playwright. El test espera ver el mensaje de confirmación "${text}" tras una operación exitosa.
+URL actual: ${page.url()}
+HTML del body (4000 chars):
+${html}
+
+¿Hay algún mensaje de confirmación/éxito visible en el HTML? Si sí, devuelve el selector Playwright exacto para localizarlo (solo el argumento de page.locator(), ejemplo: '.alert-success', ':text("Transferencia")', '[data-testid="success"]').
+Si el mensaje NO existe en el HTML actual, responde: NOT_FOUND.
+Solo el selector o NOT_FOUND, sin explicación ni código extra.`;
+
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0,
+        max_tokens: 120,
+      });
+      const aiRaw = (response.choices[0]?.message?.content?.trim() || '').replace(/```/g, '').trim();
+
+      if (aiRaw && !aiRaw.includes('NOT_FOUND')) {
+        // Limpiar prefijos tipo page.locator('...') si los hay
+        const cleanSel = aiRaw
+          .replace(/^page\.locator\(['"`]/, '')
+          .replace(/['"`]\)$/, '')
+          .replace(/^['"`]|['"`]$/g, '');
+        try {
+          const aiLoc = page.locator(cleanSel);
+          if (await aiLoc.count() > 0) {
+            await aiLoc.first().waitFor({ state: 'visible', timeout: 5000 });
+            console.log(`🧠 IA encontró mensaje de confirmación: ${cleanSel}`);
+            return;
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
+  throw new Error(`⏱️ Texto de resultado no apareció tras ${timeout}ms: "${text}"`);
 }
 
 // ─────────────────────────────────────────────

@@ -27,7 +27,7 @@ export function generateUITest(name: string, steps: any[]) {
   let code = `
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
-import { smartClick, smartFill, smartSelect } from '../../../../ConfigurationTest/tests/utils/smart-actions';
+import { smartClick, smartFill, smartSelect, smartWaitForText } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
 test('${name}', async ({ page }) => {
   await smartGoto(page, '${name}');
@@ -57,6 +57,15 @@ test('${name}', async ({ page }) => {
       code += `
   await smartFill(page, \`${selector}\`, '${value}');
   await page.waitForTimeout(500);`;
+    } else if (step.action === 'verify') {
+      // Texto de resultado asíncrono — esperar que aparezca (smartWaitForText ya valida internamente).
+      // No se añade expect().toBeVisible() adicional porque los toast/popups son transitorios
+      // y pueden desaparecer antes de que el assertion extra se ejecute.
+      const verifyTarget = step.selector || step.target || '';
+      if (!verifyTarget) continue;
+      code += `
+  // Verificar mensaje de resultado (texto asíncrono post-acción — puede ser toast transitorio)
+  await smartWaitForText(page, \`${verifyTarget}\`, 15000);`;
     }
   }
 

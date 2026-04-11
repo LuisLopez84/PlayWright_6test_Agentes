@@ -1,25 +1,28 @@
-
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
-test.describe('Security tests for Homebanking_Transfer', () => {
+test.describe('Security tests for Homebanking_Transf', () => {
 
   test('security headers', async ({ request }) => {
     const response = await request.get('https://homebanking-demo-tests.netlify.app');
-  expect(response.headers()['strict-transport-security']).toBeDefined();
-
+    expect(response.headers()['strict-transport-security']).toBeDefined();
   });
 
   test('sql injection', async ({ request }) => {
     const response = await request.post('https://homebanking-demo-tests.netlify.app/login', {
       data: { username: "' OR '1'='1", password: "' OR '1'='1" }
     });
-    expect(response.status()).not.toBe(200);
+    const status = response.status();
+    // No debe responder 200/201 (éxito) ante una inyección SQL.
+    // 404 es aceptable en SPAs donde el endpoint /login no existe como API REST.
+    // Cualquier status >= 400 indica que el servidor rechazó la petición.
+    expect(status).not.toBe(200);
+    expect(status).not.toBe(201);
   });
 
   test('XSS injection protection', async ({ page }) => {
-    await smartGoto(page, 'Homebanking_Transfer');
+    await smartGoto(page, 'Homebanking_Transf');
     const payload = "<script>alert('xss')</script>";
 
     await smartFill(page, 'Usuario', payload);
