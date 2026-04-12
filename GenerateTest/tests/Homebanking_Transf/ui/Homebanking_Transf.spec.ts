@@ -22,8 +22,6 @@ test('Homebanking_Transf', async ({ page }) => {
   await page.waitForTimeout(500);
   await smartClick(page, `Transferir`);
   // Capturar toast transitorio en paralelo con el click de confirmación.
-  // smartWaitForText empieza a escuchar ANTES de que el click se ejecute,
-  // garantizando que detecta el mensaje aunque desaparezca rápidamente.
   await Promise.all([
     smartWaitForText(page, `Transferencia realizada`, 20000),
     smartClick(page, `Confirmar`),

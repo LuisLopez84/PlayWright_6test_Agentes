@@ -311,16 +311,33 @@ async function runAgents() {
       }
 
       // 6. Base URL + Metadata
+      // Extraer la primera URL de navegación del recording (primera llamada goto)
       let baseURL = '';
       try {
         baseURL = extractBaseURL(recordingPath) || '';
+        // Si extractBaseURL no devuelve nada, buscar directamente en el contenido
+        if (!baseURL) {
+          const rawContent = fs.readFileSync(recordingPath, 'utf-8');
+          const gotoMatch = rawContent.match(/page\.goto\(['"`](.*?)['"`]\)/);
+          if (gotoMatch) baseURL = gotoMatch[1];
+        }
       } catch (err) {
         console.error('⚠️ Error extracting baseURL', err);
+      }
+      if (baseURL) {
+        // Normalizar: solo origin para los tests de security/performance/accessibility
+        try {
+          baseURL = baseURL.trim();
+          // Remover trailing slash si no es origen puro
+          if (baseURL !== new URL(baseURL).origin) {
+            // Mantener URL completa de la primera navegación (puede ser una subpágina)
+          }
+        } catch {}
       }
       const metadata = { name, baseURL };
       const metadataPath = path.join(outputDir, `${name}.metadata.json`);
       fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
-      console.log(`🧠 Metadata generated: ${metadataPath}`);
+      console.log(`🧠 Metadata generated: ${metadataPath} (baseURL: ${baseURL || 'N/A'})`);
 
       // 7. Advanced tests (Performance, Accessibility, Visual, Security)
       if (baseURL) {

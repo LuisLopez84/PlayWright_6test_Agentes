@@ -324,29 +324,29 @@
   "https://homebanking-demo-tests.netlify.app/|click|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 54,
-      "lastUsed": "2026-04-11T19:14:29.139Z"
+      "successCount": 72,
+      "lastUsed": "2026-04-12T23:03:28.023Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 57,
-      "lastUsed": "2026-04-11T19:14:31.195Z"
+      "successCount": 15,
+      "lastUsed": "2026-04-12T23:03:29.408Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 56,
-      "lastUsed": "2026-04-11T19:14:34.861Z"
+      "successCount": 72,
+      "lastUsed": "2026-04-12T22:49:05.732Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "Ingresar",
-      "successCount": 56,
-      "lastUsed": "2026-04-11T19:14:37.481Z"
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:49:08.419Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -364,50 +364,50 @@
   "https://homebanking-demo-tests.netlify.app/|click|Transferencias": [
     {
       "selector": "Transferencias",
-      "successCount": 27,
-      "lastUsed": "2026-04-11T19:14:40.944Z"
+      "successCount": 32,
+      "lastUsed": "2026-04-12T22:49:10.988Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|#source-account": [
     {
       "selector": "#source-account",
-      "successCount": 23,
-      "lastUsed": "2026-04-11T19:11:12.217Z"
+      "successCount": 29,
+      "lastUsed": "2026-04-12T22:49:12.163Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto": [
     {
       "selector": "Monto",
-      "successCount": 23,
-      "lastUsed": "2026-04-11T19:11:12.960Z"
+      "successCount": 29,
+      "lastUsed": "2026-04-12T22:49:12.569Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Monto": [
     {
       "selector": "Monto",
-      "successCount": 22,
-      "lastUsed": "2026-04-11T19:11:16.528Z"
+      "successCount": 28,
+      "lastUsed": "2026-04-12T22:49:13.879Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Descripción (opcional)": [
     {
       "selector": "Descripción (opcional)",
-      "successCount": 22,
-      "lastUsed": "2026-04-11T19:11:19.029Z"
+      "successCount": 28,
+      "lastUsed": "2026-04-12T22:49:15.636Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Descripción (opcional)": [
     {
       "selector": "Descripción (opcional)",
-      "successCount": 22,
-      "lastUsed": "2026-04-11T19:11:22.080Z"
+      "successCount": 28,
+      "lastUsed": "2026-04-12T22:49:16.937Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Transferir": [
     {
       "selector": "Transferir",
-      "successCount": 22,
-      "lastUsed": "2026-04-11T19:11:24.471Z"
+      "successCount": 27,
+      "lastUsed": "2026-04-12T22:49:18.695Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Transferencia realizada": [
@@ -427,13 +427,1223 @@
   "https://homebanking-demo-tests.netlify.app/|click|Confirmar": [
     {
       "selector": "button:has-text(\"TRANSFERIR\")",
-      "successCount": 21,
-      "lastUsed": "2026-04-11T19:11:27.380Z"
+      "successCount": 25,
+      "lastUsed": "2026-04-11T19:26:45.596Z"
+    }
+  ],
+  "https://demoqa.com/|click|Book Store Application": [
+    {
+      "selector": "text=Store Application",
+      "successCount": 97,
+      "lastUsed": "2026-04-12T23:02:56.910Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Elements": [
+    {
+      "selector": "Elements",
+      "successCount": 57,
+      "lastUsed": "2026-04-12T23:00:45.281Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Text Box": [
+    {
+      "selector": "Text Box",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:37:47.655Z"
+    }
+  ],
+  "https://demoqa.com/text-box|click|Full Name": [
+    {
+      "selector": "Full Name",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T22:37:49.949Z"
+    }
+  ],
+  "https://demoqa.com/text-box|fill|Full Name": [
+    {
+      "selector": "Full Name",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:37:52.305Z"
+    }
+  ],
+  "https://demoqa.com/text-box|click|name@example.com": [
+    {
+      "selector": "name@example.com",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:37:55.958Z"
+    }
+  ],
+  "https://demoqa.com/text-box|fill|name@example.com": [
+    {
+      "selector": "name@example.com",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:37:59.749Z"
+    }
+  ],
+  "https://demoqa.com/text-box|click|Current Address": [
+    {
+      "selector": "Current Address",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:38:03.209Z"
+    }
+  ],
+  "https://demoqa.com/text-box|fill|Current Address": [
+    {
+      "selector": "Current Address",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:38:06.324Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Radio Button": [
+    {
+      "selector": "Radio Button",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T23:00:31.126Z"
+    }
+  ],
+  "https://demoqa.com/radio-button|check|Yes": [
+    {
+      "selector": "Yes",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T23:00:32.768Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Check Box": [
+    {
+      "selector": "Check Box",
+      "successCount": 9,
+      "lastUsed": "2026-04-12T22:57:37.609Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|check|Select Home": [
+    {
+      "selector": "Select Home",
+      "successCount": 9,
+      "lastUsed": "2026-04-12T22:57:39.189Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|click|.rc-tree-switcher": [
+    {
+      "selector": ".rc-tree-switcher",
+      "successCount": 9,
+      "lastUsed": "2026-04-12T22:57:40.282Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|click|.rc-tree-switcher.rc-tree-switcher_close": [
+    {
+      "selector": ".rc-tree-switcher.rc-tree-switcher_close",
+      "successCount": 36,
+      "lastUsed": "2026-04-12T22:57:46.686Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|click|Select Excel File.doc Excel": [
+    {
+      "selector": "Select Excel File.doc Excel",
+      "successCount": 9,
+      "lastUsed": "2026-04-12T22:57:48.859Z"
+    }
+  ],
+  "https://demoqa.com/text-box|click|#permanentAddress": [
+    {
+      "selector": "#permanentAddress",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:38:09.286Z"
+    }
+  ],
+  "https://demoqa.com/text-box|fill|#permanentAddress": [
+    {
+      "selector": "#permanentAddress",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:38:10.823Z"
+    }
+  ],
+  "https://demoqa.com/text-box|click|Submit": [
+    {
+      "selector": "Submit",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:38:12.077Z"
+    }
+  ],
+  "https://demoqa.com/|click|Usuario": [
+    {
+      "selector": "text=Elements",
+      "successCount": 13,
+      "lastUsed": "2026-04-12T01:32:11.009Z"
     },
     {
-      "selector": "Confirmar",
+      "selector": "Usuario",
       "successCount": 1,
-      "lastUsed": "2026-04-10T19:54:48.562Z"
+      "lastUsed": "2026-04-12T00:27:01.518Z"
+    }
+  ],
+  "https://demoqa.com/|fill|Usuario": [
+    {
+      "selector": "text=Elements",
+      "successCount": 23,
+      "lastUsed": "2026-04-12T01:32:17.353Z"
+    },
+    {
+      "selector": "Usuario",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T01:32:17.608Z"
+    }
+  ],
+  "https://demoqa.com/|click|Contraseña": [
+    {
+      "selector": "a[href=\"/forms\"]",
+      "successCount": 8,
+      "lastUsed": "2026-04-12T01:32:19.217Z"
+    },
+    {
+      "selector": "Contraseña",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T00:43:10.449Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Broken Links - Images": [
+    {
+      "selector": "Broken Links - Images",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T22:30:56.820Z"
+    }
+  ],
+  "https://demoqa.com/broken|click|Click Here for Valid Link": [
+    {
+      "selector": "Click Here for Valid Link",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T22:30:51.337Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Links": [
+    {
+      "selector": "Links",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:59:53.529Z"
+    }
+  ],
+  "https://demoqa.com/links|click|Moved": [
+    {
+      "selector": "Moved",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:59:56.032Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Widgets": [
+    {
+      "selector": "Widgets",
+      "successCount": 21,
+      "lastUsed": "2026-04-12T23:03:00.500Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Slider": [
+    {
+      "selector": "Slider",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:40:14.235Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Select Menu": [
+    {
+      "selector": "Select Menu",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T23:03:03.121Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|.css-8mmkcg": [
+    {
+      "selector": ".css-8mmkcg",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:03:05.531Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|Group 1, option 2": [
+    {
+      "selector": "Group 1, option 2",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:03:07.457Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Tool Tips": [
+    {
+      "selector": "Tool Tips",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:02:31.014Z"
+    }
+  ],
+  "https://demoqa.com/tool-tips|click|Hover me to see": [
+    {
+      "selector": "Hover me to see",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:02:43.783Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Contraseña": [
+    {
+      "selector": "Contraseña",
+      "successCount": 9,
+      "lastUsed": "2026-04-12T22:44:34.193Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Pago de Servicios": [
+    {
+      "selector": "text=Servicios",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:42:28.409Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|Selecciona el Servicio": [
+    {
+      "selector": "Selecciona el Servicio",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:42:29.577Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Monto a Pagar": [
+    {
+      "selector": "Monto a Pagar",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:42:31.354Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|Monto a Pagar": [
+    {
+      "selector": "Monto a Pagar",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:42:33.913Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|Cuenta a Debitar": [
+    {
+      "selector": "Cuenta a Debitar",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:42:35.981Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Pagar Servicio": [
+    {
+      "selector": "Pagar Servicio",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:42:37.909Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Préstamos": [
+    {
+      "selector": "Préstamos",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:44:41.233Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|#loan-destination-account": [
+    {
+      "selector": "#loan-destination-account",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:44:42.691Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Monto a solicitar": [
+    {
+      "selector": "Monto a solicitar",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:44:43.219Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|Monto a solicitar": [
+    {
+      "selector": "Monto a solicitar",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:44:44.696Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|Cuotas": [
+    {
+      "selector": "Cuotas",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:44:46.774Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Solicitar Préstamo": [
+    {
+      "selector": "Solicitar Préstamo",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T22:44:48.604Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|Préstamo acreditado": [
+    {
+      "selector": "Préstamo acreditado",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T11:11:59.594Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Web Tables": [
+    {
+      "selector": "Web Tables",
+      "successCount": 8,
+      "lastUsed": "2026-04-12T23:00:47.919Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|#edit-record-1 > svg": [
+    {
+      "selector": "#edit-record-1 > svg",
+      "successCount": 8,
+      "lastUsed": "2026-04-12T23:00:50.231Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|First Name": [
+    {
+      "selector": "First Name",
+      "successCount": 15,
+      "lastUsed": "2026-04-12T23:01:09.153Z"
+    }
+  ],
+  "https://demoqa.com/webtables|dblclick|Last Name": [
+    {
+      "selector": "Last Name",
+      "successCount": 8,
+      "lastUsed": "2026-04-12T23:00:54.449Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|Last Name": [
+    {
+      "selector": "Last Name",
+      "successCount": 15,
+      "lastUsed": "2026-04-12T23:01:14.752Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|Submit": [
+    {
+      "selector": "Submit",
+      "successCount": 15,
+      "lastUsed": "2026-04-12T23:01:41.949Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|Add": [
+    {
+      "selector": "Add",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:06.626Z"
+    }
+  ],
+  "https://demoqa.com/webtables|fill|First Name": [
+    {
+      "selector": "First Name",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:11.522Z"
+    }
+  ],
+  "https://demoqa.com/webtables|fill|Last Name": [
+    {
+      "selector": "Last Name",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:17.417Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|name@example.com": [
+    {
+      "selector": "name@example.com",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:20.713Z"
+    }
+  ],
+  "https://demoqa.com/webtables|fill|name@example.com": [
+    {
+      "selector": "name@example.com",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:23.200Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|Age": [
+    {
+      "selector": "Age",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:25.931Z"
+    }
+  ],
+  "https://demoqa.com/webtables|fill|Age": [
+    {
+      "selector": "Age",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:28.198Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|Salary": [
+    {
+      "selector": "Salary",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:31.387Z"
+    }
+  ],
+  "https://demoqa.com/webtables|fill|Salary": [
+    {
+      "selector": "Salary",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:33.894Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|Department": [
+    {
+      "selector": "Department",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:36.553Z"
+    }
+  ],
+  "https://demoqa.com/webtables|fill|Department": [
+    {
+      "selector": "Department",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:39.171Z"
+    }
+  ],
+  "https://demoqa.com/webtables|click|LUISQA": [
+    {
+      "selector": "LUISQA",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T23:01:49.073Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Forms": [
+    {
+      "selector": "Forms",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:29:56.420Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Practice Form": [
+    {
+      "selector": "Practice Form",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:29:58.317Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|First Name": [
+    {
+      "selector": "First Name",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T13:49:59.445Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|fill|First Name": [
+    {
+      "selector": "First Name",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:30:00.758Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|Last Name": [
+    {
+      "selector": "Last Name",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T13:50:04.211Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|fill|Last Name": [
+    {
+      "selector": "Last Name",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:30:03.860Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|name@example.com": [
+    {
+      "selector": "name@example.com",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T13:50:08.421Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|fill|name@example.com": [
+    {
+      "selector": "name@example.com",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:30:06.380Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|check|Male": [
+    {
+      "selector": "Male",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:30:08.542Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|Mobile Number": [
+    {
+      "selector": "Mobile Number",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T13:50:13.964Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|fill|Mobile Number": [
+    {
+      "selector": "Mobile Number",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:30:12.105Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|#dateOfBirthInput": [
+    {
+      "selector": "#dateOfBirthInput",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T15:30:14.845Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Alerts, Frame & Windows": [
+    {
+      "selector": "Alerts, Frame & Windows",
+      "successCount": 23,
+      "lastUsed": "2026-04-12T22:58:42.516Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Modal Dialogs": [
+    {
+      "selector": "Modal Dialogs",
+      "successCount": 7,
+      "lastUsed": "2026-04-12T22:47:44.425Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Small modal": [
+    {
+      "selector": "Small modal",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T15:06:03.421Z"
+    }
+  ],
+  "https://demoqa.com/modal-dialogs|click|Small modal": [
+    {
+      "selector": "Small modal",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:47:46.428Z"
+    }
+  ],
+  "https://demoqa.com/modal-dialogs|click|Close": [
+    {
+      "selector": "Close",
+      "successCount": 6,
+      "lastUsed": "2026-04-12T22:47:52.354Z"
+    }
+  ],
+  "https://demoqa.com/modal-dialogs|click|Large modal": [
+    {
+      "selector": "Large modal",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:47:50.473Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Dynamic Properties": [
+    {
+      "selector": "Dynamic Properties",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:57:20.575Z"
+    }
+  ],
+  "https://demoqa.com/dynamic-properties|click|Color Change": [
+    {
+      "selector": "Color Change",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T22:57:22.794Z"
+    }
+  ],
+  "https://demoqa.com/dynamic-properties|click|Will enable 5 seconds": [
+    {
+      "selector": "Will enable 5 seconds",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:47:23.130Z"
+    }
+  ],
+  "https://demoqa.com/dynamic-properties|click|Visible After 5 Seconds": [
+    {
+      "selector": "Visible After 5 Seconds",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:47:29.115Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|.subjects-auto-complete__input-container": [
+    {
+      "selector": ".subjects-auto-complete__input-container",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T15:30:16.488Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|fill|#subjectsInput": [
+    {
+      "selector": "#subjectsInput",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T15:30:17.979Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|check|Reading": [
+    {
+      "selector": "Reading",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T15:30:18.986Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|fill|Current Address": [
+    {
+      "selector": "Current Address",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T15:30:20.556Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|#state > .css-13cymwt-control > .css-hlgwow > .css-19bb58m": [
+    {
+      "selector": "#state > .css-13cymwt-control > .css-hlgwow > .css-19bb58m",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:27:06.502Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|Rajasthan": [
+    {
+      "selector": "Rajasthan",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:27:08.708Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|.css-1xc3v61-indicatorContainer": [
+    {
+      "selector": ".css-1xc3v61-indicatorContainer",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:27:11.128Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|Submit": [
+    {
+      "selector": "Submit",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T15:30:24.123Z"
+    }
+  ],
+  "https://demoqa.com/automation-practice-form|click|Close": [
+    {
+      "selector": "Close",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T15:30:26.748Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Browser Windows": [
+    {
+      "selector": "Browser Windows",
+      "successCount": 10,
+      "lastUsed": "2026-04-12T22:54:45.247Z"
+    }
+  ],
+  "https://demoqa.com/browser-windows|click|New Tab": [
+    {
+      "selector": "New Tab",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:36:02.384Z"
+    }
+  ],
+  "https://demoqa.com/browser-windows|click|New Window": [
+    {
+      "selector": "New Window",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T15:37:50.730Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Interactions": [
+    {
+      "selector": "Interactions",
+      "successCount": 5,
+      "lastUsed": "2026-04-12T22:59:35.870Z"
+    }
+  ],
+  "https://demoqa.com/books|click|listitem.filter({ hasText: Sortable }": [
+    {
+      "selector": "listitem.filter({ hasText: Sortable }",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:42:40.500Z"
+    }
+  ],
+  "https://demoqa.com/sortable|click|One": [
+    {
+      "selector": "One",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:42:43.215Z"
+    }
+  ],
+  "https://demoqa.com/sortable|click|Two": [
+    {
+      "selector": "Two",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:42:45.256Z"
+    }
+  ],
+  "https://demoqa.com/sortable|click|Grid": [
+    {
+      "selector": "text=grid",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T15:42:47.056Z"
+    },
+    {
+      "selector": "Grid",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T15:42:01.670Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Upload and Download": [
+    {
+      "selector": "Upload and Download",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:58:20.341Z"
+    }
+  ],
+  "https://demoqa.com/broken|click|Click Here for Broken Link": [
+    {
+      "selector": "Click Here for Broken Link",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:31:01.411Z"
+    }
+  ],
+  "http://the-internet.herokuapp.com/status_codes/500|click|This page returned a 500": [
+    {
+      "selector": "This page returned a 500",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:31:02.966Z"
+    }
+  ],
+  "https://demoqa.com/books|click|.auto-complete__input-container": [
+    {
+      "selector": ".text:has-text(\"Auto Complete\")",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:36:55.682Z"
+    },
+    {
+      "selector": ".auto-complete__input-container",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T16:03:17.274Z"
+    }
+  ],
+  "https://demoqa.com/auto-complete|fill|#autoCompleteMultipleInput": [
+    {
+      "selector": "#autoCompleteMultipleInput",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:36:57.162Z"
+    }
+  ],
+  "https://demoqa.com/auto-complete|click|.auto-complete__input-container.css-19bb58m": [
+    {
+      "selector": ".auto-complete__input-container.css-19bb58m",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:36:58.272Z"
+    }
+  ],
+  "https://demoqa.com/auto-complete|fill|#autoCompleteSingleInput": [
+    {
+      "selector": "#autoCompleteSingleInput",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T16:17:05.597Z"
+    }
+  ],
+  "https://demoqa.com/auto-complete|click|.col-12.mt-4.col-md-6 > div:nth-child(2)": [
+    {
+      "selector": ".col-12.mt-4.col-md-6 > div:nth-child(2)",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T16:17:07.837Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Tabs": [
+    {
+      "selector": "Tabs",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:40:48.663Z"
+    }
+  ],
+  "https://demoqa.com/tabs|click|Origin": [
+    {
+      "selector": "text=origin",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:40:51.444Z"
+    }
+  ],
+  "https://demoqa.com/tabs|click|Use": [
+    {
+      "selector": "text=use",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:40:53.304Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Menu": [
+    {
+      "selector": "Menu",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T16:24:02.403Z"
+    }
+  ],
+  "https://demoqa.com/menu|click|Main Item 1": [
+    {
+      "selector": "Main Item 1",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T16:24:04.333Z"
+    }
+  ],
+  "https://demoqa.com/menu#|click|Main Item 1": [
+    {
+      "selector": "Main Item 1",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T16:24:06.187Z"
+    }
+  ],
+  "https://demoqa.com/menu#|click|Main Item 2": [
+    {
+      "selector": "Main Item 2",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T16:24:13.657Z"
+    }
+  ],
+  "https://demoqa.com/menu#|click|Main Item 3": [
+    {
+      "selector": "Main Item 3",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T16:24:11.825Z"
+    }
+  ],
+  "https://demoqa.com/menu#|click|SUB SUB LIST »": [
+    {
+      "selector": "SUB SUB LIST »",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T16:24:15.519Z"
+    }
+  ],
+  "https://demoqa.com/menu#|click|Sub Sub Item 1": [
+    {
+      "selector": "Sub Sub Item 1",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T16:24:17.285Z"
+    }
+  ],
+  "https://demoqa.com/menu#|click|Sub Sub Item 2": [
+    {
+      "selector": "Sub Sub Item 2",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T16:24:19.136Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|check|Select Excel File.doc": [
+    {
+      "selector": "Select Excel File.doc",
+      "successCount": 6,
+      "lastUsed": "2026-04-12T22:57:51.183Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|check|Select Word File.doc": [
+    {
+      "selector": "Select Word File.doc",
+      "successCount": 6,
+      "lastUsed": "2026-04-12T22:57:52.504Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|check|Select Public": [
+    {
+      "selector": "Select Public",
+      "successCount": 6,
+      "lastUsed": "2026-04-12T22:57:53.696Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|check|Select React": [
+    {
+      "selector": "Select React",
+      "successCount": 6,
+      "lastUsed": "2026-04-12T22:57:56.422Z"
+    }
+  ],
+  "https://demoqa.com/checkbox|check|Select Notes": [
+    {
+      "selector": "Select Notes",
+      "successCount": 6,
+      "lastUsed": "2026-04-12T22:57:58.069Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Progress Bar": [
+    {
+      "selector": "Progress Bar",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:02:09.959Z"
+    }
+  ],
+  "https://demoqa.com/progress-bar|click|Start": [
+    {
+      "selector": "Start",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:02:11.592Z"
+    }
+  ],
+  "https://demoqa.com/progress-bar|click|Stop": [
+    {
+      "selector": "Stop",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:02:13.834Z"
+    }
+  ],
+  "https://demoqa.com/progress-bar|click|%": [
+    {
+      "selector": "%",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:02:16.268Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Buttons": [
+    {
+      "selector": "Buttons",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:56:30.315Z"
+    }
+  ],
+  "https://demoqa.com/buttons|dblclick|Double Click Me": [
+    {
+      "selector": "Double Click Me",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:56:33.823Z"
+    }
+  ],
+  "https://demoqa.com/buttons|dblclick|Right Click Me": [
+    {
+      "selector": "Right Click Me",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:56:36.918Z"
+    }
+  ],
+  "https://demoqa.com/buttons|click|Click Me": [
+    {
+      "selector": "Click Me",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:56:39.502Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Alerts": [
+    {
+      "selector": "Alerts",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:54:08.952Z"
+    }
+  ],
+  "https://demoqa.com/alerts|click|#alertButton": [
+    {
+      "selector": "#alertButton",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T18:26:23.974Z"
+    }
+  ],
+  "https://demoqa.com/alerts|click|#timerAlertButton": [
+    {
+      "selector": "#timerAlertButton",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T18:26:26.769Z"
+    }
+  ],
+  "https://demoqa.com/alerts|click|#confirmButton": [
+    {
+      "selector": "#confirmButton",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T18:26:27.876Z"
+    }
+  ],
+  "https://demoqa.com/links|click|Home": [
+    {
+      "selector": "Home",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T22:59:58.878Z"
+    }
+  ],
+  "https://demoqa.com/links|click|Book Store Application": [
+    {
+      "selector": "Book Store Application",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:00:02.454Z"
+    }
+  ],
+  "https://demoqa.com/links|click|Elements": [
+    {
+      "selector": "Elements",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:00:05.200Z"
+    }
+  ],
+  "https://demoqa.com/links|click|Links": [
+    {
+      "selector": "Links",
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:00:07.812Z"
+    }
+  ],
+  "https://demoqa.com/links|click|HomeeSOYc": [
+    {
+      "selector": "text=Home",
+      "successCount": 4,
+      "lastUsed": "2026-04-12T23:00:09.885Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Frames": [
+    {
+      "selector": "Frames",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:58:46.406Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Sortable": [
+    {
+      "selector": "Sortable",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:59:38.046Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Selectable": [
+    {
+      "selector": "Selectable",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:35:34.399Z"
+    }
+  ],
+  "https://demoqa.com/selectable|click|Resizable": [
+    {
+      "selector": "Resizable",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:35:36.226Z"
+    }
+  ],
+  "https://demoqa.com/resizable|click|Resizable box, starting at": [
+    {
+      "selector": "Resizable box, starting at",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:35:38.306Z"
+    }
+  ],
+  "https://demoqa.com/resizable|click|#resizable": [
+    {
+      "selector": "#resizable",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:35:40.272Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Accordian": [
+    {
+      "selector": "Accordian",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:36:29.972Z"
+    }
+  ],
+  "https://demoqa.com/accordian|click|Where does it come from?": [
+    {
+      "selector": "Where does it come from?",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:36:32.102Z"
+    }
+  ],
+  "https://demoqa.com/accordian|click|Why do we use it?": [
+    {
+      "selector": "Why do we use it?",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:36:34.601Z"
+    }
+  ],
+  "https://demoqa.com/books|click|Date Picker": [
+    {
+      "selector": "Date Picker",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:39:02.019Z"
+    }
+  ],
+  "https://demoqa.com/date-picker|click|#datePickerMonthYearInput": [
+    {
+      "selector": "#datePickerMonthYearInput",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:39:04.907Z"
+    }
+  ],
+  "https://demoqa.com/date-picker|click|#dateAndTimePickerInput": [
+    {
+      "selector": "#dateAndTimePickerInput",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T22:39:08.860Z"
+    }
+  ],
+  "https://demoqa.com/slider|fill|#slider": [
+    {
+      "selector": "#slider",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:40:19.882Z"
+    }
+  ],
+  "https://demoqa.com/slider|click|#sliderValue": [
+    {
+      "selector": "#sliderValue",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:40:23.501Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|.css-1xc3v61-indicatorContainer > .css-8mmkcg": [
+    {
+      "selector": ".css-1xc3v61-indicatorContainer > .css-8mmkcg",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:09.774Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|Mr.": [
+    {
+      "selector": "Mr.",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:12.662Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|select|#oldSelectMenu": [
+    {
+      "selector": "#oldSelectMenu",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:15.327Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|div:nth-child(8) > .col-md-6 > .css-b62m3t-container > .css-13cymwt-control > .css-1wy0on6 > .css-1xc3v61-indicatorContainer > .css-8mmkcg": [
+    {
+      "selector": "div:nth-child(8) > .col-md-6 > .css-b62m3t-container > .css-13cymwt-control > .css-1wy0on6 > .css-1xc3v61-indicatorContainer > .css-8mmkcg",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:15.913Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|#react-select-4-option-2": [
+    {
+      "selector": "#react-select-4-option-2",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:17.650Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|#react-select-4-option-1": [
+    {
+      "selector": "#react-select-4-option-1",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:19.377Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|click|div:nth-child(8)": [
+    {
+      "selector": "div:nth-child(8)",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:21.049Z"
+    }
+  ],
+  "https://demoqa.com/select-menu|select|#cars": [
+    {
+      "selector": "#cars",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:22.440Z"
+    }
+  ],
+  "https://demoqa.com/tool-tips|fill|Hover me to see": [
+    {
+      "selector": "Hover me to see",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:02:40.804Z"
+    }
+  ],
+  "https://demoqa.com/tool-tips|click|Contrary to popular belief,": [
+    {
+      "selector": "Contrary to popular belief,",
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:02:46.488Z"
+    }
+  ],
+  "https://demoqa.com/upload-download|click|Download": [
+    {
+      "selector": "Download",
+      "successCount": 1,
+      "lastUsed": "2026-04-12T22:58:24.017Z"
     }
   ]
 }

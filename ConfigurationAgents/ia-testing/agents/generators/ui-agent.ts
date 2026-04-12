@@ -8,21 +8,45 @@ export function generateUITest(name: string, steps: any[]) {
   ensureDir(dir);
   const output = path.join(dir, `${name}.spec.ts`);
 
+  // ── Deduplicar pasos únicos ──
+  // Solo se deduplicAN: input/fill (se tomó ya el último en el parser),
+  // select/selectOption, verify (mismo texto), check/uncheck, upload.
+  // Los CLICKS se preservan todos aunque sean idénticos: pueden operar sobre
+  // elementos dinámicos distintos que comparten selector (e.g., árbol expandible).
   const uniqueSteps: any[] = [];
   const seen = new Set();
+  const NON_DEDUP_ACTIONS = new Set(['click', 'dblclick', 'press_enter', 'dialog_handler', 'page_load']);
   for (const step of steps) {
-    const key = `${step.action}-${step.selector || step.target}-${step.value ?? ''}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      uniqueSteps.push(step);
+    if (NON_DEDUP_ACTIONS.has(step.action)) {
+      uniqueSteps.push(step); // clics siempre se preservan
+    } else {
+      const key = `${step.action}-${step.selector || step.target}-${step.value ?? ''}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        uniqueSteps.push(step);
+      }
     }
   }
   console.log(`📊 generateUITest: steps únicos: ${uniqueSteps.length} de ${steps.length}`);
 
+  // ── Determinar qué imports necesitamos ──
+  const usesCheck   = uniqueSteps.some(s => s.action === 'check' || s.action === 'uncheck');
+  const usesDbl     = uniqueSteps.some(s => s.action === 'dblclick');
+  const usesUpload  = uniqueSteps.some(s => s.action === 'upload');
+  const usesVerify  = uniqueSteps.some(s => s.action === 'verify');
+  const usesSelect  = uniqueSteps.some(s => s.action === 'select' || s.action === 'selectOption');
+
+  const importedActions = ['smartClick', 'smartFill'];
+  if (usesSelect) importedActions.push('smartSelect');
+  if (usesVerify) importedActions.push('smartWaitForText');
+  if (usesCheck)  importedActions.push('smartCheck');
+  if (usesDbl)    importedActions.push('smartDblClick');
+  if (usesUpload) importedActions.push('smartUpload');
+
   let code = `
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
-import { smartClick, smartFill, smartSelect, smartWaitForText } from '../../../../ConfigurationTest/tests/utils/smart-actions';
+import { ${importedActions.join(', ')} } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
 test('${name}', async ({ page }) => {
   await smartGoto(page, '${name}');
@@ -33,15 +57,87 @@ test('${name}', async ({ page }) => {
     const step = uniqueSteps[i];
     const nextStep = uniqueSteps[i + 1];
 
-    // ── SELECT ──────────────────────────────────────────────────
+    // ── page_load → omitir (smartGoto ya se encarga) ──────────────────
+    if (step.action === 'page_load') {
+      i++;
+      continue;
+    }
+
+    // ── dialog_handler → registrar antes del siguiente click ──────────
+    if (step.action === 'dialog_handler') {
+      const action = (step.value === 'dismiss') ? 'dismiss' : 'accept';
+      code += `
+  // Manejar diálogo nativo del navegador
+  page.once('dialog', async dialog => {
+    console.log(\`Dialog: \${dialog.message()}\`);
+    await dialog.${action}();
+  });`;
+      i++;
+      continue;
+    }
+
+    // ── press_enter → teclado ─────────────────────────────────────────
+    if (step.action === 'press_enter') {
+      code += `
+  await page.keyboard.press('Enter');`;
+      i++;
+      continue;
+    }
+
+    // ── SELECT ────────────────────────────────────────────────────────
     if (step.action === 'select' || step.action === 'selectOption') {
-      let selector = step.selector || step.target;
+      const rawSel = step.selector || step.target;
+      const selector = normalizeSelector(rawSel);
       const value = step.value || '';
       if (selector && value) {
-        selector = normalizeSelector(selector);
         code += `
   await smartSelect(page, \`${selector}\`, '${value}');`;
       }
+      i++;
+      continue;
+    }
+
+    // ── CHECK / UNCHECK ───────────────────────────────────────────────
+    if (step.action === 'check' || step.action === 'uncheck') {
+      const rawSel = step.selector || step.target;
+      const selector = normalizeSelector(rawSel);
+      if (selector) {
+        if (step.action === 'uncheck') {
+          code += `
+  await smartCheck(page, \`${selector}\`, false);`;
+        } else {
+          code += `
+  await smartCheck(page, \`${selector}\`);`;
+        }
+      }
+      i++;
+      continue;
+    }
+
+    // ── DBLCLICK ──────────────────────────────────────────────────────
+    if (step.action === 'dblclick') {
+      const rawSel = step.selector || step.target;
+      const selector = normalizeSelector(rawSel);
+      if (selector) {
+        code += `
+  await smartDblClick(page, \`${selector}\`);`;
+      }
+      i++;
+      continue;
+    }
+
+    // ── UPLOAD ────────────────────────────────────────────────────────
+    if (step.action === 'upload') {
+      const rawSel = step.selector || step.target;
+      const selector = normalizeSelector(rawSel);
+      const filePath = step.value || '';
+      code += `
+  // Upload de archivo — asegúrate de que el fichero existe en el entorno de test
+  try {
+    await smartUpload(page, \`${selector}\`, '${filePath}');
+  } catch (e) {
+    console.warn('⚠️ Upload omitido (archivo no encontrado):', '${filePath}');
+  }`;
       i++;
       continue;
     }
@@ -51,10 +147,8 @@ test('${name}', async ({ page }) => {
     const value = step.value || '';
 
     // ── CLICK seguido de VERIFY → patrón "confirm + toast transitorio" ──
-    // Se inicia smartWaitForText EN PARALELO con smartClick para capturar
-    // toasts que aparecen y desaparecen DURANTE el procesamiento post-click.
-    // Ejemplo: click 'Confirmar' → transfer POST → toast 'Transferencia realizada' (2-3s) → form reset
-    // Sin paralelismo el toast ya desapareció cuando smartWaitForText empieza.
+    // smartWaitForText empieza a escuchar EN PARALELO con smartClick para
+    // capturar toasts que aparecen y desaparecen DURANTE el post-click.
     if (step.action === 'click' && nextStep?.action === 'verify') {
       if (!selector) { i++; continue; }
       const verifyTarget = normalizeSelector(nextStep.selector || nextStep.target || '');
@@ -62,18 +156,16 @@ test('${name}', async ({ page }) => {
 
       code += `
   // Capturar toast transitorio en paralelo con el click de confirmación.
-  // smartWaitForText empieza a escuchar ANTES de que el click se ejecute,
-  // garantizando que detecta el mensaje aunque desaparezca rápidamente.
   await Promise.all([
     smartWaitForText(page, \`${verifyTarget}\`, 20000),
     smartClick(page, \`${selector}\`),
   ]);`;
 
-      i += 2; // consumir tanto el click como el verify
+      i += 2;
       continue;
     }
 
-    // ── CLICK simple ──────────────────────────────────────────────
+    // ── CLICK simple ──────────────────────────────────────────────────
     if (step.action === 'click') {
       if (!selector) { i++; continue; }
       code += `
@@ -82,7 +174,7 @@ test('${name}', async ({ page }) => {
       continue;
     }
 
-    // ── FILL / INPUT ──────────────────────────────────────────────
+    // ── FILL / INPUT ──────────────────────────────────────────────────
     if (step.action === 'input' || step.action === 'fill') {
       if (!selector) { i++; continue; }
       code += `
@@ -92,15 +184,14 @@ test('${name}', async ({ page }) => {
       continue;
     }
 
-    // ── VERIFY standalone (no precedido de click) ─────────────────
-    // Texto de resultado asíncrono sin click previo en el mismo paso.
-    // Timeout 15s para cubrir respuestas lentas del servidor/backend.
+    // ── VERIFY standalone ─────────────────────────────────────────────
     if (step.action === 'verify') {
       const verifyTarget = step.selector || step.target || '';
       if (!verifyTarget) { i++; continue; }
+      const cleanTarget = normalizeSelector(verifyTarget) || verifyTarget;
       code += `
   // Verificar mensaje de resultado (texto asíncrono — puede ser toast transitorio)
-  await smartWaitForText(page, \`${verifyTarget}\`, 15000);`;
+  await smartWaitForText(page, \`${cleanTarget}\`, 15000);`;
       i++;
       continue;
     }

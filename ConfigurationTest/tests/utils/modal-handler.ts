@@ -38,18 +38,12 @@ const DISMISS_PATTERNS: ModalHandler[] = [
   { selector: 'button:has-text("Saltar")', label: '⏭️ Saltado' },
 
   // Cerrar (X)
-  { selector: '[role="dialog"] button[aria-label="Cerrar"]', label: '❎ Dialog cerrado (aria)' },
-  { selector: '[role="dialog"] button[aria-label="Close"]', label: '❎ Dialog closed (aria)' },
-  { selector: '[role="dialog"] button:has-text("Cerrar")', label: '❎ Dialog cerrado' },
-  { selector: '[role="dialog"] button:has-text("Close")', label: '❎ Dialog closed' },
-  { selector: '[role="dialog"] button:has-text("×")', label: '❎ Dialog X' },
-  { selector: '.modal button:has-text("Cerrar")', label: '❎ Modal cerrado' },
-  { selector: '.modal button:has-text("Close")', label: '❎ Modal closed' },
-  { selector: '.modal-close', label: '❎ Modal close button' },
-  { selector: '[aria-label="Close"]', label: '❎ Aria close' },
-  { selector: '[aria-label="Cerrar"]', label: '❎ Aria cerrar' },
-  { selector: 'button.close', label: '❎ Bootstrap close' },
-  { selector: '.modal__close', label: '❎ Modal close' },
+  // NOTA: Solo cerrar modales de información/error, NO modales de confirmación de transacciones.
+  // Los selectores genéricos como .modal-close, [role="dialog"] button.close, button.close
+  // fueron ELIMINADOS porque en SPAs de homebanking/e-commerce son parte del flujo
+  // de confirmación (Confirmar/Cancelar) y no deben ser descartados automáticamente.
+  { selector: '[role="alertdialog"] button[aria-label="Cerrar"]', label: '❎ Alert dialog cerrado' },
+  { selector: '[role="alertdialog"] button[aria-label="Close"]', label: '❎ Alert dialog closed' },
 
   // Notificaciones / Push notifications
   { selector: 'button:has-text("Ahora no")', label: '🔔 Notificación descartada' },

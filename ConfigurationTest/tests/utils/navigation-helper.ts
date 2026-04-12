@@ -7,16 +7,26 @@ export async function smartGoto(page: Page, testName: string = 'GLOBAL') {
 
   try {
 
-    // 🔥 Buscar metadata dinámicamente
-    const metadataFile = fs.readdirSync('GenerateTest')
-      .find(file => file.endsWith('.metadata.json'));
+    // 🔥 Buscar metadata por testName exacto (top-level GenerateTest/)
+    let metadataPath = path.join('GenerateTest', `${testName}.metadata.json`);
 
-    if (!metadataFile) {
-      console.log('⚠️ No metadata found');
+    // Fallback 1: dentro del subdirectorio del test
+    if (!fs.existsSync(metadataPath)) {
+      metadataPath = path.join('GenerateTest', 'tests', testName, `${testName}.metadata.json`);
+    }
+
+    // Fallback 2: buscar cualquier metadata con el nombre del test en GenerateTest/
+    if (!fs.existsSync(metadataPath)) {
+      const files = fs.readdirSync('GenerateTest');
+      const found = files.find(f => f === `${testName}.metadata.json`);
+      if (found) metadataPath = path.join('GenerateTest', found);
+    }
+
+    if (!fs.existsSync(metadataPath)) {
+      console.log(`⚠️ No metadata found for: ${testName}`);
       return;
     }
 
-    const metadataPath = path.join('GenerateTest', metadataFile);
     const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
 
     if (!metadata.baseURL) {

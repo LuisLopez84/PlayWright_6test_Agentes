@@ -1,3 +1,11 @@
 {
-  "Confirmar": "button:has-text(\"TRANSFERIR\")"
+  "Usuario": "text=Elements",
+  "Book Store Application": "text=Store Application",
+  "Pago de Servicios": "text=Servicios",
+  "HomeeSOYc": "text=Home",
+  "Choose Saturday, April 11th,": "button:has-text(\"Choose\")",
+  "Grid": "text=grid",
+  ".auto-complete__input-container": ".text:has-text(\"Auto Complete\")",
+  "Origin": "text=origin",
+  "Use": "text=use"
 }

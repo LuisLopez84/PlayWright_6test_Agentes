@@ -206,19 +206,12 @@ async function tryTextVariants(page: Page, original: string): Promise<string | n
 // ESTRATEGIA 3: ATRIBUTOS ESTRUCTURALES
 // ─────────────────────────────────────────────
 async function tryStructuralStrategies(page: Page, original: string): Promise<string | null> {
-  // Por ID
+  // Por ID directo
   if (original.startsWith('#')) {
     if (await isLocatorValid(page, original)) return original;
   }
 
-  // name="..."
-  const nameMatch = original.match(/name=['"](.*?)['"]/);
-  if (nameMatch) {
-    const sel = `[name="${nameMatch[1]}"]`;
-    if (await isLocatorValid(page, sel)) return sel;
-  }
-
-  // data-testid="..."
+  // data-testid (máxima prioridad para elementos etiquetados)
   const testIdMatch = original.match(/data-testid=['"](.*?)['"]/);
   if (testIdMatch) {
     const sel = `[data-testid="${testIdMatch[1]}"]`;
@@ -232,19 +225,64 @@ async function tryStructuralStrategies(page: Page, original: string): Promise<st
     if (await isLocatorValid(page, sel)) return sel;
   }
 
-  // Buscar inputs por ID parcial
+  // name="..."
+  const nameMatch = original.match(/name=['"](.*?)['"]/);
+  if (nameMatch) {
+    const sel = `[name="${nameMatch[1]}"]`;
+    if (await isLocatorValid(page, sel)) return sel;
+  }
+
+  // getByPlaceholder — muy útil para campos sin label
   try {
-    const inputs = page.locator('input:visible');
+    const byPh = page.getByPlaceholder(original, { exact: false });
+    if (await byPh.count() > 0 && await byPh.first().isVisible().catch(() => false)) {
+      return `[placeholder="${original}"]`;
+    }
+  } catch {}
+
+  // getByLabel — inputs asociados con <label> (usa HTML label-for, no aria-label)
+  try {
+    const byLabel = page.getByLabel(original, { exact: false });
+    if (await byLabel.count() > 0 && await byLabel.first().isVisible().catch(() => false)) {
+      // Extraer selector estable del elemento real encontrado (no devolver aria-label*)
+      const id          = await byLabel.first().getAttribute('id').catch(() => null);
+      if (id) return `#${id}`;
+      const name        = await byLabel.first().getAttribute('name').catch(() => null);
+      if (name) return `[name="${name}"]`;
+      const inputType   = await byLabel.first().getAttribute('type').catch(() => null);
+      const ariaLabel   = await byLabel.first().getAttribute('aria-label').catch(() => null);
+      if (ariaLabel) return `[aria-label="${ariaLabel}"]`;
+      if (inputType === 'password') return `input[type="password"]`;
+      if (inputType) return `input[type="${inputType}"]`;
+    }
+  } catch {}
+
+  // Buscar checkbox/radio por nombre
+  try {
+    const byCheckbox = page.getByRole('checkbox', { name: original });
+    if (await byCheckbox.count() > 0) return `input[type="checkbox"][aria-label*="${original}"], input[type="checkbox"][name*="${original}"]`;
+
+    const byRadio = page.getByRole('radio', { name: original });
+    if (await byRadio.count() > 0) return `input[type="radio"][aria-label*="${original}"], input[type="radio"][name*="${original}"]`;
+  } catch {}
+
+  // Buscar inputs/textareas por atributos parciales
+  try {
+    const inputs = page.locator('input:visible, textarea:visible');
     const count = await inputs.count();
     for (let i = 0; i < Math.min(count, 20); i++) {
       const el = inputs.nth(i);
-      const id = await el.getAttribute('id').catch(() => null);
+      const id          = await el.getAttribute('id').catch(() => null);
       const placeholder = await el.getAttribute('placeholder').catch(() => null);
-      const label = await el.getAttribute('aria-label').catch(() => null);
-      const name = await el.getAttribute('name').catch(() => null);
+      const label       = await el.getAttribute('aria-label').catch(() => null);
+      const name        = await el.getAttribute('name').catch(() => null);
       const attrs = [id, placeholder, label, name].filter(Boolean).join(' ').toLowerCase();
-      if (attrs && original.toLowerCase().split(/\s+/).some(word => attrs.includes(word.toLowerCase()))) {
-        const selector = id ? `#${id}` : name ? `[name="${name}"]` : placeholder ? `[placeholder="${placeholder}"]` : null;
+      if (attrs && original.toLowerCase().split(/\s+/).some(w => w.length > 2 && attrs.includes(w.toLowerCase()))) {
+        const selector = id          ? `#${id}`
+                       : name        ? `[name="${name}"]`
+                       : placeholder ? `[placeholder="${placeholder}"]`
+                       : label       ? `[aria-label="${label}"]`
+                       : null;
         if (selector && await isLocatorValid(page, selector)) return selector;
       }
     }
@@ -440,11 +478,64 @@ export async function healSelector(
     return aiSelector;
   }
 
-  // 6️⃣ Fallback genérico final
-  const fallback = `text=${originalSelector}`;
-  if (await isLocatorValid(page, fallback)) {
-    return fallback;
+  // 6️⃣ Fallbacks genéricos finales
+  // Para fill: omitir text= / :text() porque matchean labels no rellenables
+  const fallbacks = action === 'fill'
+    ? [
+        `[placeholder*="${originalSelector}"]`,
+        `[aria-label*="${originalSelector}"]`,
+        `[name*="${originalSelector}"]`,
+        `[id*="${originalSelector}"]`,
+        `[title*="${originalSelector}"]`,
+      ]
+    : [
+        `text=${originalSelector}`,
+        `:text("${originalSelector}")`,
+        `[placeholder*="${originalSelector}"]`,
+        `[aria-label*="${originalSelector}"]`,
+        `[name*="${originalSelector}"]`,
+        `[id*="${originalSelector}"]`,
+        `[title*="${originalSelector}"]`,
+        `[alt*="${originalSelector}"]`,
+      ];
+
+  for (const fb of fallbacks) {
+    try {
+      if (await isLocatorValid(page, fb)) {
+        console.log(`🔄 Fallback genérico exitoso: ${fb}`);
+        saveHealing(originalSelector, fb);
+        return fb;
+      }
+    } catch {}
   }
+
+  // 7️⃣ Último recurso: texto visible más cercano en cualquier elemento interactivo
+  try {
+    const interactives = page.locator('button, a, [role="button"], [role="link"], input, textarea, select, [tabindex]');
+    const count = await interactives.count();
+    for (let i = 0; i < Math.min(count, 30); i++) {
+      const el = interactives.nth(i);
+      const text = await el.textContent().catch(() => null) || '';
+      const label = await el.getAttribute('aria-label').catch(() => null) || '';
+      const placeholder = await el.getAttribute('placeholder').catch(() => null) || '';
+      const combined = `${text} ${label} ${placeholder}`.toLowerCase();
+      const originalLower = originalSelector.toLowerCase();
+      const words = originalLower.split(/\s+/).filter(w => w.length > 2);
+      const matchCount = words.filter(w => combined.includes(w)).length;
+      if (matchCount > 0 && matchCount >= Math.ceil(words.length * 0.6)) {
+        const isVis = await el.isVisible().catch(() => false);
+        if (isVis) {
+          const id = await el.getAttribute('id').catch(() => null);
+          const elSel = id ? `#${id}` : `text=${text.trim().substring(0, 30)}`;
+          if (elSel && await isLocatorValid(page, elSel)) {
+            console.log(`🎯 Fallback por texto visible: ${elSel}`);
+            saveHealing(originalSelector, elSel);
+            return elSel;
+          }
+        }
+      }
+    }
+  } catch {}
 
   console.log(`❌ Healing agotado para: "${originalSelector}"`);
   return null;

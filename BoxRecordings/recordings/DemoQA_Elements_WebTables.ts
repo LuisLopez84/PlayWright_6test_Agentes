@@ -1,0 +1,33 @@
+import { test, expect } from '@playwright/test';
+
+test('test', async ({ page }) => {
+  await page.goto('https://demoqa.com/');
+  await page.getByRole('link', { name: 'Book Store Application' }).click();
+  await page.getByText('Elements').click();
+  await page.getByRole('link', { name: 'Web Tables' }).click();
+  await page.locator('#edit-record-1 > svg').click();
+  await page.getByRole('textbox', { name: 'First Name' }).click();
+  await page.getByRole('textbox', { name: 'First Name' }).press('CapsLock');
+  await page.getByRole('textbox', { name: 'First Name' }).fill('CierraQA');
+  await page.getByRole('textbox', { name: 'Last Name' }).dblclick();
+  await page.getByRole('textbox', { name: 'Last Name' }).click();
+  await page.getByRole('textbox', { name: 'Last Name' }).fill('VegaQA');
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await page.getByRole('button', { name: 'Add' }).click();
+  await page.getByRole('textbox', { name: 'First Name' }).click();
+  await page.getByRole('textbox', { name: 'First Name' }).fill('LUISQA');
+  await page.getByRole('textbox', { name: 'Last Name' }).click();
+  await page.getByRole('textbox', { name: 'Last Name' }).fill('LOPEZQA');
+  await page.getByRole('textbox', { name: 'name@example.com' }).click();
+  await page.getByRole('textbox', { name: 'name@example.com' }).fill('LUIS@GMAIL.COM');
+  await page.getByRole('textbox', { name: 'Age' }).click();
+  await page.getByRole('textbox', { name: 'Age' }).fill('42');
+  await page.getByRole('textbox', { name: 'Salary' }).click();
+  await page.getByRole('textbox', { name: 'Salary' }).fill('1000000000');
+  await page.getByRole('textbox', { name: 'Department' }).click();
+  await page.getByRole('textbox', { name: 'Department' }).fill('B');
+  await page.getByRole('textbox', { name: 'Department' }).press('CapsLock');
+  await page.getByRole('textbox', { name: 'Department' }).fill('Bogota');
+  await page.getByRole('button', { name: 'Submit' }).click();
+  await page.getByRole('cell', { name: 'LUISQA' }).click();
+});
