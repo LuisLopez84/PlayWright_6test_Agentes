@@ -338,15 +338,15 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 72,
-      "lastUsed": "2026-04-12T22:49:05.732Z"
+      "successCount": 73,
+      "lastUsed": "2026-04-12T23:03:32.674Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "Ingresar",
-      "successCount": 1,
-      "lastUsed": "2026-04-12T22:49:08.419Z"
+      "successCount": 2,
+      "lastUsed": "2026-04-12T23:03:34.592Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -680,50 +680,50 @@
   "https://homebanking-demo-tests.netlify.app/|click|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 9,
-      "lastUsed": "2026-04-12T22:44:34.193Z"
+      "successCount": 10,
+      "lastUsed": "2026-04-12T23:03:31.200Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Pago de Servicios": [
     {
       "selector": "text=Servicios",
-      "successCount": 3,
-      "lastUsed": "2026-04-12T22:42:28.409Z"
+      "successCount": 4,
+      "lastUsed": "2026-04-12T23:03:36.942Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|Selecciona el Servicio": [
     {
       "selector": "Selecciona el Servicio",
-      "successCount": 2,
-      "lastUsed": "2026-04-12T22:42:29.577Z"
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:03:37.983Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto a Pagar": [
     {
       "selector": "Monto a Pagar",
-      "successCount": 2,
-      "lastUsed": "2026-04-12T22:42:31.354Z"
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:03:39.787Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Monto a Pagar": [
     {
       "selector": "Monto a Pagar",
-      "successCount": 2,
-      "lastUsed": "2026-04-12T22:42:33.913Z"
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:03:42.150Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|Cuenta a Debitar": [
     {
       "selector": "Cuenta a Debitar",
-      "successCount": 2,
-      "lastUsed": "2026-04-12T22:42:35.981Z"
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:03:43.923Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Pagar Servicio": [
     {
       "selector": "Pagar Servicio",
-      "successCount": 2,
-      "lastUsed": "2026-04-12T22:42:37.909Z"
+      "successCount": 3,
+      "lastUsed": "2026-04-12T23:03:45.473Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Préstamos": [
