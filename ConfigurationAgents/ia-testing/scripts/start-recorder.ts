@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+import { spawnSync } from "child_process";
 import path from "path";
 import fs from "fs";
 
@@ -19,18 +19,17 @@ const outputFile = path.join(recordingsDir, `${name}.ts`);
 console.log("Iniciando grabadora de Playwright...");
 console.log("Archivo de salida:", outputFile);
 
-const child = spawn(
+const result = spawnSync(
   "npx",
   ["playwright", "codegen", "--output", outputFile],
   { stdio: "inherit", shell: true }
 );
 
-child.on("close", (code) => {
-  if (fs.existsSync(outputFile)) {
-    console.log(`\nGrabación guardada: ${outputFile}`);
-    console.log(`Ahora puedes ejecutar: npm run generate`);
-  } else {
-    console.log("\nNo se guardó ninguna grabación.");
-  }
-  process.exit(code ?? 0);
-});
+if (fs.existsSync(outputFile)) {
+  console.log(`\nGrabación guardada: ${outputFile}`);
+  console.log(`Ahora puedes ejecutar: npm run generate`);
+} else {
+  console.log("\nNo se guardó ninguna grabación.");
+}
+
+process.exit(result.status ?? 0);
