@@ -67,6 +67,11 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
     throw new Error(`🚨 Page cerrada antes de resolver selector: ${selector}`);
   }
 
+  // ── Estrategia -2: Shadow DOM pierce (selector con >>>) ──
+  if (selector.includes('>>>')) {
+    return page.locator(selector);
+  }
+
   // ── Estrategia 0: CSS/XPath directo (más eficiente, sin probar roles) ──
   if (isCSSSelector(selector)) {
     const directLoc = page.locator(selector);
@@ -588,8 +593,77 @@ export async function smartFill(page: Page, selector: string, value: string): Pr
     // ── [4] Ejecutar fill ──
     try {
       await locator.scrollIntoViewIfNeeded().catch(() => {});
+
+      // Detectar tipo de input para estrategia adecuada
+      const inputType = await locator.getAttribute('type').catch(() => null);
+      const role      = await locator.getAttribute('role').catch(() => null);
+      const tagName   = await locator.evaluate((el: Element) => el.tagName.toLowerCase()).catch(() => '');
+
+      // Password: ocultar valor en logs (el fill es normal, pero se registra ofuscado)
+      if (inputType === 'password') {
+        console.log(`🔒 Filling password field (value hidden)`);
+        await locator.click({ force: true });
+        await locator.fill('');
+        await locator.fill(smartValue);
+        learningStore.recordSuccess(sig, selector);
+        await waitForPageStability(page);
+        return;
+      }
+
+      // Range slider: usar evaluate para establecer valor directamente + disparo de input event
+      if (inputType === 'range') {
+        await locator.evaluate((el: HTMLInputElement, val: string) => {
+          el.value = val;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }, smartValue);
+        learningStore.recordSuccess(sig, selector);
+        await waitForPageStability(page);
+        return;
+      }
+
+      // Color picker: establecer valor hex directamente
+      if (inputType === 'color') {
+        await locator.evaluate((el: HTMLInputElement, val: string) => {
+          el.value = val;
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        }, smartValue);
+        learningStore.recordSuccess(sig, selector);
+        await waitForPageStability(page);
+        return;
+      }
+
+      // Date/datetime: usar fill nativo de Playwright (maneja el formato del navegador)
+      if (inputType === 'date' || inputType === 'datetime-local' || inputType === 'time' || inputType === 'month') {
+        await locator.fill(smartValue).catch(async () => {
+          // Fallback: triple-click + type para limpiar primero
+          await locator.click({ clickCount: 3, force: true });
+          await locator.pressSequentially(smartValue, { delay: 50 });
+        });
+        learningStore.recordSuccess(sig, selector);
+        await waitForPageStability(page);
+        return;
+      }
+
+      // Spinbutton / number: fill normal con fallback a dispatchEvent
+      if (inputType === 'number' || role === 'spinbutton') {
+        await locator.click({ force: true });
+        await locator.fill('');
+        await locator.fill(smartValue).catch(async () => {
+          await locator.evaluate((el: HTMLInputElement, val: string) => {
+            el.value = val;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+          }, smartValue);
+        });
+        learningStore.recordSuccess(sig, selector);
+        await waitForPageStability(page);
+        return;
+      }
+
+      // General: click → fill con fallback a pressSequentially
       await locator.click({ force: true });
-      // Intentar fill nativo; algunos custom inputs no soportan fill() → pressSequentially
       try {
         await locator.fill('');
         await locator.fill(smartValue);
@@ -597,7 +671,6 @@ export async function smartFill(page: Page, selector: string, value: string): Pr
         await locator.pressSequentially(smartValue, { delay: 30 });
       }
 
-      const role = await locator.getAttribute('role').catch(() => null);
       const isCombo = role === 'combobox' ||
         (await locator.getAttribute('aria-autocomplete').catch(() => null)) === 'list';
       if (isCombo) {
@@ -1025,4 +1098,262 @@ export async function smartSelect(page: Page, selector: string, value: string): 
     if (!isPageAlive(page)) throw new Error(`🚨 Page cerrada después de select en "${selector}"`);
     await page.waitForTimeout(500);
   }, selector);
+}
+
+// ─────────────────────────────────────────────
+// SMART HOVER  (para submenús y tooltips)
+// ─────────────────────────────────────────────
+export async function smartHover(page: Page, selector: string): Promise<void> {
+  await retryAction(page, async () => {
+    await waitForUIStability(page);
+
+    const url = page.url();
+    const sig = { url, action: 'hover', targetText: selector };
+
+    // ── [1] LearningStore ──
+    const learned = learningStore.getBestSelector(sig);
+    if (learned) {
+      try {
+        const learnedLoc = page.locator(learned);
+        if (await learnedLoc.count() > 0 && await learnedLoc.first().isVisible().catch(() => false)) {
+          await learnedLoc.first().scrollIntoViewIfNeeded().catch(() => {});
+          await learnedLoc.first().hover();
+          learningStore.recordSuccess(sig, learned);
+          await page.waitForTimeout(300);
+          return;
+        }
+      } catch {}
+    }
+
+    // ── [2] Resolver locator ──
+    let locator = await resolveLocator(page, selector);
+    let isVisible = await waitForVisible(locator, 8000);
+
+    // ── [3] Healing ──
+    if (!isVisible) {
+      console.log(`🔧 Elemento no visible para hover → healing: "${selector}"`);
+      learningStore.recordFailure(sig, selector);
+
+      const healed = await healSelector(page, selector, 'hover');
+      if (healed) {
+        locator = page.locator(healed);
+        isVisible = await waitForVisible(locator, 5000);
+        if (isVisible) learningStore.recordSuccess(sig, healed);
+      }
+
+      if (!isVisible) {
+        const aiSel = await healWithAI(page, selector, 'hover');
+        if (aiSel) {
+          locator = page.locator(aiSel);
+          isVisible = await waitForVisible(locator, 4000);
+          if (isVisible) learningStore.recordSuccess(sig, aiSel);
+        }
+      }
+
+      if (!isVisible) throw new Error(`Elemento no visible para hover: ${selector}`);
+    }
+
+    // ── [4] Ejecutar hover ──
+    await locator.scrollIntoViewIfNeeded().catch(() => {});
+    await locator.hover({ timeout: 8000 });
+    learningStore.recordSuccess(sig, selector);
+    // Esperar a que el submenú / tooltip aparezca
+    await page.waitForTimeout(500);
+  }, selector);
+}
+
+// ─────────────────────────────────────────────
+// SMART RIGHT CLICK  (menú contextual)
+// ─────────────────────────────────────────────
+export async function smartRightClick(page: Page, selector: string): Promise<void> {
+  await retryAction(page, async () => {
+    await waitForUIStability(page);
+
+    const url = page.url();
+    const sig = { url, action: 'rightclick', targetText: selector };
+
+    // ── [1] LearningStore ──
+    const learned = learningStore.getBestSelector(sig);
+    if (learned) {
+      try {
+        const learnedLoc = page.locator(learned);
+        if (await learnedLoc.count() > 0 && await learnedLoc.first().isVisible().catch(() => false)) {
+          await learnedLoc.first().scrollIntoViewIfNeeded().catch(() => {});
+          await learnedLoc.first().click({ button: 'right', force: true });
+          learningStore.recordSuccess(sig, learned);
+          await page.waitForTimeout(300);
+          return;
+        }
+      } catch {}
+    }
+
+    // ── [2] Resolver locator ──
+    let locator = await resolveLocator(page, selector);
+    let isVisible = await waitForVisible(locator, 8000);
+
+    // ── [3] Healing ──
+    if (!isVisible) {
+      console.log(`🔧 Elemento no visible para rightclick → healing: "${selector}"`);
+      learningStore.recordFailure(sig, selector);
+
+      const healed = await healSelector(page, selector, 'rightclick');
+      if (healed) {
+        locator = page.locator(healed);
+        isVisible = await waitForVisible(locator, 5000);
+        if (isVisible) learningStore.recordSuccess(sig, healed);
+      }
+
+      if (!isVisible) throw new Error(`Elemento no visible para rightclick: ${selector}`);
+    }
+
+    // ── [4] Ejecutar click derecho ──
+    await locator.scrollIntoViewIfNeeded().catch(() => {});
+    await locator.click({ button: 'right', force: true, timeout: 8000 });
+    learningStore.recordSuccess(sig, selector);
+    await page.waitForTimeout(300);
+  }, selector);
+}
+
+// ─────────────────────────────────────────────
+// SMART DRAG AND DROP
+// ─────────────────────────────────────────────
+export async function smartDragAndDrop(
+  page: Page,
+  sourceSelector: string,
+  targetSelector: string,
+): Promise<void> {
+  await retryAction(page, async () => {
+    await waitForUIStability(page);
+
+    const sourceLoc = await resolveLocator(page, sourceSelector);
+    const targetLoc = await resolveLocator(page, targetSelector);
+
+    const sourceVisible = await waitForVisible(sourceLoc, 8000);
+    const targetVisible = await waitForVisible(targetLoc, 8000);
+
+    if (!sourceVisible) throw new Error(`Origen no visible para drag: ${sourceSelector}`);
+    if (!targetVisible) throw new Error(`Destino no visible para drop: ${targetSelector}`);
+
+    await sourceLoc.scrollIntoViewIfNeeded().catch(() => {});
+
+    // Intentar dragTo nativo de Playwright
+    try {
+      await sourceLoc.dragTo(targetLoc, { timeout: 10000 });
+      console.log(`🖱️ DragAndDrop: "${sourceSelector}" → "${targetSelector}"`);
+    } catch {
+      // Fallback: mouse simulation (para elementos que no soportan dragTo nativo)
+      const sourceBB = await sourceLoc.boundingBox();
+      const targetBB = await targetLoc.boundingBox();
+      if (sourceBB && targetBB) {
+        const sx = sourceBB.x + sourceBB.width / 2;
+        const sy = sourceBB.y + sourceBB.height / 2;
+        const tx = targetBB.x + targetBB.width / 2;
+        const ty = targetBB.y + targetBB.height / 2;
+        await page.mouse.move(sx, sy);
+        await page.mouse.down();
+        await page.waitForTimeout(200);
+        await page.mouse.move(tx, ty, { steps: 10 });
+        await page.waitForTimeout(200);
+        await page.mouse.up();
+        console.log(`🖱️ DragAndDrop (mouse simulation): "${sourceSelector}" → "${targetSelector}"`);
+      } else {
+        throw new Error(`No se pudo obtener bounding box para drag and drop`);
+      }
+    }
+
+    await waitForPageStability(page);
+  }, sourceSelector);
+}
+
+// ─────────────────────────────────────────────
+// SMART SCROLL  (scroll hasta elemento o por píxeles)
+// ─────────────────────────────────────────────
+export async function smartScroll(
+  page: Page,
+  selectorOrPixels: string | number,
+  direction: 'up' | 'down' | 'left' | 'right' = 'down',
+): Promise<void> {
+  if (!isPageAlive(page)) return;
+
+  try {
+    if (typeof selectorOrPixels === 'number') {
+      // Scroll por píxeles
+      const delta = direction === 'up' || direction === 'down'
+        ? { deltaX: 0, deltaY: direction === 'down' ? selectorOrPixels : -selectorOrPixels }
+        : { deltaX: direction === 'right' ? selectorOrPixels : -selectorOrPixels, deltaY: 0 };
+      await page.mouse.wheel(delta.deltaX, delta.deltaY);
+    } else {
+      // Scroll hasta elemento
+      const locator = await resolveLocator(page, selectorOrPixels);
+      const isVis = await waitForVisible(locator, 5000);
+      if (isVis) {
+        await locator.scrollIntoViewIfNeeded().catch(() => {});
+        console.log(`📜 Scroll hacia: "${selectorOrPixels}"`);
+      } else {
+        // Fallback: scroll de la página completa
+        await page.evaluate((dir) => {
+          const amount = dir === 'down' ? 500 : -500;
+          window.scrollBy(0, amount);
+        }, direction);
+      }
+    }
+    await page.waitForTimeout(200);
+  } catch (e) {
+    console.warn(`⚠️ smartScroll: ${e}`);
+  }
+}
+
+// ─────────────────────────────────────────────
+// WAIT FOR TOAST  (notificaciones transitories)
+// ─────────────────────────────────────────────
+export async function waitForToast(
+  page: Page,
+  expectedText?: string,
+  timeout = 8000,
+): Promise<string> {
+  if (!isPageAlive(page)) return '';
+
+  const toastSelectors = [
+    '[role="alert"]',
+    '[class*="toast"]',
+    '[class*="snackbar"]',
+    '[class*="notification"]',
+    '.Toastify__toast',
+    '.swal2-popup',
+    '[class*="alert"]:not([role="dialog"])',
+    '.toast',
+    '.toast-message',
+    '.toast-container > div',
+  ];
+
+  const combined = toastSelectors.join(', ');
+
+  try {
+    // Esperar que aparezca el toast
+    await page.waitForSelector(combined, { state: 'visible', timeout });
+    const toastEl = page.locator(combined).first();
+    const text = await toastEl.textContent().catch(() => '');
+    console.log(`🍞 Toast detectado: "${text?.trim()}"`);
+
+    if (expectedText) {
+      // Verificar que el texto esperado está en el toast
+      const lowerText = (text || '').toLowerCase();
+      const lowerExpected = expectedText.toLowerCase();
+      if (!lowerText.includes(lowerExpected)) {
+        console.warn(`⚠️ Toast texto "${text}" no contiene "${expectedText}"`);
+      }
+    }
+
+    return text?.trim() || '';
+  } catch {
+    if (expectedText) {
+      // Si no hay toast visible, buscar el texto esperado en la página directamente
+      try {
+        await page.waitForSelector(`:text("${expectedText}")`, { state: 'visible', timeout: 3000 });
+        return expectedText;
+      } catch {}
+    }
+    console.log(`⚠️ No se detectó toast en ${timeout}ms`);
+    return '';
+  }
 }

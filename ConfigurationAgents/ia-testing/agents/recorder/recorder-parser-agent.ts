@@ -95,6 +95,10 @@ function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any |
   // press enter
   if (/\.press\(['"`](Enter|Return)['"`]\)/.test(line)) return { action: "press_enter", target: "Enter", raw: line };
 
+  // press key (other keys: Tab, Escape, etc.)
+  const pressKeyM = line.match(/\.press\(['"`](Tab|Escape|Backspace|Delete|Space|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)['"`]\)/);
+  if (pressKeyM) return { action: "press_key", target: pressKeyM[1], raw: line };
+
   // selectOption
   const selOptM = line.match(/\.selectOption\(['"`](.*?)['"`]\)/);
   if (selOptM) {
@@ -149,6 +153,36 @@ function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any |
   if (roleFill) return { action: "input", target: roleFill[2], value: roleFill[3], raw: line, selector: `page.getByRole('${roleFill[1]}', { name: '${roleFill[2]}' })` };
   const locFill = line.match(/locator\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
   if (locFill) return { action: "input", target: locFill[1], value: locFill[2], raw: line, selector: `page.locator('${locFill[1]}')` };
+
+  // hover — getByRole / getByText / locator
+  const hoverRoleM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.hover/);
+  if (hoverRoleM) return { action: "hover", target: hoverRoleM[2], raw: line, selector: `page.getByRole('${hoverRoleM[1]}', { name: '${hoverRoleM[2]}' })` };
+  const hoverTextM = line.match(/getByText\(['"`](.*?)['"`]\)\.hover/);
+  if (hoverTextM) return { action: "hover", target: hoverTextM[1], raw: line, selector: `page.getByText('${hoverTextM[1]}')` };
+  const hoverLocM = line.match(/locator\(['"`](.*?)['"`]\)\.hover/);
+  if (hoverLocM) return { action: "hover", target: hoverLocM[1], raw: line, selector: `page.locator('${hoverLocM[1]}')` };
+
+  // right-click — click({ button: 'right' })
+  const rightClickRoleM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click\([^)]*button:\s*['"`]right['"`]/);
+  if (rightClickRoleM) return { action: "rightclick", target: rightClickRoleM[2], raw: line, selector: `page.getByRole('${rightClickRoleM[1]}', { name: '${rightClickRoleM[2]}' })` };
+  const rightClickLocM = line.match(/locator\(['"`](.*?)['"`]\)\.click\([^)]*button:\s*['"`]right['"`]/);
+  if (rightClickLocM) return { action: "rightclick", target: rightClickLocM[1], raw: line, selector: `page.locator('${rightClickLocM[1]}')` };
+  const rightClickTextM = line.match(/getByText\(['"`](.*?)['"`]\)\.click\([^)]*button:\s*['"`]right['"`]/);
+  if (rightClickTextM) return { action: "rightclick", target: rightClickTextM[1], raw: line, selector: `page.getByText('${rightClickTextM[1]}')` };
+
+  // dragTo — locator().dragTo(locator())
+  const dragToM = line.match(/locator\(['"`](.*?)['"`]\)\.dragTo\(.*locator\(['"`](.*?)['"`]\)/);
+  if (dragToM) return { action: "drag", source: dragToM[1], target: dragToM[2], raw: line, selector: `page.locator('${dragToM[1]}')`, targetSelector: `page.locator('${dragToM[2]}')` };
+
+  // frameLocator — page.frameLocator('selector').getByRole/getByText/locator
+  const frameLocRoleM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click/);
+  if (frameLocRoleM) return { action: "frame_click", frameSelector: frameLocRoleM[1], target: frameLocRoleM[3], raw: line, selector: `page.frameLocator('${frameLocRoleM[1]}').getByRole('${frameLocRoleM[2]}', { name: '${frameLocRoleM[3]}' })` };
+  const frameLocTextM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
+  if (frameLocTextM) return { action: "frame_click", frameSelector: frameLocTextM[1], target: frameLocTextM[2], raw: line, selector: `page.frameLocator('${frameLocTextM[1]}').getByText('${frameLocTextM[2]}')` };
+  const frameLocFillM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.fill\(['"`](.*?)['"`]\)/);
+  if (frameLocFillM) return { action: "frame_fill", frameSelector: frameLocFillM[1], target: frameLocFillM[3], value: frameLocFillM[4], raw: line, selector: `page.frameLocator('${frameLocFillM[1]}').getByRole('${frameLocFillM[2]}', { name: '${frameLocFillM[3]}' })` };
+  const frameLocLblFillM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByLabel\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
+  if (frameLocLblFillM) return { action: "frame_fill", frameSelector: frameLocLblFillM[1], target: frameLocLblFillM[2], value: frameLocLblFillM[3], raw: line, selector: `page.frameLocator('${frameLocLblFillM[1]}').getByLabel('${frameLocLblFillM[2]}')` };
 
   // clicks — role (heading/paragraph → verify)
   const roleClk = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.(?:first\(\)\.)?click/);
@@ -301,8 +335,110 @@ export function parseRecording(filePath: string): any[] {
       continue;
     }
 
+    // ─────────────────────────────────────────
+    // 🔥 PRESS KEY  (Tab, Escape, etc.) — solo teclas semánticas útiles
+    // ─────────────────────────────────────────
+    const pressKeyMain = line.match(/\.press\(['"`](Tab|Escape|Space|Backspace|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight)['"`]\)/);
+    if (pressKeyMain) {
+      rawSteps.push({ action: "press_key", target: pressKeyMain[1], raw: line });
+      continue;
+    }
+
     // Ignorar teclas de control no semánticas
-    if (/\.press\(['"`](CapsLock|Shift|Control|Alt|Meta|Tab|Escape|Backspace|Delete|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|F\d+|Home|End|PageUp|PageDown)['"`]\)/.test(line)) continue;
+    if (/\.press\(['"`](CapsLock|Shift|Control|Alt|Meta|F\d+|Home|End|PageUp|PageDown)['"`]\)/.test(line)) continue;
+
+    // ─────────────────────────────────────────
+    // 🔥 HOVER  — genera submenús y tooltips
+    // ─────────────────────────────────────────
+    if (line.includes('.hover(')) {
+      const hvRoleM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.hover/);
+      if (hvRoleM) {
+        rawSteps.push({ action: "hover", target: hvRoleM[2], raw: line, selector: `page.getByRole('${hvRoleM[1]}', { name: '${hvRoleM[2]}' })` });
+        continue;
+      }
+      const hvTextM = line.match(/getByText\(['"`](.*?)['"`]\)\.hover/);
+      if (hvTextM) {
+        rawSteps.push({ action: "hover", target: hvTextM[1], raw: line, selector: `page.getByText('${hvTextM[1]}')` });
+        continue;
+      }
+      const hvLocM = line.match(/locator\(['"`](.*?)['"`]\)\.hover/);
+      if (hvLocM) {
+        rawSteps.push({ action: "hover", target: hvLocM[1], raw: line, selector: `page.locator('${hvLocM[1]}')` });
+        continue;
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // 🔥 RIGHT-CLICK  — click({ button: 'right' })
+    // ─────────────────────────────────────────
+    if (line.includes("button: 'right'") || line.includes('button: "right"')) {
+      const rcRoleM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click/);
+      if (rcRoleM) {
+        rawSteps.push({ action: "rightclick", target: rcRoleM[2], raw: line, selector: `page.getByRole('${rcRoleM[1]}', { name: '${rcRoleM[2]}' })` });
+        continue;
+      }
+      const rcLocM = line.match(/locator\(['"`](.*?)['"`]\)\.click/);
+      if (rcLocM) {
+        rawSteps.push({ action: "rightclick", target: rcLocM[1], raw: line, selector: `page.locator('${rcLocM[1]}')` });
+        continue;
+      }
+      const rcTextM = line.match(/getByText\(['"`](.*?)['"`]\)\.click/);
+      if (rcTextM) {
+        rawSteps.push({ action: "rightclick", target: rcTextM[1], raw: line, selector: `page.getByText('${rcTextM[1]}')` });
+        continue;
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // 🔥 DRAG AND DROP  — locator().dragTo()
+    // ─────────────────────────────────────────
+    if (line.includes('.dragTo(')) {
+      const dtM = line.match(/locator\(['"`](.*?)['"`]\)\.dragTo\(.*?locator\(['"`](.*?)['"`]\)/);
+      if (dtM) {
+        rawSteps.push({ action: "drag", source: dtM[1], target: dtM[2], raw: line, selector: `page.locator('${dtM[1]}')`, targetSelector: `page.locator('${dtM[2]}')` });
+        continue;
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // 🔥 FRAME LOCATOR  — page.frameLocator('sel').getBy*/locator
+    // ─────────────────────────────────────────
+    if (line.includes('.frameLocator(')) {
+      const flRoleClickM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click/);
+      if (flRoleClickM) {
+        rawSteps.push({ action: "frame_click", frameSelector: flRoleClickM[1], target: flRoleClickM[3], raw: line, selector: `page.frameLocator('${flRoleClickM[1]}').getByRole('${flRoleClickM[2]}', { name: '${flRoleClickM[3]}' })` });
+        continue;
+      }
+      const flTextClickM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
+      if (flTextClickM) {
+        rawSteps.push({ action: "frame_click", frameSelector: flTextClickM[1], target: flTextClickM[2], raw: line, selector: `page.frameLocator('${flTextClickM[1]}').getByText('${flTextClickM[2]}')` });
+        continue;
+      }
+      const flRoleFillM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.fill\(['"`](.*?)['"`]\)/);
+      if (flRoleFillM) {
+        rawSteps.push({ action: "frame_fill", frameSelector: flRoleFillM[1], target: flRoleFillM[3], value: flRoleFillM[4], raw: line, selector: `page.frameLocator('${flRoleFillM[1]}').getByRole('${flRoleFillM[2]}', { name: '${flRoleFillM[3]}' })` });
+        continue;
+      }
+      const flLblFillM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.getByLabel\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
+      if (flLblFillM) {
+        rawSteps.push({ action: "frame_fill", frameSelector: flLblFillM[1], target: flLblFillM[2], value: flLblFillM[3], raw: line, selector: `page.frameLocator('${flLblFillM[1]}').getByLabel('${flLblFillM[2]}')` });
+        continue;
+      }
+      // frame + locator click
+      const flLocClickM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.locator\(['"`](.*?)['"`]\)\.click/);
+      if (flLocClickM) {
+        rawSteps.push({ action: "frame_click", frameSelector: flLocClickM[1], target: flLocClickM[2], raw: line, selector: `page.frameLocator('${flLocClickM[1]}').locator('${flLocClickM[2]}')` });
+        continue;
+      }
+      // frame + locator fill
+      const flLocFillM = line.match(/frameLocator\(['"`](.*?)['"`]\)\.locator\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
+      if (flLocFillM) {
+        rawSteps.push({ action: "frame_fill", frameSelector: flLocFillM[1], target: flLocFillM[2], value: flLocFillM[3], raw: line, selector: `page.frameLocator('${flLocFillM[1]}').locator('${flLocFillM[2]}')` });
+        continue;
+      }
+      // frame genérico → skip sin crashear
+      continue;
+    }
 
     // ─────────────────────────────────────────
     // 🔥 CONTENT FRAME  locator('#id').contentFrame()...

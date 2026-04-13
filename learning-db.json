@@ -434,8 +434,8 @@
   "https://demoqa.com/|click|Book Store Application": [
     {
       "selector": "text=Store Application",
-      "successCount": 221,
-      "lastUsed": "2026-04-13T20:14:42.746Z"
+      "successCount": 223,
+      "lastUsed": "2026-04-13T20:51:42.052Z"
     },
     {
       "selector": "Book Store Application",
@@ -446,8 +446,8 @@
   "https://demoqa.com/books|click|Elements": [
     {
       "selector": "Elements",
-      "successCount": 102,
-      "lastUsed": "2026-04-13T20:14:50.415Z"
+      "successCount": 104,
+      "lastUsed": "2026-04-13T20:52:30.743Z"
     }
   ],
   "https://demoqa.com/books|click|Text Box": [
@@ -516,36 +516,36 @@
   "https://demoqa.com/books|click|Check Box": [
     {
       "selector": "Check Box",
-      "successCount": 13,
-      "lastUsed": "2026-04-13T20:14:55.688Z"
+      "successCount": 15,
+      "lastUsed": "2026-04-13T20:52:36.274Z"
     }
   ],
   "https://demoqa.com/checkbox|check|Select Home": [
     {
       "selector": "Select Home",
-      "successCount": 13,
-      "lastUsed": "2026-04-13T20:15:00.994Z"
+      "successCount": 15,
+      "lastUsed": "2026-04-13T20:52:38.799Z"
     }
   ],
   "https://demoqa.com/checkbox|click|.rc-tree-switcher": [
     {
       "selector": ".rc-tree-switcher",
-      "successCount": 13,
-      "lastUsed": "2026-04-13T20:15:03.708Z"
+      "successCount": 15,
+      "lastUsed": "2026-04-13T20:52:41.324Z"
     }
   ],
   "https://demoqa.com/checkbox|click|.rc-tree-switcher.rc-tree-switcher_close": [
     {
       "selector": ".rc-tree-switcher.rc-tree-switcher_close",
-      "successCount": 56,
-      "lastUsed": "2026-04-13T20:15:15.612Z"
+      "successCount": 5,
+      "lastUsed": "2026-04-13T20:52:52.284Z"
     }
   ],
   "https://demoqa.com/checkbox|click|Select Excel File.doc Excel": [
     {
       "selector": "Select Excel File.doc Excel",
-      "successCount": 13,
-      "lastUsed": "2026-04-13T20:15:19.909Z"
+      "successCount": 14,
+      "lastUsed": "2026-04-13T20:52:55.152Z"
     }
   ],
   "https://demoqa.com/text-box|click|#permanentAddress": [
@@ -1319,36 +1319,36 @@
   "https://demoqa.com/checkbox|check|Select Excel File.doc": [
     {
       "selector": "Select Excel File.doc",
-      "successCount": 10,
-      "lastUsed": "2026-04-13T20:15:23.580Z"
+      "successCount": 11,
+      "lastUsed": "2026-04-13T20:52:57.025Z"
     }
   ],
   "https://demoqa.com/checkbox|check|Select Word File.doc": [
     {
       "selector": "Select Word File.doc",
-      "successCount": 9,
-      "lastUsed": "2026-04-13T20:15:26.008Z"
+      "successCount": 10,
+      "lastUsed": "2026-04-13T20:52:58.251Z"
     }
   ],
   "https://demoqa.com/checkbox|check|Select Public": [
     {
       "selector": "Select Public",
-      "successCount": 9,
-      "lastUsed": "2026-04-13T20:15:28.291Z"
+      "successCount": 10,
+      "lastUsed": "2026-04-13T20:52:59.452Z"
     }
   ],
   "https://demoqa.com/checkbox|check|Select React": [
     {
       "selector": "Select React",
-      "successCount": 9,
-      "lastUsed": "2026-04-13T20:15:30.618Z"
+      "successCount": 10,
+      "lastUsed": "2026-04-13T20:53:00.690Z"
     }
   ],
   "https://demoqa.com/checkbox|check|Select Notes": [
     {
       "selector": "Select Notes",
-      "successCount": 8,
-      "lastUsed": "2026-04-13T20:15:32.879Z"
+      "successCount": 9,
+      "lastUsed": "2026-04-13T20:53:01.846Z"
     }
   ],
   "https://demoqa.com/books|click|Progress Bar": [

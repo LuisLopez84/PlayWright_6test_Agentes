@@ -97,6 +97,8 @@ export async function waitForOverlayToDisappear(page: Page, timeoutMs = 10000): 
   const overlaySelectors = [
     '.loading', '.loader', '[class*="loading"]', '[class*="spinner"]',
     '[aria-busy="true"]', '.overlay:not([role="dialog"])',
+    // Skeleton loaders
+    '[class*="skeleton"]', '[class*="shimmer"]', '[class*="placeholder"]:not(input):not(textarea)',
   ];
   for (const sel of overlaySelectors) {
     try {
@@ -105,5 +107,51 @@ export async function waitForOverlayToDisappear(page: Page, timeoutMs = 10000): 
         await el.first().waitFor({ state: 'hidden', timeout: timeoutMs }).catch(() => {});
       }
     } catch {}
+  }
+}
+
+/**
+ * Espera a que aparezca un toast/snackbar/notificación y devuelve su texto.
+ * Útil para verificar mensajes de éxito/error post-operación.
+ * @param expectedText - texto parcial esperado (opcional, solo para log)
+ * @param timeout - tiempo máximo de espera en ms
+ */
+export async function waitForToastMessage(
+  page: Page,
+  expectedText?: string,
+  timeout = 8000,
+): Promise<string> {
+  if (page.isClosed()) return '';
+
+  const toastSelectors = [
+    '[role="alert"]',
+    '[class*="toast"]',
+    '[class*="snackbar"]',
+    '[class*="notification"]:not([class*="badge"])',
+    '.Toastify__toast',
+    '.swal2-popup',
+    '.toast',
+    '.toast-message',
+  ];
+  const combined = toastSelectors.join(', ');
+
+  try {
+    await page.waitForSelector(combined, { state: 'visible', timeout });
+    const toastEl = page.locator(combined).first();
+    const text = await toastEl.textContent().catch(() => '');
+    const trimmed = text?.trim() || '';
+    console.log(`🍞 Toast detectado: "${trimmed.substring(0, 80)}"`);
+    if (expectedText && !trimmed.toLowerCase().includes(expectedText.toLowerCase())) {
+      console.warn(`⚠️ Toast no contiene texto esperado: "${expectedText}"`);
+    }
+    return trimmed;
+  } catch {
+    if (expectedText) {
+      try {
+        await page.waitForSelector(`:text("${expectedText}")`, { state: 'visible', timeout: 3000 });
+        return expectedText;
+      } catch {}
+    }
+    return '';
   }
 }

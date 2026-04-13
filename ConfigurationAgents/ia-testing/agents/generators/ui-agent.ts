@@ -15,7 +15,7 @@ export function generateUITest(name: string, steps: any[]) {
   // elementos dinámicos distintos que comparten selector (e.g., árbol expandible).
   const uniqueSteps: any[] = [];
   const seen = new Set();
-  const NON_DEDUP_ACTIONS = new Set(['click', 'dblclick', 'press_enter', 'dialog_handler', 'page_load']);
+  const NON_DEDUP_ACTIONS = new Set(['click', 'dblclick', 'press_enter', 'press_key', 'dialog_handler', 'page_load', 'hover', 'rightclick', 'drag', 'frame_click', 'frame_fill', 'scroll']);
   for (const step of steps) {
     if (NON_DEDUP_ACTIONS.has(step.action)) {
       uniqueSteps.push(step); // clics siempre se preservan
@@ -30,20 +30,28 @@ export function generateUITest(name: string, steps: any[]) {
   console.log(`📊 generateUITest: steps únicos: ${uniqueSteps.length} de ${steps.length}`);
 
   // ── Determinar qué imports necesitamos ──
-  const usesCheck   = uniqueSteps.some(s => s.action === 'check' || s.action === 'uncheck');
-  const usesDbl     = uniqueSteps.some(s => s.action === 'dblclick');
-  const usesUpload  = uniqueSteps.some(s => s.action === 'upload');
-  const usesVerify  = uniqueSteps.some(s => s.action === 'verify') ||
-                      uniqueSteps.some(s => s.pageRef === 'popup' && s.action === 'verify');
-  const usesSelect  = uniqueSteps.some(s => s.action === 'select' || s.action === 'selectOption');
-  const usesPopup   = uniqueSteps.some(s => s.popupTrigger);
+  const usesCheck     = uniqueSteps.some(s => s.action === 'check' || s.action === 'uncheck');
+  const usesDbl       = uniqueSteps.some(s => s.action === 'dblclick');
+  const usesUpload    = uniqueSteps.some(s => s.action === 'upload');
+  const usesVerify    = uniqueSteps.some(s => s.action === 'verify') ||
+                        uniqueSteps.some(s => s.pageRef === 'popup' && s.action === 'verify');
+  const usesSelect    = uniqueSteps.some(s => s.action === 'select' || s.action === 'selectOption');
+  const usesPopup     = uniqueSteps.some(s => s.popupTrigger);
+  const usesHover     = uniqueSteps.some(s => s.action === 'hover');
+  const usesRightClick= uniqueSteps.some(s => s.action === 'rightclick');
+  const usesDrag      = uniqueSteps.some(s => s.action === 'drag');
+  const usesScroll    = uniqueSteps.some(s => s.action === 'scroll');
 
   const importedActions = ['smartClick', 'smartFill'];
-  if (usesSelect) importedActions.push('smartSelect');
-  if (usesVerify) importedActions.push('smartWaitForText');
-  if (usesCheck)  importedActions.push('smartCheck');
-  if (usesDbl)    importedActions.push('smartDblClick');
-  if (usesUpload) importedActions.push('smartUpload');
+  if (usesSelect)     importedActions.push('smartSelect');
+  if (usesVerify)     importedActions.push('smartWaitForText');
+  if (usesCheck)      importedActions.push('smartCheck');
+  if (usesDbl)        importedActions.push('smartDblClick');
+  if (usesUpload)     importedActions.push('smartUpload');
+  if (usesHover)      importedActions.push('smartHover');
+  if (usesRightClick) importedActions.push('smartRightClick');
+  if (usesDrag)       importedActions.push('smartDragAndDrop');
+  if (usesScroll)     importedActions.push('smartScroll');
 
   // ── URL base del recording (para fallback directo en popup triggers) ──
   const pageLoadStep = uniqueSteps.find(s => s.action === 'page_load');
@@ -116,6 +124,87 @@ ${dialogQueueBlock}`;
     if (step.action === 'press_enter') {
       code += `
   await page.keyboard.press('Enter');`;
+      i++;
+      continue;
+    }
+
+    // ── press_key → tecla arbitraria ──────────────────────────────────
+    if (step.action === 'press_key') {
+      code += `
+  await page.keyboard.press('${step.target}');`;
+      i++;
+      continue;
+    }
+
+    // ── HOVER → smartHover ────────────────────────────────────────────
+    if (step.action === 'hover') {
+      const rawSel = step.selector || step.target;
+      const selector = normalizeSelector(rawSel);
+      if (selector) {
+        code += `
+  await smartHover(page, \`${selector}\`);`;
+      }
+      i++;
+      continue;
+    }
+
+    // ── RIGHT CLICK → smartRightClick ─────────────────────────────────
+    if (step.action === 'rightclick') {
+      const rawSel = step.selector || step.target;
+      const selector = normalizeSelector(rawSel);
+      if (selector) {
+        code += `
+  await smartRightClick(page, \`${selector}\`);`;
+      }
+      i++;
+      continue;
+    }
+
+    // ── DRAG AND DROP → smartDragAndDrop ──────────────────────────────
+    if (step.action === 'drag') {
+      const srcSel = normalizeSelector(step.selector || step.source || '');
+      const tgtSel = normalizeSelector(step.targetSelector || step.target || '');
+      if (srcSel && tgtSel) {
+        code += `
+  await smartDragAndDrop(page, \`${srcSel}\`, \`${tgtSel}\`);`;
+      }
+      i++;
+      continue;
+    }
+
+    // ── FRAME CLICK → frameLocator directo ───────────────────────────
+    if (step.action === 'frame_click') {
+      // Usar el selector completo del frame que ya incluye frameLocator()
+      const rawSel = step.selector || '';
+      if (rawSel) {
+        code += `
+  // Interacción dentro de iframe: ${step.frameSelector}
+  await ${rawSel.startsWith('page.') ? rawSel : `page.${rawSel}`}.click();`;
+      }
+      i++;
+      continue;
+    }
+
+    // ── FRAME FILL → frameLocator + fill ─────────────────────────────
+    if (step.action === 'frame_fill') {
+      const rawSel = step.selector || '';
+      const val = step.value || '';
+      if (rawSel) {
+        code += `
+  // Fill dentro de iframe: ${step.frameSelector}
+  await ${rawSel.startsWith('page.') ? rawSel : `page.${rawSel}`}.fill('${val}');`;
+      }
+      i++;
+      continue;
+    }
+
+    // ── SCROLL → smartScroll ──────────────────────────────────────────
+    if (step.action === 'scroll') {
+      const target = step.target || '';
+      if (target) {
+        code += `
+  await smartScroll(page, \`${target}\`);`;
+      }
       i++;
       continue;
     }
