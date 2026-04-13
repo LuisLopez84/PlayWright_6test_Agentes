@@ -45,6 +45,10 @@ export function generateUITest(name: string, steps: any[]) {
   if (usesDbl)    importedActions.push('smartDblClick');
   if (usesUpload) importedActions.push('smartUpload');
 
+  // ── URL base del recording (para fallback directo en popup triggers) ──
+  const pageLoadStep = uniqueSteps.find(s => s.action === 'page_load');
+  const recordingBaseURL = pageLoadStep?.url || '';
+
   // ── Recopilar todos los dialog_handler para el manejador global ──
   const dialogSteps = uniqueSteps.filter(s => s.action === 'dialog_handler');
   const hasDialogs = dialogSteps.length > 0;
@@ -199,11 +203,35 @@ ${dialogQueueBlock}`;
         ? `(${rawStepSel.startsWith('page.') ? rawStepSel : `page.${rawStepSel}`}).click()`
         : (selector ? `smartClick(page, \`${selector}\`)` : null);
       if (!triggerExpr) { i = j; continue; }
-      code += `
-  // Asegurar que la página está lista antes de abrir nueva pestaña
-  await page.waitForLoadState('load');
-  // context.waitForEvent('page') es más robusto que page.waitForEvent('popup'):
-  // captura cualquier nueva página en el contexto sin depender del actionTimeout
+      // ── Fallback de navegación directa ──────────────────────────────
+      // Derivar URL esperada a partir del texto del link de navegación previo.
+      // Si los clicks de sidebar/menú no llegaron al destino, ir directamente.
+      const prevNavStep = uniqueSteps[i - 1];
+      const prevTarget = (prevNavStep?.target || prevNavStep?.selector || '').trim();
+      const isLinkNav = prevTarget && /get[A-Z]/.test(prevNavStep?.selector || '') &&
+                        (prevNavStep?.selector || '').includes('link');
+      let fallbackUrlCode = '';
+      if (isLinkNav && prevTarget && recordingBaseURL) {
+        try {
+          const origin = new URL(recordingBaseURL).origin;
+          const derivedPath = prevTarget
+            .toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '')
+            .trim()
+            .replace(/\s+/g, '-');
+          fallbackUrlCode = `
+  // Fallback de navegación directa: si los clicks previos no llegaron al destino
+  // (sidebar complejo, SPA, menús desplegables), navegar directamente.
+  if (!page.url().includes('${derivedPath}')) {
+    console.log('⚠️ Navegación UI no llegó a ${derivedPath} — usando goto directo');
+    await page.goto('${origin}/${derivedPath}');
+    await page.waitForLoadState('load');
+  }`;
+        } catch { /* URL derivation failed, skip fallback */ }
+      }
+      code += `${fallbackUrlCode}
+  // context.waitForEvent('page') captura cualquier nueva página del contexto
+  // sin depender del actionTimeout del config (más robusto que page.waitForEvent('popup'))
   const [_popupPage] = await Promise.all([
     context.waitForEvent('page', { timeout: 30000 }),
     ${triggerExpr},

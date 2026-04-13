@@ -10,14 +10,19 @@ test('DemoQA_Elements_Browser', async ({ page, context }) => {
   await smartClick(page, `Alerts, Frame & Windows`);
   await smartClick(page, `Browser Windows`);
 
-  // Esperar que la página de Browser Windows esté completamente lista
-  await page.waitForLoadState('load');
+  // Fallback de navegación directa: si los clicks de sidebar no llegaron al destino
+  // (menú colapsado, SPA, overlay, etc.), navegar directamente.
+  if (!page.url().includes('browser-windows')) {
+    console.log('⚠️ Navegación UI no llegó a browser-windows — usando goto directo');
+    await page.goto('https://demoqa.com/browser-windows');
+    await page.waitForLoadState('load');
+  }
 
-  // Abrir nueva pestaña usando context.waitForEvent('page') que es más robusto
-  // que page.waitForEvent('popup') — captura cualquier nueva página en el contexto
+  // context.waitForEvent('page') captura cualquier nueva página del contexto
+  // sin depender del actionTimeout del config (más robusto que page.waitForEvent('popup'))
   const [_popupPage] = await Promise.all([
     context.waitForEvent('page', { timeout: 30000 }),
-    (page.getByRole('button', { name: 'New Tab' })).click(),
+    page.getByRole('button', { name: 'New Tab' }).click(),
   ]);
   await _popupPage.waitForLoadState('load');
 

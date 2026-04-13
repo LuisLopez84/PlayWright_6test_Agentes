@@ -3,19 +3,22 @@ import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 import { smartClick, smartFill } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
-test('DemoQA_Elements_Links', async ({ page }) => {
+test('DemoQA_Elements_Links', async ({ page, context }) => {
   await smartGoto(page, 'DemoQA_Elements_Links');
 
   await smartClick(page, `Book Store Application`);
   await smartClick(page, `Elements`);
   await smartClick(page, `Links`);
   await smartClick(page, `Moved`);
-  // Abrir nueva pestaña y esperar a que esté lista
+  // Asegurar que la página está lista antes de abrir nueva pestaña
+  await page.waitForLoadState('load');
+  // context.waitForEvent('page') es más robusto que page.waitForEvent('popup'):
+  // captura cualquier nueva página en el contexto sin depender del actionTimeout
   const [_popupPage] = await Promise.all([
-    page.waitForEvent('popup'),
+    context.waitForEvent('page', { timeout: 30000 }),
     (page.getByRole('link', { name: 'Home', exact: true })).click(),
   ]);
-  await _popupPage.waitForLoadState();
+  await _popupPage.waitForLoadState('load');
   await smartClick(_popupPage, `Book Store Application`);
   await smartClick(_popupPage, `Elements`);
   await smartClick(_popupPage, `Links`);

@@ -256,11 +256,34 @@ const NAVIGATION_TRIGGERS = [
   'entrar', 'logout', 'cerrar sesion', 'sign out',
 ];
 
-async function waitForNavigationAfterClick(page: Page, selector: string): Promise<void> {
+async function waitForNavigationAfterClick(
+  page: Page,
+  selector: string,
+  urlBefore: string = '',
+): Promise<void> {
+  if (!isPageAlive(page)) return;
+
   const normalized = selector.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+  // ── Keyword-based (operaciones de negocio conocidas) ──────────────
   if (NAVIGATION_TRIGGERS.some(kw => normalized.includes(kw))) {
     await page.waitForLoadState('networkidle', { timeout: 4000 }).catch(() => {});
     await page.waitForTimeout(800);
+    return;
+  }
+
+  // ── Detección fiable de cambio de URL ─────────────────────────────
+  // urlBefore viene capturado JUSTO ANTES del click, por lo que siempre
+  // refleja la URL pre-click aunque la navegación ya haya completado.
+  if (!urlBefore) return; // sin referencia, no podemos detectar cambio
+
+  const currentUrl = page.url();
+  const urlChanged = currentUrl !== urlBefore && !currentUrl.startsWith('about:');
+
+  if (urlChanged) {
+    // URL cambió durante el click → esperar carga completa de la nueva página
+    await page.waitForLoadState('load', { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(200);
   }
 }
 
@@ -442,6 +465,8 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
     }
 
     // ── [4] Ejecutar click ──
+    // Capturar URL antes del click para detectar navegación posterior
+    const _urlBeforeClick = page.url();
     await locator.scrollIntoViewIfNeeded().catch(() => {});
     try {
       // Primer intento SIN force — necesario para React Router / SPA navigation links.
@@ -467,6 +492,7 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
           await optLoc.click({ force: true });
           learningStore.recordSuccess(sig, healedOpt);
           await waitForPageStability(page);
+          await waitForNavigationAfterClick(page, selector, _urlBeforeClick);
           return;
         }
       }
@@ -478,6 +504,7 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
         await healedLoc.click({ force: true });
         learningStore.recordSuccess(sig, healedOnClick);
         await waitForPageStability(page);
+        await waitForNavigationAfterClick(page, selector, _urlBeforeClick);
         return;
       }
 
@@ -489,6 +516,7 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
           await aiLoc.first().click({ force: true });
           learningStore.recordSuccess(sig, aiSel);
           await waitForPageStability(page);
+          await waitForNavigationAfterClick(page, selector, _urlBeforeClick);
           return;
         }
       }
@@ -496,7 +524,7 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
     }
 
     await waitForPageStability(page);
-    await waitForNavigationAfterClick(page, selector);
+    await waitForNavigationAfterClick(page, selector, _urlBeforeClick);
     await closeAnyModal(page);
   }, selector);
 }

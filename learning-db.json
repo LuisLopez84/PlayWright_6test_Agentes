@@ -434,8 +434,8 @@
   "https://demoqa.com/|click|Book Store Application": [
     {
       "selector": "text=Store Application",
-      "successCount": 197,
-      "lastUsed": "2026-04-13T17:18:05.893Z"
+      "successCount": 207,
+      "lastUsed": "2026-04-13T18:40:58.501Z"
     },
     {
       "selector": "Book Store Application",
@@ -993,8 +993,8 @@
   "https://demoqa.com/books|click|Alerts, Frame & Windows": [
     {
       "selector": "Alerts, Frame & Windows",
-      "successCount": 58,
-      "lastUsed": "2026-04-13T17:18:46.723Z"
+      "successCount": 68,
+      "lastUsed": "2026-04-13T18:41:12.263Z"
     }
   ],
   "https://demoqa.com/books|click|Modal Dialogs": [
@@ -1120,8 +1120,8 @@
   "https://demoqa.com/books|click|Browser Windows": [
     {
       "selector": "text=Windows",
-      "successCount": 15,
-      "lastUsed": "2026-04-13T17:18:59.121Z"
+      "successCount": 25,
+      "lastUsed": "2026-04-13T18:41:18.835Z"
     }
   ],
   "https://demoqa.com/browser-windows|click|New Tab": [
