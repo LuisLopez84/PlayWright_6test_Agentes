@@ -1,6 +1,7 @@
 
 Feature: Homebankink_Prestamos
 
+@UI
 Scenario: Flujo Homebankink_Prestamos
   Given el usuario está en la aplicación
   When el usuario ingresa "demo" en "Usuario"

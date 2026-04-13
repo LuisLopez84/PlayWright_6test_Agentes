@@ -1,6 +1,7 @@
 
 Feature: DemoQA_Elements_Alerts
 
+@UI
 Scenario: Flujo DemoQA_Elements_Alerts
   Given el usuario está en la aplicación
   And hace clic en "Book Store Application"

@@ -9,13 +9,10 @@ test('DemoQA_Elements_Interactions', async ({ page }) => {
   await smartClick(page, `Book Store Application`);
   await smartClick(page, `Interactions`);
   await smartClick(page, `Sortable`);
-  // List tab items
-  await page.getByLabel('List').getByText('One').click();
-  await page.getByLabel('List').getByText('Two').click();
-  // Switch to Grid tab
-  await page.getByRole('tab', { name: 'Grid' }).click();
-  // Grid tab items
-  await page.getByLabel('Grid').getByText('Five').click();
-  await page.getByLabel('Grid').getByText('Three').click();
-  await page.getByLabel('Grid').getByText('One').click();
+  await smartClick(page, `One`);
+  await smartClick(page, `Two`);
+  await smartClick(page, `Grid`);
+  await smartClick(page, `Five`);
+  await smartClick(page, `Three`);
+  await smartClick(page, `One`);
 });

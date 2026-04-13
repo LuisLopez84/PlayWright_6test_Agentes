@@ -7,5 +7,7 @@
   "Grid": "text=grid",
   ".auto-complete__input-container": ".text:has-text(\"Auto Complete\")",
   "Origin": "text=origin",
-  "Use": "text=use"
+  "Use": "text=use",
+  "New Window Message": "text=Window Message",
+  "Browser Windows": "text=Windows"
 }

@@ -1,6 +1,7 @@
 
 Feature: Homebanking_Transf
 
+@UI
 Scenario: Flujo Homebanking_Transf
   Given el usuario está en la aplicación
   When el usuario ingresa "demo" en "Usuario"

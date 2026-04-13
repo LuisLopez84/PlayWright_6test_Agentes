@@ -9,12 +9,13 @@ test('DemoQA_Elements_DownloadUpload', async ({ page }) => {
   await smartClick(page, `Book Store Application`);
   await smartClick(page, `Elements`);
   await smartClick(page, `Upload and Download`);
+  await smartClick(page, `Choose File`);
   // Upload de archivo — asegúrate de que el fichero existe en el entorno de test
   try {
     await smartUpload(page, `Choose File`, 'cloude001.png');
-    // Solo verificar la ruta si el upload tuvo éxito
-    await smartWaitForText(page, `C:\\fakepath\\cloude001.png`, 5000);
   } catch (e) {
-    console.warn('⚠️ Upload omitido (archivo no encontrado) — test continúa:', 'cloude001.png');
+    console.warn('⚠️ Upload omitido (archivo no encontrado):', 'cloude001.png');
   }
+  // Verificar mensaje de resultado (texto asíncrono — puede ser toast transitorio)
+  await smartWaitForText(page, `C:\\fakepath\\cloude001.png`, 15000);
 });

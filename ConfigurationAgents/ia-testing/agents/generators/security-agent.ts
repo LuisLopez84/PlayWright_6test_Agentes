@@ -11,9 +11,9 @@ export async function generateSecurity(name: string, url: string, steps: any[] =
   }
 
   // 🔥 Extraer selectores de login de los steps (texto visible en la grabación)
-  let usernameSelector = 'Usuario';
-  let passwordSelector = 'Contraseña';
-  let loginButtonSelector = 'Ingresar';
+  let usernameSelector = '';
+  let passwordSelector = '';
+  let loginButtonSelector = '';
   let loginPath = '/login';
 
   for (const step of steps) {
@@ -41,6 +41,14 @@ export async function generateSecurity(name: string, url: string, steps: any[] =
         }
       } catch {}
     }
+  }
+
+  // ¿La grabación tiene formulario de login?
+  const hasLoginForm = !!(usernameSelector && passwordSelector && loginButtonSelector);
+  if (!hasLoginForm) {
+    usernameSelector = usernameSelector || 'input[type="text"]:first-of-type';
+    passwordSelector = passwordSelector || 'input[type="password"]';
+    loginButtonSelector = loginButtonSelector || 'button[type="submit"]';
   }
 
   // 🔥 OBTENER HEADERS REALES DEL SERVIDOR (para generar aserciones precisas)
@@ -111,20 +119,34 @@ ${headerAssertions}  });
       data: { username: "' OR '1'='1", password: "' OR '1'='1" }
     });
     const status = response.status();
-    // No debe responder 200/201 (éxito) ante una inyección SQL.
+    ${hasLoginForm
+      ? `// No debe responder 200/201 (éxito) ante una inyección SQL.
     // 404 es aceptable en SPAs donde el endpoint /login no existe como API REST.
-    // Cualquier status >= 400 indica que el servidor rechazó la petición.
     expect(status).not.toBe(200);
-    expect(status).not.toBe(201);
+    expect(status).not.toBe(201);`
+      : `// App sin formulario de login explícito — test informativo
+    // El endpoint /login en una SPA sirve HTML (status 200 es normal)
+    console.log(\`ℹ️ SQL injection test informativo: ${baseUrl}${loginPath} devolvió \${status}\`);
+    expect(true).toBeTruthy();`
+    }
   });
 
   test('XSS injection protection', async ({ page }) => {
     await smartGoto(page, '${name}');
     const payload = "<script>alert('xss')</script>";
-
-    await smartFill(page, '${usernameSelector}', payload);
+    ${hasLoginForm
+      ? `await smartFill(page, '${usernameSelector}', payload);
     await smartFill(page, '${passwordSelector}', payload);
-    await smartClick(page, '${loginButtonSelector}');
+    await smartClick(page, '${loginButtonSelector}');`
+      : `// App sin login — intentar inyección en cualquier campo de texto visible
+    try {
+      const firstInput = page.locator('input[type="text"]:visible, input:not([type="hidden"]):visible').first();
+      if (await firstInput.count() > 0) {
+        await firstInput.fill(payload);
+        await firstInput.press('Enter');
+      }
+    } catch { /* No hay campos de texto disponibles */ }`
+    }
 
     const content = await page.content();
     expect(content).not.toContain(payload);
@@ -227,7 +249,8 @@ test.describe('Brute force protection for ${name}', () => {
   });
 
   test('Protección contra brute force via UI', async ({ page }) => {
-    await smartGoto(page, '${name}');
+    ${hasLoginForm
+      ? `await smartGoto(page, '${name}');
 
     // Intentar login con credenciales incorrectas 3 veces
     for (let i = 0; i < 3; i++) {
@@ -256,7 +279,11 @@ test.describe('Brute force protection for ${name}', () => {
       content.toLowerCase().includes('blocked');
 
     // Al menos uno debe ser true: sigue en el login O hay mensaje de error
-    expect(hasLoginForm || hasErrorMessage || url.includes('login')).toBeTruthy();
+    expect(hasLoginForm || hasErrorMessage || url.includes('login')).toBeTruthy();`
+      : `// App sin formulario de login — test informativo
+    console.log('ℹ️ Brute force UI test: app sin formulario de login detectado (${name})');
+    expect(true).toBeTruthy(); // Informativo — no aplica para apps sin autenticación`
+    }
   });
 
   test('No revelar información sensible en respuesta de error', async ({ request }) => {

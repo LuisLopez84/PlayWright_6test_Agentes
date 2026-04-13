@@ -1,6 +1,7 @@
 
 Feature: Homebankink_PagoServicios
 
+@UI
 Scenario: Flujo Homebankink_PagoServicios
   Given el usuario está en la aplicación
   When el usuario ingresa "demo" en "Usuario"

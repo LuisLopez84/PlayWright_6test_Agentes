@@ -11,8 +11,14 @@ export async function restRequest(
   }
 ) {
   const startTime = Date.now();
+  // Playwright serializa `data` como form-encoded a menos que se use la opción
+  // `contentType: 'application/json'`. Detectamos el header y serializamos manualmente.
+  const contentType = options?.headers?.['Content-Type'] || options?.headers?.['content-type'] || '';
+  const rawData = (contentType.includes('application/json') && options?.data && typeof options.data === 'object')
+    ? JSON.stringify(options.data)
+    : options?.data;
   const response = await request[method.toLowerCase()](url, {
-    data: options?.data,
+    data: rawData,
     headers: options?.headers,
     params: options?.params,
   });

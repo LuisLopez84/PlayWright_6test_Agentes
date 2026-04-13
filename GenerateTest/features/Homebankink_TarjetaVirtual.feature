@@ -1,6 +1,7 @@
 
 Feature: Homebankink_TarjetaVirtual
 
+@UI
 Scenario: Flujo Homebankink_TarjetaVirtual
   Given el usuario está en la aplicación
   When el usuario ingresa "demo" en "Usuario"

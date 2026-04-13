@@ -11,6 +11,7 @@ test('Homebanking_Transf', async ({ page }) => {
   await page.waitForTimeout(500);
   await smartFill(page, `Contraseña`, 'demo123');
   await page.waitForTimeout(500);
+  await page.keyboard.press('Enter');
   await smartClick(page, `Ingresar`);
   await smartClick(page, `Transferencias`);
   await smartSelect(page, `#source-account`, 'ACC002');

@@ -1,6 +1,7 @@
 
 Feature: Homebankink_PlazosFijos
 
+@UI
 Scenario: Flujo Homebankink_PlazosFijos
   Given el usuario está en la aplicación
   When el usuario ingresa "demo" en "Usuario"

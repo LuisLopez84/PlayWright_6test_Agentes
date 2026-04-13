@@ -1,6 +1,7 @@
 
 Feature: DemoQA_Elements_Modales
 
+@UI
 Scenario: Flujo DemoQA_Elements_Modales
   Given el usuario está en la aplicación
   And hace clic en "Book Store Application"

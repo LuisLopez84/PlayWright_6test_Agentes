@@ -1,6 +1,7 @@
 
 Feature: DemoQA_Elements_Frames
 
+@UI
 Scenario: Flujo DemoQA_Elements_Frames
   Given el usuario está en la aplicación
   And hace clic en "Book Store Application"
