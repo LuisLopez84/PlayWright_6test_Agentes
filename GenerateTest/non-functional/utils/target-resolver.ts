@@ -1,7 +1,7 @@
 /**
  * target-resolver.ts
  *
- * Resuelve los targets (recordings + APIs) configurados en nf-config.ts
+ * Resuelve targets (recordings + APIs) configurados en nf-config.ts
  * hacia objetos LoadTarget ejecutables por el motor de carga.
  *
  * Para recordings:
@@ -10,6 +10,9 @@
  *
  * Para APIs:
  *   Usa directamente los datos de configuración del usuario.
+ *
+ * También exporta el tipo LoadTarget para que los specs generados puedan
+ * importarlo y embeber el target en tiempo de generación.
  */
 
 import fs from 'fs';
@@ -92,41 +95,36 @@ function resolveRecordingTarget(recordingName: string): LoadTarget | null {
   return null;
 }
 
-// ─── Resolver para APIs ───────────────────────────────────────────────────────
-
-function resolveApiTarget(api: typeof NFConfig.apis[0]): LoadTarget {
-  return {
-    name: api.name,
-    url: api.url,
-    method: api.method,
-    headers: api.headers ?? {},
-    body: api.body,
-    type: 'api',
-  };
-}
-
 // ─── Resolver principal ───────────────────────────────────────────────────────
 
 /**
  * Convierte la configuración del usuario en una lista de LoadTargets ejecutables.
+ * Soporta el nuevo formato targets[] (recordings + APIs unificados).
  * Los targets con URL inválida o no encontrada se omiten con un warning.
  */
 export function resolveTargets(config: typeof NFConfig): LoadTarget[] {
   const targets: LoadTarget[] = [];
 
-  // Recordings
-  for (const name of config.recordings) {
-    const t = resolveRecordingTarget(name.trim());
-    if (t) targets.push(t);
-  }
-
-  // APIs
-  for (const api of config.apis) {
-    if (!api.url) {
-      console.warn(`  ⚠️  API "${api.name}" no tiene URL configurada — omitida`);
-      continue;
+  for (const t of config.targets) {
+    if (t.type === 'recording') {
+      const resolved = resolveRecordingTarget(t.recording.trim());
+      if (resolved) targets.push(resolved);
+    } else if (t.type === 'api') {
+      const ep = t.endpoint;
+      if (!ep.url) {
+        console.warn(`  ⚠️  API "${ep.name}" no tiene URL — omitida`);
+        continue;
+      }
+      targets.push({
+        name: ep.name,
+        url: ep.url,
+        method: ep.method,
+        headers: ep.headers ?? {},
+        body: ep.body,
+        type: 'api',
+      });
+      console.log(`  📡 API "${ep.name}" → ${ep.url}`);
     }
-    targets.push(resolveApiTarget(api));
   }
 
   return targets;

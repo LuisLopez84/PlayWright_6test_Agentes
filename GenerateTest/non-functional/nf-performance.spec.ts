@@ -1,21 +1,17 @@
 /**
  * nf-performance.spec.ts
  *
- * Spec principal de pruebas NO FUNCIONALES (carga y rendimiento).
+ * Spec STANDALONE de pruebas no funcionales (runner independiente).
+ * Útil para probar la configuración ANTES de generar los specs integrados.
  *
  * ╔══════════════════════════════════════════════════════════════════════╗
- * ║  Cómo ejecutar:                                                      ║
- * ║    npx playwright test GenerateTest/non-functional/nf-performance.spec.ts
+ * ║  Ejecución directa (sin integración al reporte principal):          ║
+ * ║    npx playwright test --config GenerateTest/non-functional/nf.playwright.config.ts
  * ║                                                                      ║
- * ║  Antes de ejecutar, edita:                                           ║
- * ║    GenerateTest/non-functional/config/nf-config.ts                  ║
+ * ║  Para integración completa en el reporte HTML:                      ║
+ * ║    1. npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
+ * ║    2. npx playwright test --project=non-functional                  ║
  * ╚══════════════════════════════════════════════════════════════════════╝
- *
- * NOTAS TÉCNICAS:
- *  - Usa Node.js https/http (sin browser) para máxima eficiencia bajo carga.
- *  - Promise.all garantiza N workers concurrentes (red I/O-bound → verdadera concurrencia).
- *  - No modifica playwright.config.ts — funciona con la configuración existente.
- *  - test.setTimeout(0) deshabilita el límite de tiempo (las pruebas de carga pueden durar minutos).
  */
 
 import { test } from '@playwright/test';
@@ -24,20 +20,13 @@ import { resolveTargets } from './utils/target-resolver';
 import { runIncrementalTest, runSpikeTest } from './core/load-engine';
 import { printSummaryTable } from './reporters/summary-reporter';
 
-// ─── Configuración del test ───────────────────────────────────────────────────
-
-// Forzar ejecución serial: los tests de carga no deben correr en paralelo entre sí
 test.describe.configure({ mode: 'serial' });
 
-// ─── Test principal ───────────────────────────────────────────────────────────
-
-test('Prueba No Funcional — Carga y Rendimiento', async () => {
-  // Deshabilitar timeout: las pruebas de carga pueden durar varios minutos
+test('Prueba No Funcional — Standalone', async () => {
   test.setTimeout(0);
 
-  // ── Resolver targets ──────────────────────────────────────────────────────
   console.log('\n' + '═'.repeat(60));
-  console.log('  🚀 INICIANDO PRUEBA NO FUNCIONAL');
+  console.log('  🚀 INICIANDO PRUEBA NO FUNCIONAL (standalone)');
   console.log('═'.repeat(60));
 
   const targets = resolveTargets(NFConfig);
@@ -45,49 +34,25 @@ test('Prueba No Funcional — Carga y Rendimiento', async () => {
   if (targets.length === 0) {
     console.log(`
   ⚠️  No hay targets configurados.
-
-  Para ejecutar pruebas no funcionales, edita el archivo:
-    GenerateTest/non-functional/config/nf-config.ts
-
-  Opciones disponibles:
-    recordings: ['Homebankink_PagoServicios', 'Homebankink_PlazosFijos', ...]
-    apis: [{ name: 'Mi API', method: 'GET', url: 'https://...' }]
-
-  Recordings disponibles en BoxRecordings/recordings/*.ts
+  Edita: GenerateTest/non-functional/config/nf-config.ts
+  Añade recordings o apis al array targets[].
 `);
     return;
   }
 
-  console.log(`\n  📋 Tipo de prueba: ${NFConfig.testType.toUpperCase()}`);
-  console.log(`  🎯 Targets configurados: ${targets.length}`);
+  console.log(`\n  📋 Tipo: ${NFConfig.testType.toUpperCase()} | Targets: ${targets.length}`);
   for (const t of targets) {
     console.log(`     • [${t.type.toUpperCase()}] ${t.name} → ${t.url}`);
   }
 
-  // ── Ejecutar prueba para cada target ─────────────────────────────────────
-  const allResults: Array<{ target: typeof targets[0]; summaries: ReturnType<typeof resolveTargets>[0] }> = [];
-
   for (const target of targets) {
     console.log(`\n${'─'.repeat(60)}`);
-    console.log(`  📡 Target: ${target.name}`);
-    console.log(`  🌐 URL: ${target.url}`);
-    console.log(`  🔧 Método: ${target.method}`);
-    if (NFConfig.assertions.expectedStatusCodes.length > 0) {
-      console.log(`  ✅ Códigos esperados: [${NFConfig.assertions.expectedStatusCodes.join(', ')}]`);
-    }
-    if (NFConfig.assertions.expectedResponseText) {
-      console.log(`  🔍 Texto esperado: "${NFConfig.assertions.expectedResponseText}"`);
-    }
+    console.log(`  📡 ${target.name} | ${target.url}`);
 
-    let summaries;
+    const summaries = NFConfig.testType === 'incremental'
+      ? await runIncrementalTest(target, NFConfig.incremental, NFConfig.assertions)
+      : await runSpikeTest(target, NFConfig.spike, NFConfig.assertions);
 
-    if (NFConfig.testType === 'incremental') {
-      summaries = await runIncrementalTest(target, NFConfig.incremental, NFConfig.assertions);
-    } else {
-      summaries = await runSpikeTest(target, NFConfig.spike, NFConfig.assertions);
-    }
-
-    // Imprimir reporte inmediatamente después de cada target
     printSummaryTable(target, summaries, NFConfig.testType);
   }
 

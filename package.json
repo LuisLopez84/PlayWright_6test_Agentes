@@ -12,7 +12,8 @@
     "test:all": "npx playwright test",
     "report": "npx playwright show-report",
     "pw:record": "npx playwright codegen",
-    "reports-index": "node ConfigurationAgents/ia-testing/scripts/generate-reports-index.js"
+    "reports-index": "node ConfigurationAgents/ia-testing/scripts/generate-reports-index.js",
+    "generate:nf": "ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.8.2",

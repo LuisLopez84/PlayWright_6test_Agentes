@@ -61,6 +61,7 @@ export default defineConfig({
       '**/accessibility/**/*.spec.ts',
       '**/security/**/*.spec.ts',
       '**/visual/**/*.spec.ts',
+      '**/non-functional/**/*.spec.ts',
     ],
     use: { ...devices['Desktop Chrome'] }
   },
@@ -76,6 +77,7 @@ export default defineConfig({
       '**/accessibility/**/*.spec.ts',
       '**/security/**/*.spec.ts',
       '**/visual/**/*.spec.ts',
+      '**/non-functional/**/*.spec.ts',
     ],
     use: { ...devices['Desktop Firefox'] }
   },
@@ -91,6 +93,7 @@ export default defineConfig({
       '**/accessibility/**/*.spec.ts',
       '**/security/**/*.spec.ts',
       '**/visual/**/*.spec.ts',
+      '**/non-functional/**/*.spec.ts',
     ],
     use: { ...devices['Desktop Safari'] }
   },
@@ -145,6 +148,20 @@ export default defineConfig({
     testMatch: [
       'GenerateTest/tests/**/security/**/*.spec.ts'
     ]
+  },
+
+  // 🔥 NON-FUNCTIONAL (Carga / Rendimiento estilo JMeter)
+  {
+    name: 'non-functional',
+    testMatch: [
+      'GenerateTest/tests/**/non-functional/**/*.spec.ts'
+    ],
+    // Sin timeout: las pruebas de carga pueden durar varios minutos
+    timeout: 0,
+    // Serial: no paralelizar pruebas de carga entre sí
+    fullyParallel: false,
+    workers: 1,
+    retries: 0,
   }
 
 ]
