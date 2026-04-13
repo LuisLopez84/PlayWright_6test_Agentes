@@ -79,6 +79,134 @@ export function isResultText(text: string): boolean {
 }
 
 // ─────────────────────────────────────────────────────────────
+// PARSER DE LÍNEA INDIVIDUAL
+// Reutilizado tanto por el loop principal como por el handler de popup.
+// ─────────────────────────────────────────────────────────────
+function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any | null {
+  // goto
+  const gotoM = line.match(/page\.goto\(['"`](.*?)['"`]\)/);
+  if (gotoM) return { action: "page_load", url: gotoM[1], raw: line };
+
+  // dialog
+  if (line.includes("page.once('dialog'") || line.includes('page.once("dialog"')) {
+    return { action: "dialog_handler", value: line.includes("dismiss") ? "dismiss" : "accept", raw: line };
+  }
+
+  // press enter
+  if (/\.press\(['"`](Enter|Return)['"`]\)/.test(line)) return { action: "press_enter", target: "Enter", raw: line };
+
+  // selectOption
+  const selOptM = line.match(/\.selectOption\(['"`](.*?)['"`]\)/);
+  if (selOptM) {
+    const roleM2 = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)/);
+    const locM2  = line.match(/locator\(['"`](.*?)['"`]\)/);
+    const lblM2  = line.match(/getByLabel\(['"`](.*?)['"`]\)/);
+    const phM2   = line.match(/getByPlaceholder\(['"`](.*?)['"`]\)/);
+    let sel2 = '', tgt2 = '';
+    if (roleM2)  { sel2 = `page.getByRole('${roleM2[1]}', { name: '${roleM2[2]}' })`; tgt2 = roleM2[2]; }
+    else if (locM2) { sel2 = locM2[1]; tgt2 = sel2; }
+    else if (lblM2)  { sel2 = `page.getByLabel('${lblM2[1]}')`; tgt2 = lblM2[1]; }
+    else if (phM2)   { sel2 = `page.getByPlaceholder('${phM2[1]}')`; tgt2 = phM2[1]; }
+    return { action: "select", target: tgt2 || sel2, value: selOptM[1], selector: sel2, raw: line };
+  }
+
+  // setInputFiles
+  const sifM = line.match(/\.setInputFiles\(['"`](.*?)['"`]\)/);
+  if (sifM) {
+    const roleM3 = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)/);
+    const locM3  = line.match(/locator\(['"`](.*?)['"`]\)/);
+    const tgt3   = roleM3 ? roleM3[2] : (locM3 ? locM3[1] : 'file-input');
+    const sel3   = roleM3 ? `page.getByRole('${roleM3[1]}', { name: '${roleM3[2]}' })` : (locM3 ? `page.locator('${locM3[1]}')` : '');
+    return { action: "upload", target: tgt3, value: sifM[1], selector: sel3, raw: line };
+  }
+
+  // dblclick
+  const dblRole = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.dblclick/);
+  if (dblRole) return { action: "dblclick", target: dblRole[2], raw: line, selector: `page.getByRole('${dblRole[1]}', { name: '${dblRole[2]}' })` };
+  const dblText = line.match(/getByText\(['"`](.*?)['"`]\)\.dblclick/);
+  if (dblText) return { action: "dblclick", target: dblText[1], raw: line, selector: `page.getByText('${dblText[1]}')` };
+  const dblLoc  = line.match(/locator\(['"`](.*?)['"`]\)\.dblclick/);
+  if (dblLoc)  return { action: "dblclick", target: dblLoc[1],  raw: line, selector: `page.locator('${dblLoc[1]}')` };
+
+  // check/uncheck
+  const rChk  = line.match(/getByRole\(['"`](radio|checkbox)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.check/);
+  if (rChk) return { action: "check", target: rChk[2], raw: line, selector: `page.getByRole('${rChk[1]}', { name: '${rChk[2]}' })` };
+  const rUnc  = line.match(/getByRole\(['"`](radio|checkbox)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.uncheck/);
+  if (rUnc) return { action: "uncheck", target: rUnc[2], raw: line, selector: `page.getByRole('${rUnc[1]}', { name: '${rUnc[2]}' })` };
+  const rChkCl = line.match(/getByRole\(['"`](checkbox|radio)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click/);
+  if (rChkCl) return { action: "check", target: rChkCl[2], raw: line, selector: `page.getByRole('${rChkCl[1]}', { name: '${rChkCl[2]}' })` };
+  const lChk  = line.match(/locator\(['"`](.*?)['"`]\)\.check/);
+  if (lChk) return { action: "check", target: lChk[1], raw: line, selector: `page.locator('${lChk[1]}')` };
+  const lUnc  = line.match(/locator\(['"`](.*?)['"`]\)\.uncheck/);
+  if (lUnc) return { action: "uncheck", target: lUnc[1], raw: line, selector: `page.locator('${lUnc[1]}')` };
+
+  // fills
+  const phFill = line.match(/getByPlaceholder\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
+  if (phFill) return { action: "input", target: phFill[1], value: phFill[2], raw: line, selector: `page.getByPlaceholder('${phFill[1]}')` };
+  const lblFill = line.match(/getByLabel\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.fill\(['"`](.*?)['"`]\)/);
+  if (lblFill) return { action: "input", target: lblFill[1], value: lblFill[2], raw: line, selector: `page.getByLabel('${lblFill[1]}')` };
+  const roleFill = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.fill\(['"`](.*?)['"`]\)/);
+  if (roleFill) return { action: "input", target: roleFill[2], value: roleFill[3], raw: line, selector: `page.getByRole('${roleFill[1]}', { name: '${roleFill[2]}' })` };
+  const locFill = line.match(/locator\(['"`](.*?)['"`]\)\.fill\(['"`](.*?)['"`]\)/);
+  if (locFill) return { action: "input", target: locFill[1], value: locFill[2], raw: line, selector: `page.locator('${locFill[1]}')` };
+
+  // clicks — role (heading/paragraph → verify)
+  const roleClk = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.(?:first\(\)\.)?click/);
+  if (roleClk) {
+    const role = roleClk[1]; const name = roleClk[2];
+    if (role === 'heading' || role === 'paragraph') {
+      return { action: "verify", target: name, raw: line, selector: name, verifyType: "text-visible" };
+    }
+    const exactM = line.match(/exact:\s*(true|false)/);
+    const exact = exactM ? exactM[1] === 'true' : undefined;
+    const sel = exact ? `page.getByRole('${role}', { name: '${name}', exact: true })` : `page.getByRole('${role}', { name: '${name}' })`;
+    return { action: "click", target: name, raw: line, selector: sel };
+  }
+
+  // clicks — text
+  const txtClk = line.match(/getByText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.click/);
+  if (txtClk) {
+    const text = txtClk[1];
+    return resultTextFn(text)
+      ? { action: "verify", target: text, raw: line, selector: text, verifyType: "text-visible" }
+      : { action: "click",  target: text, raw: line, selector: `page.getByText('${text}')` };
+  }
+
+  // clicks — locator variants
+  const locFirst = line.match(/locator\(['"`](.*?)['"`]\)\.first\(\)\.click/);
+  if (locFirst) return { action: "click", target: locFirst[1], raw: line, selector: `page.locator('${locFirst[1]}').first()` };
+  const locNth   = line.match(/locator\(['"`](.*?)['"`]\)\.nth\((\d+)\)\.click/);
+  if (locNth)   return { action: "click", target: locNth[1], raw: line, selector: `page.locator('${locNth[1]}').nth(${locNth[2]})` };
+  const locClk   = line.match(/locator\(['"`](.*?)['"`]\)\.click/);
+  if (locClk) {
+    const sel = locClk[1];
+    const inTxt = sel.match(/:(?:has-)?text\(['"`](.*?)['"`]\)/);
+    if (inTxt && resultTextFn(inTxt[1])) return { action: "verify", target: inTxt[1], raw: line, selector: inTxt[1], verifyType: "text-visible" };
+    return { action: "click", target: sel, raw: line, selector: `page.locator('${sel}')` };
+  }
+
+  // clicks — label/placeholder/altText/title/testId
+  const lblClk  = line.match(/getByLabel\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.click/);
+  if (lblClk)  return { action: "click", target: lblClk[1], raw: line, selector: `page.getByLabel('${lblClk[1]}')` };
+  const phClk   = line.match(/getByPlaceholder\(['"`](.*?)['"`]\)\.click/);
+  if (phClk)   return { action: "click", target: phClk[1], raw: line, selector: `page.getByPlaceholder('${phClk[1]}')` };
+  const altClk  = line.match(/getByAltText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.click/);
+  if (altClk)  return { action: "click", target: altClk[1], raw: line, selector: `page.getByAltText('${altClk[1]}')` };
+  const titClk  = line.match(/getByTitle\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.click/);
+  if (titClk)  return { action: "click", target: titClk[1], raw: line, selector: `page.getByTitle('${titClk[1]}')` };
+  const tidClk  = line.match(/getByTestId\(['"`](.*?)['"`]\)\.click/);
+  if (tidClk)  return { action: "click", target: tidClk[1], raw: line, selector: `page.getByTestId('${tidClk[1]}')` };
+
+  // expect assertions
+  const expVis = line.match(/expect\(.*getByText\(['"`](.*?)['"`].*\)\)\.toBeVisible/);
+  if (expVis) return { action: "verify", target: expVis[1], raw: line, selector: expVis[1], verifyType: "text-visible" };
+  const expTxt = line.match(/expect\(.*\)\.toHaveText\(['"`](.*?)['"`]/);
+  if (expTxt) return { action: "verify", target: expTxt[1], raw: line, selector: expTxt[1], verifyType: "text-exact" };
+
+  return null;
+}
+
+// ─────────────────────────────────────────────────────────────
 // PARSER PRINCIPAL
 // ─────────────────────────────────────────────────────────────
 export function parseRecording(filePath: string): any[] {
@@ -86,9 +214,63 @@ export function parseRecording(filePath: string): any[] {
   const rawSteps: any[] = [];
   const lines = content.split("\n");
 
+  // ── Estado para manejo de popups / nuevas pestañas ──────────────────
+  // Detecta el patrón de Playwright codegen:
+  //   const page1Promise = page.waitForEvent('popup');
+  //   await page.getByRole(...).click();
+  //   const page1 = await page1Promise;
+  //   await page1.getByRole(...).click();
+  let pendingPopupPromiseVar: string | null = null;  // nombre de la var promise
+  const popupPageVars = new Set<string>();            // vars que son popup pages
+
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("/*") || trimmed.startsWith("*")) continue;
+
+    // ─────────────────────────────────────────
+    // 🔥 POPUP  const pageXPromise = page.waitForEvent('popup')
+    // ─────────────────────────────────────────
+    const popupPromiseM = line.match(/const\s+(\w+)\s*=\s*page\.waitForEvent\(['"`]popup['"`]\)/);
+    if (popupPromiseM) {
+      pendingPopupPromiseVar = popupPromiseM[1];
+      continue;
+    }
+
+    // ─────────────────────────────────────────
+    // 🔥 POPUP  const pageX = await pageXPromise
+    // ─────────────────────────────────────────
+    if (pendingPopupPromiseVar) {
+      const popupAssignM = line.match(new RegExp(`const\\s+(\\w+)\\s*=\\s*await\\s+${pendingPopupPromiseVar}`));
+      if (popupAssignM) {
+        popupPageVars.add(popupAssignM[1]);
+        pendingPopupPromiseVar = null;
+        continue;
+      }
+    }
+
+    // ─────────────────────────────────────────
+    // 🔥 ACCIÓN EN POPUP PAGE  pageX.getByRole/getByText/etc.
+    // ─────────────────────────────────────────
+    // Detectar si la línea empieza con una var de popup conocida
+    let popupLinePageVar: string | null = null;
+    for (const pv of popupPageVars) {
+      if (trimmed.startsWith(`await ${pv}.`) || trimmed.startsWith(`${pv}.`)) {
+        popupLinePageVar = pv;
+        break;
+      }
+    }
+    if (popupLinePageVar) {
+      // Normalizar: reemplazar la var popup por 'page' para reutilizar los parsers
+      const nl = line.replace(
+        new RegExp(`(await\\s+)?${popupLinePageVar}\\.`),
+        (_m, aw) => `${aw || ''}page.`
+      );
+      // Parsear la línea normalizada con los mismos patrones del main loop
+      const ps = parseOneLine(nl, isResultText);
+      if (ps) rawSteps.push({ ...ps, pageRef: 'popup' });
+      continue;
+    }
+
     // Ignorar imports, test() wrapper y expect() de setup
     if (/^\s*(import|export|const\s+\w+\s*=|let\s+\w+|var\s+\w+|\/\/|\/\*)/.test(trimmed)) continue;
 
@@ -477,6 +659,16 @@ export function parseRecording(filePath: string): any[] {
       steps.push(s);
     }
   });
+
+  // ── Post-procesado: marcar popup triggers ──────────────────────────
+  // El click en la página principal que antecede a acciones de popup
+  // debe marcarse con popupTrigger:true para que el ui-agent genere
+  // el waitForEvent('popup') + Promise.all correspondiente.
+  for (let i = 1; i < steps.length; i++) {
+    if (steps[i].pageRef === 'popup' && steps[i - 1].action === 'click' && !steps[i - 1].pageRef) {
+      steps[i - 1] = { ...steps[i - 1], popupTrigger: true };
+    }
+  }
 
   return steps;
 }

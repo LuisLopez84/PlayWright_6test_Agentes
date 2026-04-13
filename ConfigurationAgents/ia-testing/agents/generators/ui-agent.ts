@@ -33,8 +33,10 @@ export function generateUITest(name: string, steps: any[]) {
   const usesCheck   = uniqueSteps.some(s => s.action === 'check' || s.action === 'uncheck');
   const usesDbl     = uniqueSteps.some(s => s.action === 'dblclick');
   const usesUpload  = uniqueSteps.some(s => s.action === 'upload');
-  const usesVerify  = uniqueSteps.some(s => s.action === 'verify');
+  const usesVerify  = uniqueSteps.some(s => s.action === 'verify') ||
+                      uniqueSteps.some(s => s.pageRef === 'popup' && s.action === 'verify');
   const usesSelect  = uniqueSteps.some(s => s.action === 'select' || s.action === 'selectOption');
+  const usesPopup   = uniqueSteps.some(s => s.popupTrigger);
 
   const importedActions = ['smartClick', 'smartFill'];
   if (usesSelect) importedActions.push('smartSelect');
@@ -43,14 +45,51 @@ export function generateUITest(name: string, steps: any[]) {
   if (usesDbl)    importedActions.push('smartDblClick');
   if (usesUpload) importedActions.push('smartUpload');
 
+  // ── Recopilar todos los dialog_handler para el manejador global ──
+  const dialogSteps = uniqueSteps.filter(s => s.action === 'dialog_handler');
+  const hasDialogs = dialogSteps.length > 0;
+
+  // Bloque de manejador global de diálogos (cola ordenada)
+  let dialogQueueBlock = '';
+  if (hasDialogs) {
+    const queueItems = dialogSteps.map(s => {
+      const action = (s.value === 'dismiss') ? 'dismiss' : 'accept';
+      const promptValue = (action === 'accept' && s.promptValue) ? `, '${s.promptValue}'` : '';
+      return `  { action: '${action}'${promptValue ? `, value: '${s.promptValue}'` : ''} }`;
+    }).join(',\n');
+    dialogQueueBlock = `
+  // ── Manejador global de diálogos nativos (alert / confirm / prompt) ──
+  // Cola ordenada: cada diálogo consume una entrada; el resto se acepta por defecto.
+  const _dialogQueue: Array<{ action: 'accept' | 'dismiss'; value?: string }> = [
+${queueItems},
+  ];
+  let _dialogIdx = 0;
+  page.on('dialog', async dialog => {
+    const cfg = _dialogQueue[_dialogIdx++] ?? { action: 'accept' };
+    try {
+      if (cfg.action === 'dismiss') {
+        await dialog.dismiss();
+      } else {
+        await dialog.accept(cfg.value);
+      }
+    } catch {
+      // Diálogo ya manejado (race condition prevenida)
+    }
+  });
+`;
+  }
+
+  // fixture: añadir context cuando hay popups/nuevas pestañas
+  const fixture = usesPopup ? '{ page, context }' : '{ page }';
+
   let code = `
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 import { ${importedActions.join(', ')} } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
-test('${name}', async ({ page }) => {
+test('${name}', async (${fixture}) => {
   await smartGoto(page, '${name}');
-`;
+${dialogQueueBlock}`;
 
   let i = 0;
   while (i < uniqueSteps.length) {
@@ -63,15 +102,8 @@ test('${name}', async ({ page }) => {
       continue;
     }
 
-    // ── dialog_handler → registrar antes del siguiente click ──────────
+    // ── dialog_handler → ya consolidado en el bloque global; omitir ───
     if (step.action === 'dialog_handler') {
-      const action = (step.value === 'dismiss') ? 'dismiss' : 'accept';
-      code += `
-  // Manejar diálogo nativo del navegador
-  page.once('dialog', async dialog => {
-    console.log(\`Dialog: \${dialog.message()}\`);
-    await dialog.${action}();
-  });`;
       i++;
       continue;
     }
@@ -146,10 +178,65 @@ test('${name}', async ({ page }) => {
     const selector = normalizeSelector(rawSelector);
     const value = step.value || '';
 
+    // ── POPUP TRIGGER → click que abre nueva pestaña ──────────────────
+    // El parser marca popupTrigger:true en el click de la página principal
+    // que precede a acciones sobre la popup page (pageRef:'popup').
+    if (step.action === 'click' && step.popupTrigger) {
+      // Recopilar todas las acciones seguidas que pertenecen a la popup
+      const popupSteps: any[] = [];
+      let j = i + 1;
+      while (j < uniqueSteps.length && uniqueSteps[j].pageRef === 'popup') {
+        popupSteps.push(uniqueSteps[j]);
+        j++;
+      }
+      // Para el trigger usamos el selector Playwright original (no normalizado)
+      // para garantizar precisión: el elemento que abre el popup debe ser exacto.
+      // Si el step tiene un selector completo (getByRole/locator/etc.) lo usamos
+      // directamente; de lo contrario caemos en smartClick como fallback.
+      const rawStepSel = (step.selector || '').trim();
+      const isPlaywrightExpr = /get[A-Z]|locator\(/.test(rawStepSel);
+      const triggerExpr = isPlaywrightExpr
+        ? `(${rawStepSel.startsWith('page.') ? rawStepSel : `page.${rawStepSel}`}).click()`
+        : (selector ? `smartClick(page, \`${selector}\`)` : null);
+      if (!triggerExpr) { i = j; continue; }
+      code += `
+  // Asegurar que la página está lista antes de abrir nueva pestaña
+  await page.waitForLoadState('load');
+  // context.waitForEvent('page') es más robusto que page.waitForEvent('popup'):
+  // captura cualquier nueva página en el contexto sin depender del actionTimeout
+  const [_popupPage] = await Promise.all([
+    context.waitForEvent('page', { timeout: 30000 }),
+    ${triggerExpr},
+  ]);
+  await _popupPage.waitForLoadState('load');`;
+      // Generar acciones sobre la popup page
+      for (const ps of popupSteps) {
+        const pSel = normalizeSelector(ps.selector || ps.target || '');
+        const pVal = ps.value || '';
+        if (ps.action === 'click' || ps.action === 'verify') {
+          if (!pSel) continue;
+          if (ps.action === 'verify') {
+            code += `
+  await smartWaitForText(_popupPage, \`${pSel}\`, 15000);`;
+          } else {
+            code += `
+  await smartClick(_popupPage, \`${pSel}\`);`;
+          }
+        } else if (ps.action === 'input' || ps.action === 'fill') {
+          if (!pSel) continue;
+          code += `
+  await smartFill(_popupPage, \`${pSel}\`, '${pVal}');
+  await _popupPage.waitForTimeout(500);`;
+        }
+      }
+      i = j; // saltar los popup steps ya procesados
+      continue;
+    }
+
     // ── CLICK seguido de VERIFY → patrón "confirm + toast transitorio" ──
     // smartWaitForText empieza a escuchar EN PARALELO con smartClick para
     // capturar toasts que aparecen y desaparecen DURANTE el post-click.
-    if (step.action === 'click' && nextStep?.action === 'verify') {
+    if (step.action === 'click' && nextStep?.action === 'verify' && !step.pageRef) {
       if (!selector) { i++; continue; }
       const verifyTarget = normalizeSelector(nextStep.selector || nextStep.target || '');
       if (!verifyTarget) { i++; continue; }
@@ -165,8 +252,8 @@ test('${name}', async ({ page }) => {
       continue;
     }
 
-    // ── CLICK simple ──────────────────────────────────────────────────
-    if (step.action === 'click') {
+    // ── CLICK simple (página principal) ───────────────────────────────
+    if (step.action === 'click' && !step.pageRef) {
       if (!selector) { i++; continue; }
       code += `
   await smartClick(page, \`${selector}\`);`;
@@ -174,12 +261,20 @@ test('${name}', async ({ page }) => {
       continue;
     }
 
-    // ── FILL / INPUT ──────────────────────────────────────────────────
-    if (step.action === 'input' || step.action === 'fill') {
+    // ── FILL / INPUT (página principal) ───────────────────────────────
+    if ((step.action === 'input' || step.action === 'fill') && !step.pageRef) {
       if (!selector) { i++; continue; }
       code += `
   await smartFill(page, \`${selector}\`, '${value}');
   await page.waitForTimeout(500);`;
+      i++;
+      continue;
+    }
+
+    // ── Acciones popup sueltas (sin trigger previo detectado) ─────────
+    // Fallback: si por alguna razón quedó un paso con pageRef:'popup'
+    // sin ser consumido por el bloque popupTrigger, lo saltamos.
+    if (step.pageRef === 'popup') {
       i++;
       continue;
     }

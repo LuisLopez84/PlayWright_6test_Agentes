@@ -434,8 +434,8 @@
   "https://demoqa.com/|click|Book Store Application": [
     {
       "selector": "text=Store Application",
-      "successCount": 174,
-      "lastUsed": "2026-04-13T13:42:26.413Z"
+      "successCount": 197,
+      "lastUsed": "2026-04-13T17:18:05.893Z"
     },
     {
       "selector": "Book Store Application",
@@ -446,8 +446,8 @@
   "https://demoqa.com/books|click|Elements": [
     {
       "selector": "Elements",
-      "successCount": 94,
-      "lastUsed": "2026-04-13T10:16:47.970Z"
+      "successCount": 98,
+      "lastUsed": "2026-04-13T16:15:23.370Z"
     }
   ],
   "https://demoqa.com/books|click|Text Box": [
@@ -608,15 +608,15 @@
   "https://demoqa.com/books|click|Broken Links - Images": [
     {
       "selector": "Broken Links - Images",
-      "successCount": 13,
-      "lastUsed": "2026-04-13T03:59:10.128Z"
+      "successCount": 17,
+      "lastUsed": "2026-04-13T16:15:30.741Z"
     }
   ],
   "https://demoqa.com/broken|click|Click Here for Valid Link": [
     {
       "selector": "Click Here for Valid Link",
-      "successCount": 8,
-      "lastUsed": "2026-04-13T03:59:03.854Z"
+      "successCount": 10,
+      "lastUsed": "2026-04-13T16:15:12.219Z"
     }
   ],
   "https://demoqa.com/books|click|Links": [
@@ -993,8 +993,8 @@
   "https://demoqa.com/books|click|Alerts, Frame & Windows": [
     {
       "selector": "Alerts, Frame & Windows",
-      "successCount": 47,
-      "lastUsed": "2026-04-13T13:42:30.558Z"
+      "successCount": 58,
+      "lastUsed": "2026-04-13T17:18:46.723Z"
     }
   ],
   "https://demoqa.com/books|click|Modal Dialogs": [
@@ -1120,8 +1120,8 @@
   "https://demoqa.com/books|click|Browser Windows": [
     {
       "selector": "text=Windows",
-      "successCount": 4,
-      "lastUsed": "2026-04-13T04:02:28.014Z"
+      "successCount": 15,
+      "lastUsed": "2026-04-13T17:18:59.121Z"
     }
   ],
   "https://demoqa.com/browser-windows|click|New Tab": [
@@ -1188,15 +1188,15 @@
   "https://demoqa.com/broken|click|Click Here for Broken Link": [
     {
       "selector": "Click Here for Broken Link",
-      "successCount": 5,
-      "lastUsed": "2026-04-13T03:59:13.099Z"
+      "successCount": 7,
+      "lastUsed": "2026-04-13T16:15:38.304Z"
     }
   ],
   "http://the-internet.herokuapp.com/status_codes/500|click|This page returned a 500": [
     {
       "selector": "This page returned a 500",
-      "successCount": 4,
-      "lastUsed": "2026-04-13T03:59:14.459Z"
+      "successCount": 5,
+      "lastUsed": "2026-04-13T16:15:41.957Z"
     }
   ],
   "https://demoqa.com/books|click|.auto-complete__input-container": [
@@ -1410,29 +1410,29 @@
   "https://demoqa.com/books|click|Alerts": [
     {
       "selector": "Alerts",
-      "successCount": 15,
-      "lastUsed": "2026-04-13T13:42:33.143Z"
+      "successCount": 22,
+      "lastUsed": "2026-04-13T16:07:42.176Z"
     }
   ],
   "https://demoqa.com/alerts|click|#alertButton": [
     {
       "selector": "#alertButton",
-      "successCount": 13,
-      "lastUsed": "2026-04-13T13:42:35.363Z"
+      "successCount": 20,
+      "lastUsed": "2026-04-13T16:07:44.300Z"
     }
   ],
   "https://demoqa.com/alerts|click|#timerAlertButton": [
     {
       "selector": "#timerAlertButton",
-      "successCount": 24,
-      "lastUsed": "2026-04-13T13:42:38.164Z"
+      "successCount": 30,
+      "lastUsed": "2026-04-13T16:07:45.719Z"
     }
   ],
   "https://demoqa.com/alerts|click|#confirmButton": [
     {
       "selector": "#confirmButton",
-      "successCount": 10,
-      "lastUsed": "2026-04-13T13:42:39.693Z"
+      "successCount": 15,
+      "lastUsed": "2026-04-13T16:07:47.208Z"
     }
   ],
   "https://demoqa.com/links|click|Home": [
@@ -1678,8 +1678,8 @@
   "https://demoqa.com/alerts|click|#promtButton": [
     {
       "selector": "#promtButton",
-      "successCount": 3,
-      "lastUsed": "2026-04-13T13:42:40.509Z"
+      "successCount": 7,
+      "lastUsed": "2026-04-13T16:07:48.673Z"
     }
   ],
   "https://demoqa.com/browser-windows|click|New Window Message": [
@@ -1715,6 +1715,13 @@
       "selector": "+ Generar Nueva Tarjeta",
       "successCount": 1,
       "lastUsed": "2026-04-13T03:57:34.103Z"
+    }
+  ],
+  "https://demoqa.com/books|click|div:nth-child(3) > .group-header > .header-wrapper > .header-right": [
+    {
+      "selector": "div:nth-child(3) > .group-header > .header-wrapper > .header-right",
+      "successCount": 7,
+      "lastUsed": "2026-04-13T16:07:40.150Z"
     }
   ]
 }

@@ -10,8 +10,13 @@ test('DemoQA_Elements_Browser3', async ({ page }) => {
   await smartClick(page, `Widgets`);
   await smartClick(page, `Alerts, Frame & Windows`);
   await smartClick(page, `Browser Windows`);
-  await smartClick(page, `New Window Message`);
-  await smartClick(page, `Knowledge increases by`);
-  await smartClick(page, `Knowledge increases by`);
-  await smartClick(page, `Knowledge increases by`);
+  // Abrir nueva pestaña y esperar a que esté lista
+  const [_popupPage] = await Promise.all([
+    page.waitForEvent('popup'),
+    (page.getByRole('button', { name: 'New Window Message' })).click(),
+  ]);
+  await _popupPage.waitForLoadState();
+  await smartClick(_popupPage, `Knowledge increases by`);
+  await smartClick(_popupPage, `Knowledge increases by`);
+  await smartClick(_popupPage, `Knowledge increases by`);
 });

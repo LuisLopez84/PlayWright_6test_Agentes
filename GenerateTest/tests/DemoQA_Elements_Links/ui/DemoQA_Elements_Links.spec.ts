@@ -10,9 +10,14 @@ test('DemoQA_Elements_Links', async ({ page }) => {
   await smartClick(page, `Elements`);
   await smartClick(page, `Links`);
   await smartClick(page, `Moved`);
-  await smartClick(page, `Home`);
-  await smartClick(page, `Book Store Application`);
-  await smartClick(page, `Elements`);
-  await smartClick(page, `Links`);
-  await smartClick(page, `HomeeSOYc`);
+  // Abrir nueva pestaña y esperar a que esté lista
+  const [_popupPage] = await Promise.all([
+    page.waitForEvent('popup'),
+    (page.getByRole('link', { name: 'Home', exact: true })).click(),
+  ]);
+  await _popupPage.waitForLoadState();
+  await smartClick(_popupPage, `Book Store Application`);
+  await smartClick(_popupPage, `Elements`);
+  await smartClick(_popupPage, `Links`);
+  await smartClick(_popupPage, `HomeeSOYc`);
 });

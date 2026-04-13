@@ -7,5 +7,4 @@ Scenario: Flujo DemoQA_Elements_Browser
   And hace clic en "Alerts, Frame & Windows"
   And hace clic en "Browser Windows"
   And hace clic en "New Tab"
-  And hace clic en "This is a sample page"
   Then la operación es exitosa
