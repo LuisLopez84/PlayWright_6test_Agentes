@@ -434,8 +434,8 @@
   "https://demoqa.com/|click|Book Store Application": [
     {
       "selector": "text=Store Application",
-      "successCount": 169,
-      "lastUsed": "2026-04-13T10:16:40.056Z"
+      "successCount": 174,
+      "lastUsed": "2026-04-13T13:42:26.413Z"
     },
     {
       "selector": "Book Store Application",
@@ -993,8 +993,8 @@
   "https://demoqa.com/books|click|Alerts, Frame & Windows": [
     {
       "selector": "Alerts, Frame & Windows",
-      "successCount": 42,
-      "lastUsed": "2026-04-13T04:06:19.407Z"
+      "successCount": 47,
+      "lastUsed": "2026-04-13T13:42:30.558Z"
     }
   ],
   "https://demoqa.com/books|click|Modal Dialogs": [
@@ -1410,29 +1410,29 @@
   "https://demoqa.com/books|click|Alerts": [
     {
       "selector": "Alerts",
-      "successCount": 10,
-      "lastUsed": "2026-04-13T02:13:20.890Z"
+      "successCount": 15,
+      "lastUsed": "2026-04-13T13:42:33.143Z"
     }
   ],
   "https://demoqa.com/alerts|click|#alertButton": [
     {
       "selector": "#alertButton",
-      "successCount": 8,
-      "lastUsed": "2026-04-13T02:13:30.131Z"
+      "successCount": 13,
+      "lastUsed": "2026-04-13T13:42:35.363Z"
     }
   ],
   "https://demoqa.com/alerts|click|#timerAlertButton": [
     {
       "selector": "#timerAlertButton",
-      "successCount": 14,
-      "lastUsed": "2026-04-13T02:13:34.988Z"
+      "successCount": 24,
+      "lastUsed": "2026-04-13T13:42:38.164Z"
     }
   ],
   "https://demoqa.com/alerts|click|#confirmButton": [
     {
       "selector": "#confirmButton",
-      "successCount": 7,
-      "lastUsed": "2026-04-13T02:13:38.176Z"
+      "successCount": 10,
+      "lastUsed": "2026-04-13T13:42:39.693Z"
     }
   ],
   "https://demoqa.com/links|click|Home": [
@@ -1675,7 +1675,13 @@
       "lastUsed": "2026-04-13T03:02:57.947Z"
     }
   ],
-  "https://demoqa.com/alerts|click|#promtButton": [],
+  "https://demoqa.com/alerts|click|#promtButton": [
+    {
+      "selector": "#promtButton",
+      "successCount": 3,
+      "lastUsed": "2026-04-13T13:42:40.509Z"
+    }
+  ],
   "https://demoqa.com/browser-windows|click|New Window Message": [
     {
       "selector": "New Window Message",

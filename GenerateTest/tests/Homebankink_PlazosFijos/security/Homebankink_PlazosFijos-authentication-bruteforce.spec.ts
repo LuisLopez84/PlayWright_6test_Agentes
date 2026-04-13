@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
+import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
 test.describe('Brute force protection for Homebankink_PlazosFijos', () => {
 
@@ -10,71 +11,52 @@ test.describe('Brute force protection for Homebankink_PlazosFijos', () => {
     // Enviar 10 intentos fallidos consecutivos
     for (let i = 0; i < 10; i++) {
       const res = await request.post(loginEndpoint, {
-        data: { username: 'test_user', password: `wrong_password_${i}` }
+        data: { username: 'Usuario', password: `wrong_password_${i}` }
       });
       lastStatus = res.status();
     }
 
     // Tras múltiples intentos, el servidor debe bloquear (429) o al menos no devolver 200
+    // También es válido 404 si el endpoint no existe en el backend (SPA)
     const isProtected = lastStatus !== 200 && lastStatus !== 201;
     if (!isProtected) {
-      console.warn('⚠️ El endpoint no aplicó rate limiting tras 10 intentos fallidos (puede ser SPA)');
+      console.warn('⚠️ El endpoint no aplicó rate limiting tras 10 intentos fallidos');
     }
-    // Test informativo — SPAs sirven HTML (200) para cualquier ruta
+    // Test informativo — no todos los SPAs tienen este endpoint activo
     expect(true).toBeTruthy();
   });
 
   test('Protección contra brute force via UI', async ({ page }) => {
-    // Registrar handler de dialogs para evitar que bloqueen la ejecución
-    page.on('dialog', async dialog => {
-      console.log(`ℹ️ Dialog detectado: ${dialog.message()}`);
-      await dialog.dismiss().catch(() => {});
-    });
-
     await smartGoto(page, 'Homebankink_PlazosFijos');
 
-    // Realizar un intento de login con credenciales incorrectas
-    try {
-      const usernameField = page.locator(
-        'input[aria-label*="usuario" i], input[name*="user" i], input[name*="email" i], input[placeholder*="usuario" i]'
-      ).first();
-      const passwordField = page.locator('input[type="password"]').first();
-      const loginBtn = page.locator('button[type="submit"], button:has-text("Ingresar"), button:has-text("Login")').first();
-
-      if (await usernameField.count() > 0) {
-        await usernameField.fill('wrong_user', { timeout: 5000 });
-        await passwordField.fill('wrong_pass_001', { timeout: 5000 });
-        await loginBtn.click({ timeout: 5000 });
-        await page.waitForTimeout(1000);
-      } else {
-        console.log('ℹ️ No se encontró formulario de login en la página inicial');
-      }
-    } catch (e) {
-      console.log(`ℹ️ Intento de login interrumpido: ${e.message}`);
+    // Intentar login con credenciales incorrectas 3 veces
+    for (let i = 0; i < 3; i++) {
+      try {
+        await smartFill(page, 'Usuario', 'Usuario');
+        await smartFill(page, 'Contraseña', `wrong_attempt_${i}`);
+        await smartClick(page, 'Ingresar');
+        await page.waitForTimeout(500);
+      } catch { break; }
     }
 
-    // Verificar estado post-intento — cualquier comportamiento de protección es válido
-    try {
-      const url = page.url();
-      const content = await page.content();
+    // Verificar que no se autenticó (no debe estar en una página protegida)
+    const url = page.url();
+    const content = await page.content();
 
-      const hasPasswordField = await page.locator('input[type="password"]').count() > 0;
-      const hasErrorMessage = content.toLowerCase().includes('error') ||
-        content.toLowerCase().includes('incorrecto') ||
-        content.toLowerCase().includes('invalid') ||
-        content.toLowerCase().includes('incorrect') ||
-        content.toLowerCase().includes('bloqueado');
+    // El login fallido debe mostrar error o mantener el formulario visible
+    const hasLoginForm = await page.locator(
+      'input[type="password"], [type="password"], [name="password"], [aria-label*="contraseña" i], [aria-label*="password" i]'
+    ).count() > 0;
 
-      if (!hasPasswordField && !hasErrorMessage) {
-        console.warn(`⚠️ No se detectó feedback de error en ${url} — verificar manualmente`);
-      }
-    } catch (pageClosedError) {
-      // Si la página se cerró, también es protección válida
-      console.log('ℹ️ La página se cerró tras intento fallido — protección válida');
-    }
+    const hasErrorMessage = content.toLowerCase().includes('error') ||
+      content.toLowerCase().includes('incorrecto') ||
+      content.toLowerCase().includes('invalid') ||
+      content.toLowerCase().includes('incorrect') ||
+      content.toLowerCase().includes('bloqueado') ||
+      content.toLowerCase().includes('blocked');
 
-    // Test informativo
-    expect(true).toBeTruthy();
+    // Al menos uno debe ser true: sigue en el login O hay mensaje de error
+    expect(hasLoginForm || hasErrorMessage || url.includes('login')).toBeTruthy();
   });
 
   test('No revelar información sensible en respuesta de error', async ({ request }) => {

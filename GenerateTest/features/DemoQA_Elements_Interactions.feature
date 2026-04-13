@@ -1,7 +1,6 @@
 
 Feature: DemoQA_Elements_Interactions
 
-@UI
 Scenario: Flujo DemoQA_Elements_Interactions
   Given el usuario está en la aplicación
   And hace clic en "Book Store Application"

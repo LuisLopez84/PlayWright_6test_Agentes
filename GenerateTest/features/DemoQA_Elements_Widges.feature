@@ -1,7 +1,6 @@
 
 Feature: DemoQA_Elements_Widges
 
-@UI
 Scenario: Flujo DemoQA_Elements_Widges
   Given el usuario está en la aplicación
   And hace clic en "Book Store Application"

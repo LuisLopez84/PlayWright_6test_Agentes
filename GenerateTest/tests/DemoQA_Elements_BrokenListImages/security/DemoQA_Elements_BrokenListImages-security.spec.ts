@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
+import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
 test.describe('Security tests for DemoQA_Elements_BrokenListImages', () => {
 
@@ -24,7 +25,6 @@ test.describe('Security tests for DemoQA_Elements_BrokenListImages', () => {
   test('XSS injection protection', async ({ page }) => {
     await smartGoto(page, 'DemoQA_Elements_BrokenListImages');
     const payload = "<script>alert('xss')</script>";
-
     // App sin login — intentar inyección en cualquier campo de texto visible
     try {
       const firstInput = page.locator('input[type="text"]:visible, input:not([type="hidden"]):visible').first();

@@ -16,7 +16,6 @@ test.describe('Security tests for Homebankink_PagoServicios', () => {
     const status = response.status();
     // No debe responder 200/201 (éxito) ante una inyección SQL.
     // 404 es aceptable en SPAs donde el endpoint /login no existe como API REST.
-    // Cualquier status >= 400 indica que el servidor rechazó la petición.
     expect(status).not.toBe(200);
     expect(status).not.toBe(201);
   });
@@ -24,7 +23,6 @@ test.describe('Security tests for Homebankink_PagoServicios', () => {
   test('XSS injection protection', async ({ page }) => {
     await smartGoto(page, 'Homebankink_PagoServicios');
     const payload = "<script>alert('xss')</script>";
-
     await smartFill(page, 'Usuario', payload);
     await smartFill(page, 'Contraseña', payload);
     await smartClick(page, 'Ingresar');

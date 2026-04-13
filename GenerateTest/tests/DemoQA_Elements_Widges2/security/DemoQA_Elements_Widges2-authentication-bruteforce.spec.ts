@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
+import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
 test.describe('Brute force protection for DemoQA_Elements_Widges2', () => {
 
@@ -10,18 +11,18 @@ test.describe('Brute force protection for DemoQA_Elements_Widges2', () => {
     // Enviar 10 intentos fallidos consecutivos
     for (let i = 0; i < 10; i++) {
       const res = await request.post(loginEndpoint, {
-        data: { username: 'test_user', password: `wrong_password_${i}` }
+        data: { username: 'input[type="text"]:first-of-type', password: `wrong_password_${i}` }
       });
       lastStatus = res.status();
     }
 
     // Tras múltiples intentos, el servidor debe bloquear (429) o al menos no devolver 200
-    // También es válido 200 si el endpoint es la SPA (sirve HTML)
+    // También es válido 404 si el endpoint no existe en el backend (SPA)
     const isProtected = lastStatus !== 200 && lastStatus !== 201;
     if (!isProtected) {
-      console.warn('⚠️ El endpoint no aplicó rate limiting tras 10 intentos fallidos (o es SPA)');
+      console.warn('⚠️ El endpoint no aplicó rate limiting tras 10 intentos fallidos');
     }
-    // Test informativo — no todos los SPAs tienen este endpoint activo como API
+    // Test informativo — no todos los SPAs tienen este endpoint activo
     expect(true).toBeTruthy();
   });
 

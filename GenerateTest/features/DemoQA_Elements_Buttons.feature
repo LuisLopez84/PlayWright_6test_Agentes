@@ -1,7 +1,6 @@
 
 Feature: DemoQA_Elements_Buttons
 
-@UI
 Scenario: Flujo DemoQA_Elements_Buttons
   Given el usuario está en la aplicación
   And hace clic en "Book Store Application"

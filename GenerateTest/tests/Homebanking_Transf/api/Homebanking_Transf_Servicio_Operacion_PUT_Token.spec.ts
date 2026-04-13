@@ -1,9 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { restRequest, soapRequest } from '../../../../ConfigurationTest/tests/utils/api-helper';
 
-// Credenciales registradas en thinking-tester-contact-list.herokuapp.com
-const USER_EMAIL = 'luis_qa_test_2024@fake.com';
-const USER_PASSWORD = 'TestPass123!';
+// Credenciales (cámbialas por las tuyas)
+const USER_EMAIL = 'pruebas@prue.com.co';
+const USER_PASSWORD = '1234567';
 
 test('PUT /contacts/{id} - actualizar contacto exitoso (200)', async ({ request }) => {
   // 1. Login
@@ -44,10 +44,10 @@ test('PUT /contacts/{id} - actualizar contacto exitoso (200)', async ({ request 
     phone: "8005554242",
     street1: "13 School St.",
     street2: "Apt. 5",
-    city: "Anytown",
-    stateProvince: "KS",
-    postalCode: "12345",
-    country: "USA"
+    city: "Washington",
+    stateProvince: "QC",
+    postalCode: "A1B2D4",
+    country: "Canada"
   };
   const updateRes = await restRequest(request, 'PUT', `https://thinking-tester-contact-list.herokuapp.com/contacts/${contactId}`, {
     data: updatePayload,
@@ -66,13 +66,8 @@ test('PUT /contacts/{id} - fallo por ID inválido (404)', async ({ request }) =>
   });
   const { token } = await loginRes.json();
 
-  // ID con formato ObjectId válido pero que no existe en la BD → esperar 404
-  const invalidId = '000000000000000000000001';
-  const updatePayload = {
-    firstName: 'Test', lastName: 'User', birthdate: '1990-01-01',
-    email: 'test@fake.com', phone: '8005550000', street1: '1 Test St.',
-    street2: '', city: 'Anytown', stateProvince: 'KS', postalCode: '12345', country: 'USA'
-  };
+  const invalidId = '000000000000000000000000';
+  const updatePayload = { firstName: 'Test' };
   const response = await restRequest(request, 'PUT', `https://thinking-tester-contact-list.herokuapp.com/contacts/${invalidId}`, {
     data: updatePayload,
     headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
