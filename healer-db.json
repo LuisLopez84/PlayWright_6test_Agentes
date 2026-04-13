@@ -11,5 +11,6 @@
   "New Window Message": "text=Window Message",
   "Browser Windows": "text=Windows",
   "#alertButton": "text=Alert",
-  "#timerAlertButton": "text=Book Store Application"
+  "#timerAlertButton": "text=Book Store Application",
+  "Alerts, Frame & Windows": "text=Windows"
 }
