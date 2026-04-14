@@ -12,7 +12,7 @@
 4. [Flujo de trabajo completo](#flujo-de-trabajo-completo)
 5. [Grabación de flujos](#1-grabación-de-flujos)
 6. [Tests de API (REST y SOAP)](#2-tests-de-api-rest-y-soap)
-7. [Tests no funcionales (Carga y Rendimiento)](#3-tests-no-funcionales-carga-y-rendimiento)
+7. [Tests no funcionales (Concurrencia, Carga, Estres y Pioos)](#3-tests-no-funcionales-carga-y-rendimiento)
 8. [Generación de suites](#4-generación-de-suites)
 9. [Ejecución de tests](#5-ejecución-de-tests)
 10. [Reportes](#6-reportes)
