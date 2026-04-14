@@ -90,7 +90,7 @@ export const NFConfig: {
 } = {
 
   // ─────────────────────────────────────────────────────────────────────────────
-  // PASO 1 — TARGETS
+  // PASO 1 — TARGETS ******CONFIGURAR*******
   // Cada target genera un spec en GenerateTest/tests/<suiteName>/non-functional/
   // Cada target puede tener su propio testType, incremental y spike.
   // ─────────────────────────────────────────────────────────────────────────────
@@ -99,29 +99,39 @@ export const NFConfig: {
     // ── TARGET 1: Recording — Prueba INCREMENTAL ──────────────────────────────
     {
       type: 'recording',
-      recording: 'Homebankink_Transferencias',
+      recording: 'Homebankink_PlazosFijos3', // Indicar el recording del flujo a cual se va a inyectar la prueba no funcional
       testType: 'incremental',
       incremental: {
-        scenarios: 3,           // 3 escalones: 2 → 4 → 6 hilos
+        scenarios: 5,           // 5 escalones: 2 → 4 → 6 → 8 → 10 hilos
         initialThreads: 2,      // Primer escalón: 2 usuarios concurrentes
-        finalThreads: 6,        // Último escalón: 6 usuarios concurrentes
+        finalThreads: 10,        // Último escalón: 6 usuarios concurrentes
         durationPerScenarioSeconds: 5, // Cada escalón dura 5 segundos
       },
     },
 
-    // ── TARGET 2: API — Prueba de PICOS (spike) ───────────────────────────────
+    // ── TARGET 2: API — Prueba de PICOS (spike) para SOAP ───────────────────────────────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/api-testing-rest-soap/rest/Homebankink_Transferencias_ConsultaCliente_GET.spec.ts',
+      apiSpecPath: 'GenerateTest/api-testing-rest-soap/soap/Homebankink_PlazosFijos3_Servicio_Operacion_POST_SOAP.spec.ts',
       endpoint: {
-        name: 'Dashboard Cliente',
-        method: 'GET',
-        url: 'https://homebanking-demo.onrender.com/cliente/dashboard',
+        name: 'Prueba Rendimiento Servicio SOAP',
+        method: 'POST',
+        url: 'http://www.dneonline.com/calculator.asmx',
         headers: {
-          accept: 'application/json',
-          // Si el endpoint requiere autenticación, descomenta y ajusta:
-          // Authorization: 'Bearer TU_TOKEN',
+          'Content-Type': 'text/xml;charset=UTF-8',   // SOAP — las claves con guión van entre comillas
+          'SOAPAction': 'http://tempuri.org/Add',      // SOAP — obligatorio para identificar la operación
+          // Si el endpoint requiere autenticación, descomentar y ajustar:
+          // 'Authorization': 'Bearer TU_TOKEN',
         },
+        body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <tem:Add>
+      <tem:intA>5</tem:intA>
+      <tem:intB>2</tem:intB>
+    </tem:Add>
+  </soapenv:Body>
+</soapenv:Envelope>`,
       },
       testType: 'spike',
       spike: {
@@ -137,6 +147,24 @@ export const NFConfig: {
     //   testType: 'spike',
     //   spike: { threadsPerScenario: [5, 20], durationPerScenarioSeconds: [10, 10] },
     // },
+
+// ── TARGET 3: API — Prueba de PICOS (spike) para REST ───────────────────────────────
+//Descomentarear si se necesita enviar test no funcional a REST
+//    {
+//    type: 'api',
+//    apiSpecPath: 'GenerateTest/api-testing-rest-soap/rest/Homebankink_Transferencias_ConsultaCliente_GET.spec.ts',
+//    endpoint: {
+//        name: 'Dashboard Cliente',
+//        method: 'GET',
+//        url: 'https://homebanking-demo.onrender.com/cliente/dashboard',
+//        headers: { accept: 'application/json' },
+//        },
+//        testType: 'spike',
+//        spike: {
+//        threadsPerScenario: [1, 8, 4, 10, 3],
+//        durationPerScenarioSeconds: [5, 5, 5, 5, 5],
+//        },
+//    },
 
   ],
 

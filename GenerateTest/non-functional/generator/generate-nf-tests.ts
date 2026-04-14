@@ -154,7 +154,7 @@ function generateSpecContent(suiteName: string, targets: ResolvedTarget[]): stri
     const safeName    = t.targetName.replace(/'/g, "\\'");
     const safeUrl     = t.url.replace(/'/g, "\\'");
     const headersJson = JSON.stringify(t.headers, null, 2).replace(/\n/g, '\n  ');
-    const bodyLit     = t.body ? `'${t.body.replace(/'/g, "\\'")}'` : 'undefined';
+    const bodyLit     = t.body ? '`' + t.body.replace(/`/g, '\\`').replace(/\$\{/g, '\\${') + '`' : 'undefined';
     const incJson     = JSON.stringify(t.incremental, null, 2).replace(/\n/g, '\n  ');
     const spikeJson   = JSON.stringify({
       threadsPerScenario: t.spike.threadsPerScenario,
