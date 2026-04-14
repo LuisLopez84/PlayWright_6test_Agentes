@@ -6,9 +6,7 @@ test.describe('Security tests for Homebankink_Transferencias', () => {
 
   test('security headers', async ({ request }) => {
     const response = await request.get('https://homebanking-demo-tests.netlify.app');
-    // No se detectaron headers de seguridad — test informativo
-    console.log('⚠️ No se detectaron headers de seguridad en https://homebanking-demo-tests.netlify.app');
-    expect(true).toBeTruthy();
+    expect(response.headers()['strict-transport-security']).toBeDefined();
   });
 
   test('sql injection', async ({ request }) => {
