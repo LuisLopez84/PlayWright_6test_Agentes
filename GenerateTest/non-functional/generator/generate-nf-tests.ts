@@ -6,9 +6,7 @@
  *
  * Ejecución:
  *   npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
- *
- * O añade al package.json:
- *   "generate:nf": "ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts"
+ *   npm run generate:nf
  *
  * Nota: los specs generados se incluyen en el reporte HTML de Playwright junto con
  * todos los demás tipos de prueba (UI, API, performance, security, accessibility, visual).
@@ -16,7 +14,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { NFConfig } from '../config/nf-config';
+import { NFConfig, IncrementalParams, SpikeParams } from '../config/nf-config';
 
 // ─── Tipos internos ───────────────────────────────────────────────────────────
 
@@ -28,6 +26,9 @@ interface ResolvedTarget {
   headers: Record<string, string>;
   body: string | undefined;
   type: 'recording' | 'api';
+  testType: 'incremental' | 'spike';
+  incremental: IncrementalParams;
+  spike: SpikeParams;
 }
 
 // ─── Resolver: recording → URL ────────────────────────────────────────────────
@@ -72,7 +73,6 @@ function resolveSuiteNameFromApiSpec(apiSpecPath: string): string | null {
 
   if (!fs.existsSync(testSuitesDir)) return null;
 
-  // Buscar qué carpeta de GenerateTest/tests/ es prefijo del nombre del archivo
   const suites = fs.readdirSync(testSuitesDir, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name);
@@ -81,12 +81,10 @@ function resolveSuiteNameFromApiSpec(apiSpecPath: string): string | null {
   suites.sort((a, b) => b.length - a.length);
 
   for (const suite of suites) {
-    if (filename.startsWith(suite)) {
-      return suite;
-    }
+    if (filename.startsWith(suite)) return suite;
   }
 
-  // Fallback: usar la primera parte antes de '_Servicio' o '_GET'/'_POST'/'_PUT'
+  // Fallback: usar la primera parte antes de '_Servicio' o método HTTP
   const parts = filename.split(/_(GET|POST|PUT|PATCH|DELETE|Servicio)/i);
   if (parts.length > 1) {
     const candidate = parts[0].trim();
@@ -104,10 +102,18 @@ function resolveAllTargets(): ResolvedTarget[] {
   const resolved: ResolvedTarget[] = [];
 
   for (const t of NFConfig.targets) {
+    // Resolver testType e incremental/spike: usa el override del target si existe, si no el global
+    const testType    = t.testType    ?? NFConfig.testType;
+    const incremental = t.incremental ?? NFConfig.incremental;
+    const spike       = t.spike       ?? NFConfig.spike;
+
     if (t.type === 'recording') {
       const url = resolveRecordingURL(t.recording);
       if (!url) {
-        console.error(`  ❌ Recording "${t.recording}": no se encontró URL. Verifica que exista el metadata.json o el recording en BoxRecordings/recordings/`);
+        console.error(
+          `  ❌ Recording "${t.recording}": no se encontró URL. ` +
+          `Verifica que exista el metadata.json o el recording en BoxRecordings/recordings/`,
+        );
         continue;
       }
       resolved.push({
@@ -118,8 +124,11 @@ function resolveAllTargets(): ResolvedTarget[] {
         headers: {},
         body: undefined,
         type: 'recording',
+        testType,
+        incremental,
+        spike,
       });
-      console.log(`  ✅ Recording "${t.recording}" → ${url}`);
+      console.log(`  ✅ Recording "${t.recording}" → ${url} | Tipo: ${testType.toUpperCase()}`);
     } else {
       // API
       const suiteName = resolveSuiteNameFromApiSpec(t.apiSpecPath);
@@ -135,8 +144,13 @@ function resolveAllTargets(): ResolvedTarget[] {
         headers: t.endpoint.headers ?? {},
         body: t.endpoint.body,
         type: 'api',
+        testType,
+        incremental,
+        spike,
       });
-      console.log(`  ✅ API "${t.endpoint.name}" → suite: ${suiteName} | ${t.endpoint.url}`);
+      console.log(
+        `  ✅ API "${t.endpoint.name}" → suite: ${suiteName} | ${t.endpoint.url} | Tipo: ${testType.toUpperCase()}`,
+      );
     }
   }
 
@@ -146,24 +160,40 @@ function resolveAllTargets(): ResolvedTarget[] {
 // ─── Generador de spec ────────────────────────────────────────────────────────
 
 function generateSpecContent(target: ResolvedTarget): string {
-  // Escapar caracteres especiales para embeber en el código
-  const safeName = target.targetName.replace(/'/g, "\\'");
-  const safeUrl = target.url.replace(/'/g, "\\'");
+  const safeName   = target.targetName.replace(/'/g, "\\'");
+  const safeUrl    = target.url.replace(/'/g, "\\'");
   const safeMethod = target.method;
-  const headersJson = JSON.stringify(target.headers, null, 2)
-    .split('\n')
-    .join('\n  ');
-  const bodyLiteral = target.body
-    ? `'${target.body.replace(/'/g, "\\'")}'`
-    : 'undefined';
+  const headersJson = JSON.stringify(target.headers, null, 2).split('\n').join('\n  ');
+  const bodyLiteral = target.body ? `'${target.body.replace(/'/g, "\\'")}'` : 'undefined';
 
   // Ruta relativa desde GenerateTest/tests/<Suite>/non-functional/ a GenerateTest/non-functional/
   const toNF = '../../../non-functional';
+
+  // Embeber parámetros resueltos del target (no dependen de NFConfig en runtime)
+  const incrementalJson = JSON.stringify(target.incremental, null, 2).split('\n').join('\n  ');
+  const spikeJson = JSON.stringify({
+    threadsPerScenario: target.spike.threadsPerScenario,
+    durationPerScenarioSeconds: target.spike.durationPerScenarioSeconds,
+  }, null, 2).split('\n').join('\n  ');
+
+  // Generar solo el import y la llamada necesarios según el testType
+  const importLine = target.testType === 'incremental'
+    ? `import { runIncrementalTest } from '${toNF}/core/load-engine';`
+    : `import { runSpikeTest } from '${toNF}/core/load-engine';`;
+
+  const testCall = target.testType === 'incremental'
+    ? `const summaries = await runIncrementalTest(NF_TARGET, NF_INCREMENTAL, NFConfig.assertions);`
+    : `const summaries = await runSpikeTest(NF_TARGET, NF_SPIKE, NFConfig.assertions);`;
+
+  const paramsBlock = target.testType === 'incremental'
+    ? `const NF_INCREMENTAL = ${incrementalJson};`
+    : `const NF_SPIKE = ${spikeJson};`;
 
   return `/**
  * ${target.suiteName}.nf.spec.ts
  *
  * Prueba NO FUNCIONAL (Carga / Rendimiento) — ${target.suiteName}
+ * Tipo: ${target.testType.toUpperCase()}
  *
  * AUTO-GENERADO por:
  *   npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
@@ -180,7 +210,7 @@ function generateSpecContent(target: ResolvedTarget): string {
 
 import { test } from '@playwright/test';
 import { NFConfig } from '${toNF}/config/nf-config';
-import { runIncrementalTest, runSpikeTest } from '${toNF}/core/load-engine';
+${importLine}
 import { printSummaryTable } from '${toNF}/reporters/summary-reporter';
 import type { LoadTarget } from '${toNF}/utils/target-resolver';
 
@@ -192,7 +222,13 @@ const NF_TARGET: LoadTarget = {
   headers: ${headersJson},
   body: ${bodyLiteral},
   type: '${target.type}',
+  testType: '${target.testType}',
+  incremental: ${incrementalJson},
+  spike: ${spikeJson},
 };
+
+// ─── Parámetros de prueba embebidos (resueltos en tiempo de generación) ────
+${paramsBlock}
 
 // ─── Test ──────────────────────────────────────────────────────────────────
 test.describe.configure({ mode: 'serial' });
@@ -204,14 +240,12 @@ test('Non-Functional — ${target.suiteName}', async () => {
   console.log('\\n' + '═'.repeat(60));
   console.log('  🚀 Prueba No Funcional: ${safeName}');
   console.log('  🌐 URL: ${safeUrl}');
-  console.log('  📋 Tipo: ' + NFConfig.testType.toUpperCase());
+  console.log('  📋 Tipo: ${target.testType.toUpperCase()}');
   console.log('═'.repeat(60));
 
-  const summaries = NFConfig.testType === 'incremental'
-    ? await runIncrementalTest(NF_TARGET, NFConfig.incremental, NFConfig.assertions)
-    : await runSpikeTest(NF_TARGET, NFConfig.spike, NFConfig.assertions);
+  ${testCall}
 
-  printSummaryTable(NF_TARGET, summaries, NFConfig.testType);
+  printSummaryTable(NF_TARGET, summaries, '${target.testType}');
 });
 `;
 }
@@ -247,7 +281,7 @@ function main(): void {
   let skipped = 0;
 
   for (const target of targets) {
-    const dir = path.join('GenerateTest', 'tests', target.suiteName, 'non-functional');
+    const dir      = path.join('GenerateTest', 'tests', target.suiteName, 'non-functional');
     const specFile = path.join(dir, `${target.suiteName}.nf.spec.ts`);
 
     // Verificar que la suite existe

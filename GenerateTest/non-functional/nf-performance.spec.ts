@@ -40,20 +40,21 @@ test('Prueba No Funcional — Standalone', async () => {
     return;
   }
 
-  console.log(`\n  📋 Tipo: ${NFConfig.testType.toUpperCase()} | Targets: ${targets.length}`);
+  console.log(`\n  📋 Targets: ${targets.length}`);
   for (const t of targets) {
-    console.log(`     • [${t.type.toUpperCase()}] ${t.name} → ${t.url}`);
+    console.log(`     • [${t.type.toUpperCase()}] ${t.name} → ${t.url} | Tipo: ${t.testType.toUpperCase()}`);
   }
 
   for (const target of targets) {
     console.log(`\n${'─'.repeat(60)}`);
-    console.log(`  📡 ${target.name} | ${target.url}`);
+    console.log(`  📡 ${target.name} | ${target.url} | Tipo: ${target.testType.toUpperCase()}`);
 
-    const summaries = NFConfig.testType === 'incremental'
-      ? await runIncrementalTest(target, NFConfig.incremental, NFConfig.assertions)
-      : await runSpikeTest(target, NFConfig.spike, NFConfig.assertions);
+    // Cada target usa su propio testType, incremental y spike resueltos
+    const summaries = target.testType === 'incremental'
+      ? await runIncrementalTest(target, target.incremental, NFConfig.assertions)
+      : await runSpikeTest(target, target.spike, NFConfig.assertions);
 
-    printSummaryTable(target, summaries, NFConfig.testType);
+    printSummaryTable(target, summaries, target.testType);
   }
 
   console.log('\n  ✅ Prueba no funcional completada.\n');
