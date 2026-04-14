@@ -2,7 +2,7 @@
  * Homebankink_Transferencias.nf.spec.ts
  *
  * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebankink_Transferencias
- * Tipo: SPIKE
+ * Targets: 2 | Homebankink_Transferencias (incremental), Dashboard Cliente (spike)
  *
  * AUTO-GENERADO por:
  *   npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
@@ -19,12 +19,51 @@
 
 import { test } from '@playwright/test';
 import { NFConfig } from '../../../non-functional/config/nf-config';
-import { runSpikeTest } from '../../../non-functional/core/load-engine';
+import { runIncrementalTest, runSpikeTest } from '../../../non-functional/core/load-engine';
 import { printSummaryTable } from '../../../non-functional/reporters/summary-reporter';
 import type { LoadTarget } from '../../../non-functional/utils/target-resolver';
 
-// ─── Target embebido (resuelto en tiempo de generación) ────────────────────
-const NF_TARGET: LoadTarget = {
+// ─── Target 1: Homebankink_Transferencias [RECORDING] — INCREMENTAL ────
+const NF_TARGET_0: LoadTarget = {
+  name: 'Homebankink_Transferencias',
+  url: 'https://homebanking-demo-tests.netlify.app',
+  method: 'GET',
+  headers: {},
+  body: undefined,
+  type: 'recording',
+  testType: 'incremental',
+  incremental: {
+    "scenarios": 3,
+    "initialThreads": 2,
+    "finalThreads": 6,
+    "durationPerScenarioSeconds": 5
+  },
+  spike: {
+    "threadsPerScenario": [
+      10,
+      50,
+      5,
+      80,
+      20
+    ],
+    "durationPerScenarioSeconds": [
+      30,
+      30,
+      30,
+      30,
+      30
+    ]
+  },
+};
+const NF_PARAMS_0 = {
+    "scenarios": 3,
+    "initialThreads": 2,
+    "finalThreads": 6,
+    "durationPerScenarioSeconds": 5
+  }; // incremental
+
+// ─── Target 2: Dashboard Cliente [API] — SPIKE ────
+const NF_TARGET_1: LoadTarget = {
   name: 'Dashboard Cliente',
   url: 'https://homebanking-demo.onrender.com/cliente/dashboard',
   method: 'GET',
@@ -57,9 +96,7 @@ const NF_TARGET: LoadTarget = {
     ]
   },
 };
-
-// ─── Parámetros de prueba embebidos (resueltos en tiempo de generación) ────
-const NF_SPIKE = {
+const NF_PARAMS_1 = {
     "threadsPerScenario": [
       1,
       8,
@@ -74,22 +111,32 @@ const NF_SPIKE = {
       5,
       5
     ]
-  };
+  }; // spike
 
 // ─── Test ──────────────────────────────────────────────────────────────────
 test.describe.configure({ mode: 'serial' });
 
 test('Non-Functional — Homebankink_Transferencias', async () => {
-  // Sin timeout: las pruebas de carga pueden durar varios minutos
   test.setTimeout(0);
 
   console.log('\n' + '═'.repeat(60));
-  console.log('  🚀 Prueba No Funcional: Dashboard Cliente');
-  console.log('  🌐 URL: https://homebanking-demo.onrender.com/cliente/dashboard');
-  console.log('  📋 Tipo: SPIKE');
+  console.log('  🚀 Prueba No Funcional: Homebankink_Transferencias');
+  console.log('  📋 Targets: 2 | Homebankink_Transferencias (incremental) + Dashboard Cliente (spike)');
   console.log('═'.repeat(60));
 
-  const summaries = await runSpikeTest(NF_TARGET, NF_SPIKE, NFConfig.assertions);
+  // ── [1/2] Homebankink_Transferencias — INCREMENTAL ─────────────────────
+  console.log('\n' + '─'.repeat(60));
+  console.log('  📡 Homebankink_Transferencias | https://homebanking-demo-tests.netlify.app');
+  console.log('  📋 Tipo: INCREMENTAL');
+  const summaries_0 = await runIncrementalTest(NF_TARGET_0, NF_PARAMS_0, NFConfig.assertions);
+  printSummaryTable(NF_TARGET_0, summaries_0, 'incremental');
 
-  printSummaryTable(NF_TARGET, summaries, 'spike');
+  // ── [2/2] Dashboard Cliente — SPIKE ─────────────────────
+  console.log('\n' + '─'.repeat(60));
+  console.log('  📡 Dashboard Cliente | https://homebanking-demo.onrender.com/cliente/dashboard');
+  console.log('  📋 Tipo: SPIKE');
+  const summaries_1 = await runSpikeTest(NF_TARGET_1, NF_PARAMS_1, NFConfig.assertions);
+  printSummaryTable(NF_TARGET_1, summaries_1, 'spike');
+
+  console.log('\n  ✅ Prueba no funcional completada: Homebankink_Transferencias\n');
 });

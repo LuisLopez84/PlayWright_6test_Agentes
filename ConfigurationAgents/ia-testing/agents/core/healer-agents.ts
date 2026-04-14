@@ -292,19 +292,23 @@ async function tryStructuralStrategies(page: Page, original: string): Promise<st
 }
 
 // ─────────────────────────────────────────────
-// ESTRATEGIA 4: SCROLL + REVEAL
+// ESTRATEGIA 4: SCROLL + REVEAL + LAZY WAIT
+// Maneja: elementos fuera del viewport, lazy rendering de SPAs,
+// splash screens de login, formularios con animaciones CSS.
 // ─────────────────────────────────────────────
 async function tryScrollAndReveal(page: Page, selector: string): Promise<string | null> {
-  // Buscar el elemento aunque no esté visible y hacer scroll
   const variants = generateTextVariants(selector);
   const strategies = [
     `text=${selector}`,
     `:text-matches("${escapeRegex(selector)}", "i")`,
-    // Contextos comunes en SPAs: sidebar, menú lateral, aside
     `.menu-item:has-text("${selector}")`,
     `.sidebar :text("${selector}")`,
     `aside :text("${selector}")`,
     `li:has-text("${selector}")`,
+    // Inputs de login/form — crítico para "Usuario", "Contraseña", "Email"
+    `input[aria-label*="${selector}"]`,
+    `input[placeholder*="${selector}"]`,
+    `input[name*="${selector.toLowerCase()}"]`,
     ...variants.map(v => `text=${v}`),
     ...variants.map(v => `.menu-item:has-text("${v}")`),
     ...variants.map(v => `li:has-text("${v}")`),
@@ -314,9 +318,7 @@ async function tryScrollAndReveal(page: Page, selector: string): Promise<string 
     try {
       const loc = page.locator(sel);
       if (await loc.count() === 0) continue;
-      // Hacer scroll incluso si no está visible
       await loc.first().scrollIntoViewIfNeeded({ timeout: 3000 });
-      // Esperar más para SPAs con animaciones de sidebar
       await page.waitForTimeout(600);
       const isNowVisible = await loc.first().isVisible().catch(() => false);
       if (isNowVisible) {
@@ -325,6 +327,61 @@ async function tryScrollAndReveal(page: Page, selector: string): Promise<string 
       }
     } catch {}
   }
+
+  // ── 4b: Esperar lazy rendering (hasta 6s adicionales) ──────────────────────
+  // SPAs con autenticación pueden tardar en montar el formulario de login
+  try {
+    const selectorEsc = escapeRegex(selector);
+    await page.waitForFunction(
+      (text) => {
+        const byLabel = document.querySelector(`[aria-label*="${text}"], [placeholder*="${text}"], [name*="${text.toLowerCase()}"]`);
+        if (byLabel) {
+          const s = getComputedStyle(byLabel);
+          return s.display !== 'none' && s.visibility !== 'hidden';
+        }
+        // También buscar por texto de botón/link
+        const byText = Array.from(document.querySelectorAll('button, a, label')).find(
+          el => el.textContent?.trim().toLowerCase().includes(text.toLowerCase())
+        );
+        return byText ? getComputedStyle(byText).display !== 'none' : false;
+      },
+      selector,
+      { timeout: 6000 },
+    );
+
+    // Revisar de nuevo después del lazy rendering
+    const byLabel = page.locator(
+      `[aria-label*="${selector}"], [placeholder*="${selector}"], [name*="${selector.toLowerCase()}"]`
+    );
+    if (await byLabel.count() > 0 && await byLabel.first().isVisible().catch(() => false)) {
+      const id = await byLabel.first().getAttribute('id').catch(() => null);
+      const name = await byLabel.first().getAttribute('name').catch(() => null);
+      const aria = await byLabel.first().getAttribute('aria-label').catch(() => null);
+      const result = id ? `#${id}` : name ? `[name="${name}"]` : aria ? `[aria-label="${aria}"]` : null;
+      if (result) {
+        console.log(`⏳ Elemento revelado tras lazy-wait: ${result}`);
+        return result;
+      }
+    }
+  } catch {}
+
+  // ── 4c: Scroll a top y volver a revisar (formularios de login ocultos) ──────
+  try {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(500);
+    // Buscar por role textbox/button con el nombre
+    const textbox = page.getByRole('textbox', { name: selector });
+    if (await textbox.count() > 0 && await textbox.first().isVisible().catch(() => false)) {
+      console.log(`📜 Elemento visible tras scroll-to-top: textbox[name="${selector}"]`);
+      return `input[aria-label="${selector}"]`; // selector estable
+    }
+    const button = page.getByRole('button', { name: selector });
+    if (await button.count() > 0 && await button.first().isVisible().catch(() => false)) {
+      console.log(`📜 Botón visible tras scroll-to-top: button[name="${selector}"]`);
+      return `button:has-text("${selector}")`;
+    }
+  } catch {}
+
   return null;
 }
 

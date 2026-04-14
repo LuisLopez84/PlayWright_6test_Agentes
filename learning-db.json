@@ -324,29 +324,34 @@
   "https://homebanking-demo-tests.netlify.app/|click|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 87,
-      "lastUsed": "2026-04-14T12:46:19.090Z"
+      "successCount": 93,
+      "lastUsed": "2026-04-14T14:04:34.849Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 74,
-      "lastUsed": "2026-04-14T12:46:23.104Z"
+      "successCount": 3,
+      "lastUsed": "2026-04-14T14:04:36.472Z"
+    },
+    {
+      "selector": "text=Try Again",
+      "successCount": 2,
+      "lastUsed": "2026-04-14T13:30:28.708Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 132,
-      "lastUsed": "2026-04-14T12:46:28.793Z"
+      "successCount": 138,
+      "lastUsed": "2026-04-14T14:04:38.512Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "Ingresar",
-      "successCount": 49,
-      "lastUsed": "2026-04-14T12:46:32.077Z"
+      "successCount": 55,
+      "lastUsed": "2026-04-14T14:04:40.105Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -364,50 +369,50 @@
   "https://homebanking-demo-tests.netlify.app/|click|Transferencias": [
     {
       "selector": "Transferencias",
-      "successCount": 37,
-      "lastUsed": "2026-04-14T12:46:38.215Z"
+      "successCount": 42,
+      "lastUsed": "2026-04-14T14:04:42.894Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|#source-account": [
     {
       "selector": "#source-account",
-      "successCount": 34,
-      "lastUsed": "2026-04-14T12:46:40.731Z"
+      "successCount": 39,
+      "lastUsed": "2026-04-14T14:04:44.095Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto": [
     {
       "selector": "Monto",
-      "successCount": 34,
-      "lastUsed": "2026-04-14T12:46:42.122Z"
+      "successCount": 39,
+      "lastUsed": "2026-04-14T14:04:44.660Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Monto": [
     {
       "selector": "Monto",
-      "successCount": 33,
-      "lastUsed": "2026-04-14T12:46:45.865Z"
+      "successCount": 37,
+      "lastUsed": "2026-04-14T14:04:46.177Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Descripción (opcional)": [
     {
       "selector": "Descripción (opcional)",
-      "successCount": 33,
-      "lastUsed": "2026-04-14T12:46:49.830Z"
+      "successCount": 37,
+      "lastUsed": "2026-04-14T14:04:47.755Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Descripción (opcional)": [
     {
       "selector": "Descripción (opcional)",
-      "successCount": 33,
-      "lastUsed": "2026-04-14T12:46:54.296Z"
+      "successCount": 37,
+      "lastUsed": "2026-04-14T14:04:49.292Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Transferir": [
     {
       "selector": "Transferir",
-      "successCount": 32,
-      "lastUsed": "2026-04-14T12:46:58.733Z"
+      "successCount": 36,
+      "lastUsed": "2026-04-14T14:04:51.289Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Transferencia realizada": [
@@ -420,8 +425,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Salir": [
     {
       "selector": "Salir",
-      "successCount": 7,
-      "lastUsed": "2026-04-14T12:47:07.892Z"
+      "successCount": 10,
+      "lastUsed": "2026-04-14T14:04:59.025Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Confirmar": [
@@ -1734,8 +1739,15 @@
   "https://homebanking-demo-tests.netlify.app/|click|Sesión cerrada correctamente": [
     {
       "selector": "Sesión cerrada correctamente",
-      "successCount": 2,
-      "lastUsed": "2026-04-14T12:47:13.086Z"
+      "successCount": 5,
+      "lastUsed": "2026-04-14T14:05:01.722Z"
+    }
+  ],
+  "about:blank|click|Usuario": [
+    {
+      "selector": "#neterrorTryAgainButton",
+      "successCount": 1,
+      "lastUsed": "2026-04-14T13:29:50.882Z"
     }
   ]
 }

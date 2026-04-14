@@ -213,17 +213,26 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
 
 /**
  * Espera a que un locator sea visible, intentando scroll si es necesario.
+ * Incluye un retry con scroll-to-top para formularios de login que aparecen
+ * después de una animación o splash screen.
  */
 async function waitForVisible(locator: Locator, timeout = 10000): Promise<boolean> {
   try {
-    // Usar .first() siempre para evitar strict-mode violation cuando el locator matchea múltiples
     await locator.first().waitFor({ state: 'attached', timeout: Math.min(timeout, 5000) });
     await locator.first().scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
-    // Usar el timeout completo para toBeVisible — cubre elementos con CSS transitions largas
-    // (ej. Bootstrap modal 300ms fade, DemoQA "Visible After 5 Seconds" button)
     await expect(locator.first()).toBeVisible({ timeout });
     return true;
   } catch {
+    // Segundo intento: scroll to top + espera para formularios con animación de entrada
+    try {
+      const page = locator.page();
+      if (!page || page.isClosed()) return false;
+      await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
+      await page.waitForTimeout(600);
+      await locator.first().scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+      const isVis = await locator.first().isVisible().catch(() => false);
+      if (isVis) return true;
+    } catch {}
     return false;
   }
 }
@@ -387,6 +396,183 @@ Solo el selector, sin código ni explicación.`;
 }
 
 // ─────────────────────────────────────────────
+// CAPA 6: FORCE-REVEAL (último recurso antes de lanzar error)
+// Maneja: elementos en DOM pero ocultos por CSS, overlays, animaciones de entrada,
+// acordeones/tabs colapsados, splash screens y lazy rendering de SPAs.
+// Transversal: funciona para cualquier app web grabada con Playwright codegen.
+// ─────────────────────────────────────────────
+
+async function forceRevealAndClick(page: Page, selector: string): Promise<boolean> {
+  if (!isPageAlive(page)) return false;
+
+  // ── 6a: Scroll a toda la página buscando el elemento ──
+  // Útil cuando el form está debajo del fold y el viewport no lo muestra
+  try {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(300);
+  } catch {}
+
+  // ── 6b: Cerrar overlays/splash con más agresividad ──
+  try {
+    await page.evaluate(() => {
+      // Eliminar overlays frecuentes en apps bancarias y SPAs
+      const overlaySelectors = [
+        '[class*="overlay"]', '[class*="loading"]', '[class*="splash"]',
+        '[class*="backdrop"]', '[id*="overlay"]', '[id*="loading"]',
+      ];
+      for (const sel of overlaySelectors) {
+        document.querySelectorAll<HTMLElement>(sel).forEach(el => {
+          if (getComputedStyle(el).zIndex > '100') el.style.display = 'none';
+        });
+      }
+    });
+    await page.waitForTimeout(200);
+  } catch {}
+
+  // ── 6c: Candidatos para encontrar el elemento ignorando visibilidad ──
+  const selectorLower = selector.toLowerCase();
+  const candidates = [
+    // Roles de formulario — máxima prioridad para campos de login
+    () => page.getByRole('textbox',   { name: selector }),
+    () => page.getByRole('textbox',   { name: new RegExp(selector, 'i') }),
+    () => page.getByRole('button',    { name: selector }),
+    () => page.getByRole('button',    { name: new RegExp(selector, 'i') }),
+    () => page.getByRole('link',      { name: selector }),
+    () => page.getByRole('link',      { name: new RegExp(selector, 'i') }),
+    () => page.getByLabel(selector),
+    () => page.getByLabel(selector, { exact: false }),
+    () => page.getByText(selector, { exact: false }),
+    // Atributos de input — útil cuando getByRole falla por shadow DOM parcial
+    () => page.locator(`[placeholder*="${selector}"]`),
+    () => page.locator(`[name*="${selectorLower}"]`),
+    () => page.locator(`[id*="${selectorLower}"]`),
+    () => page.locator(`[aria-label*="${selector}"]`),
+    () => page.locator(`input[type="text"], input:not([type])`)
+        .filter({ hasText: selector }),
+  ];
+
+  for (const candidateFn of candidates) {
+    try {
+      const loc = candidateFn().first();
+      if (await loc.count() === 0) continue;
+
+      // Intentar scroll al elemento (funciona incluso si está hidden)
+      await loc.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
+      await page.waitForTimeout(400);
+
+      // ¿Ahora es visible?
+      const nowVisible = await loc.isVisible().catch(() => false);
+      if (nowVisible) {
+        await loc.click({ timeout: 5000 });
+        console.log(`✅ Force-reveal (visible tras scroll): "${selector}"`);
+        return true;
+      }
+
+      // Force-click: ignora visibility/pointer-events — para campos en tab/accordion
+      await loc.click({ force: true, timeout: 5000 });
+      console.log(`⚡ Force-reveal (force-click): "${selector}"`);
+      return true;
+    } catch {}
+  }
+
+  // ── 6d: Expandir contenedor colapsado via JavaScript ──
+  // Detecta Bootstrap collapse, tabs, acordeones, y clics en elementos padres visibles
+  try {
+    const expanded = await page.evaluate((text) => {
+      // Buscar todos los nodos de texto que contengan el selector
+      const allEls = Array.from(document.querySelectorAll<HTMLElement>('*'));
+      const targets = allEls.filter(el =>
+        el.children.length === 0 &&
+        (el.textContent?.trim() === text || el.getAttribute('placeholder')?.includes(text) ||
+         el.getAttribute('aria-label')?.includes(text) || el.getAttribute('name')?.toLowerCase().includes(text.toLowerCase()))
+      );
+
+      for (const target of targets) {
+        let ancestor: HTMLElement | null = target.parentElement;
+        while (ancestor && ancestor !== document.body) {
+          const style = getComputedStyle(ancestor);
+          const isHidden = style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0';
+          if (isHidden) {
+            // Buscar el toggler de Bootstrap / genérico
+            const id = ancestor.id;
+            if (id) {
+              const toggler = document.querySelector<HTMLElement>(
+                `[data-bs-target="#${id}"], [data-target="#${id}"], [aria-controls="${id}"]`
+              );
+              if (toggler) { toggler.click(); return true; }
+            }
+            // Intentar hacer visible directamente (remove display:none)
+            ancestor.style.removeProperty('display');
+            ancestor.style.removeProperty('visibility');
+            ancestor.style.removeProperty('opacity');
+            ancestor.classList.remove('collapse', 'd-none', 'hidden');
+            return true;
+          }
+          ancestor = ancestor.parentElement;
+        }
+      }
+      return false;
+    }, selector);
+
+    if (expanded) {
+      await page.waitForTimeout(500);
+      // Reintentar click después de expandir
+      try {
+        const retryLoc = page.getByText(selector, { exact: false }).first();
+        if (await retryLoc.isVisible().catch(() => false)) {
+          await retryLoc.click({ timeout: 5000 });
+          console.log(`✅ Force-reveal (expand+click): "${selector}"`);
+          return true;
+        }
+        const retryRole = page.getByRole('textbox', { name: selector }).first();
+        if (await retryRole.count() > 0) {
+          await retryRole.click({ force: true, timeout: 5000 });
+          console.log(`⚡ Force-reveal (expand+force): "${selector}"`);
+          return true;
+        }
+      } catch {}
+    }
+  } catch {}
+
+  // ── 6e: Esperar hasta 8s adicionales por lazy rendering ──
+  // SPAs pueden tardar en montar el formulario de login
+  try {
+    const waited = await page.waitForFunction(
+      (text) => {
+        const inputs = document.querySelectorAll<HTMLElement>('input, button, a');
+        return Array.from(inputs).some(el => {
+          const label = el.getAttribute('aria-label') || el.getAttribute('placeholder') ||
+                        el.getAttribute('name') || el.textContent?.trim() || '';
+          return label.toLowerCase().includes(text.toLowerCase()) &&
+                 getComputedStyle(el).display !== 'none' &&
+                 getComputedStyle(el).visibility !== 'hidden';
+        });
+      },
+      selector,
+      { timeout: 8000 },
+    ).catch(() => null);
+
+    if (waited) {
+      const finalLoc = page.getByRole('textbox', { name: selector });
+      if (await finalLoc.count() === 0) {
+        const finalBtn = page.getByRole('button', { name: selector });
+        if (await finalBtn.count() > 0) {
+          await finalBtn.first().click({ timeout: 5000 });
+          console.log(`✅ Force-reveal (lazy-wait): "${selector}"`);
+          return true;
+        }
+      } else {
+        await finalLoc.first().click({ timeout: 5000 });
+        console.log(`✅ Force-reveal (lazy-wait): "${selector}"`);
+        return true;
+      }
+    }
+  } catch {}
+
+  return false;
+}
+
+// ─────────────────────────────────────────────
 // SMART CLICK
 // ─────────────────────────────────────────────
 export async function smartClick(page: Page, selector: string): Promise<void> {
@@ -464,7 +650,16 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
         }
       }
 
+      // ── [6] Force-reveal: último recurso antes de fallar ──
       if (!isVisible) {
+        console.log(`🔓 [6] Force-reveal activado para: "${selector}"`);
+        const forceClicked = await forceRevealAndClick(page, selector);
+        if (forceClicked) {
+          learningStore.recordSuccess(sig, selector);
+          await waitForPageStability(page);
+          await waitForNavigationAfterClick(page, selector, url);
+          return;
+        }
         throw new Error(`Elemento no visible para click: ${selector}`);
       }
     }
