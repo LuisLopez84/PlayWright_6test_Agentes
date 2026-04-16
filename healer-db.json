@@ -12,5 +12,19 @@
   "Browser Windows": "text=Windows",
   "#alertButton": "text=Alert",
   "#timerAlertButton": "text=Book Store Application",
-  "Alerts, Frame & Windows": "text=Windows"
+  "Alerts, Frame & Windows": "text=Windows",
+  "tr:nth-child(73) > td:nth-child(2)": "#edit-contact",
+  "Last Name:": "text=Luistester CaicedoQA",
+  "LopezTesterQA": "text=Submit",
+  "Email": "[placeholder=\"Email\"]",
+  "Edit Contact": "text=Contact",
+  "LopezTesterSeniro": "text=Last Name",
+  "Submit": "button:has-text(\"Edit Contact\")",
+  "tr:nth-child(72) > td:nth-child(2)": "tr.contactTableBodyRow:has-text(\"John Doe\")",
+  "State or Province:": "text=Province:",
+  "Luistester LopezTester": "text=luistester lopeztester",
+  "Framework001": "#submit",
+  "Add a New Contact": "text=Contact",
+  "Framework Playwright": "button:has-text(\"Sign up\")",
+  "* First Name:": "button:has-text(\"Sign up\")"
 }

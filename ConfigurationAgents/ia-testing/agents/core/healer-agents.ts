@@ -52,7 +52,15 @@ export function generateTextVariants(text: string): string[] {
   // 2. Sin puntuación invertida española (¡ ¿) y final (! ?)
   const noInvPunct = (t: string) => t.replace(/^[¡¿\s]+|[!?¡¿\s]+$/g, '').trim();
 
-  // 3. Añadir variantes base
+  // 3. Variantes de asterisco — campos requeridos (patrón web universal)
+  // Playwright codegen graba "Last Name:" pero el HTML puede tener "* Last Name:"
+  // y viceversa. Generamos ambas formas para que el healer siempre encuentre el campo.
+  const withoutAsterisk = text.replace(/^\*+\s*/, '').trim();   // "* Last Name:" → "Last Name:"
+  const withAsterisk    = `* ${withoutAsterisk}`;               // "Last Name:"   → "* Last Name:"
+  if (withoutAsterisk !== text) variants.add(withoutAsterisk);  // tenía asterisco → añadir sin él
+  variants.add(withAsterisk);                                    // siempre añadir con asterisco
+
+  // 3b. Añadir variantes base
   const clean = noInvPunct(text);
   variants.add(clean);
   variants.add(noAccents(clean));
@@ -241,8 +249,18 @@ async function tryStructuralStrategies(page: Page, original: string): Promise<st
   } catch {}
 
   // getByLabel — inputs asociados con <label> (usa HTML label-for, no aria-label)
+  // Prueba también con/sin asterisco de campo requerido ("* Last Name:" ↔ "Last Name:")
+  const labelCandidates = [
+    original,
+    original.replace(/^\*+\s*/, '').trim(),   // quita "* " del inicio
+    `* ${original.replace(/^\*+\s*/, '').trim()}`, // añade "* " al inicio
+  ].filter((v, i, arr) => v && arr.indexOf(v) === i); // únicos no vacíos
+
   try {
-    const byLabel = page.getByLabel(original, { exact: false });
+    let byLabel = page.getByLabel(labelCandidates[0], { exact: false });
+    for (let ci = 1; ci < labelCandidates.length; ci++) {
+      byLabel = byLabel.or(page.getByLabel(labelCandidates[ci], { exact: false }));
+    }
     if (await byLabel.count() > 0 && await byLabel.first().isVisible().catch(() => false)) {
       // Extraer selector estable del elemento real encontrado (no devolver aria-label*)
       const id          = await byLabel.first().getAttribute('id').catch(() => null);

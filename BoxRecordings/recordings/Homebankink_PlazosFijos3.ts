@@ -10,8 +10,8 @@ test('test', async ({ page }) => {
   await page.getByRole('list').getByText('Plazos Fijos').click();
   await page.locator('#deposit-source-account').selectOption('ACC002');
   await page.getByRole('spinbutton', { name: 'Monto a invertir' }).click();
-  await page.getByRole('spinbutton', { name: 'Monto a invertir' }).fill('2000');
-  await page.getByLabel('Plazo').selectOption('180');
+  await page.getByRole('spinbutton', { name: 'Monto a invertir' }).fill('1111');
+  await page.getByLabel('Plazo').selectOption('90');
   await page.getByRole('button', { name: 'Crear Plazo Fijo' }).click();
   await page.getByRole('button', { name: 'Confirmar' }).click();
   await page.getByText('Plazo fijo creado exitosamente').click();

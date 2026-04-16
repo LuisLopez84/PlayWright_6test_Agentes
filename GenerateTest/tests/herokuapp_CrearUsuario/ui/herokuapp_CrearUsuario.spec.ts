@@ -1,0 +1,50 @@
+
+import { test, expect } from '@playwright/test';
+import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
+import { smartClick, smartFill } from '../../../../ConfigurationTest/tests/utils/smart-actions';
+
+test('herokuapp_CrearUsuario', async ({ page }) => {
+  await smartGoto(page, 'herokuapp_CrearUsuario');
+
+  await smartClick(page, `Email`);
+  await smartFill(page, `Email`, 'pruebas@prue.com.co');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Password`);
+  await smartFill(page, `Password`, '1234567');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Submit`);
+  await smartClick(page, `Add a New Contact`);
+  await smartClick(page, `* First Name:`);
+  await smartFill(page, `* First Name:`, 'Framework');
+  await page.waitForTimeout(500);
+  await smartClick(page, `* Last Name:`);
+  await smartFill(page, `* Last Name:`, 'Playwright');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Date of Birth:`);
+  await smartFill(page, `Date of Birth:`, '1984-04-01');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Email:`);
+  await smartFill(page, `Email:`, 'playwright@gmail.com.co');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Phone:`);
+  await smartFill(page, `Phone:`, '5555555555');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Street Address 1:`);
+  await smartFill(page, `Street Address 1:`, 'calle 154a 99 32');
+  await page.waitForTimeout(500);
+  await smartClick(page, `City:`);
+  await smartFill(page, `City:`, 'Bogota');
+  await page.waitForTimeout(500);
+  await smartClick(page, `State or Province:`);
+  await smartFill(page, `State or Province:`, 'Colombia');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Postal Code:`);
+  await smartFill(page, `Postal Code:`, '111121');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Country:`);
+  await smartFill(page, `Country:`, 'Bogota');
+  await page.waitForTimeout(500);
+  await smartClick(page, `Submit`);
+  await smartClick(page, `Framework Playwright`);
+  await smartClick(page, `Framework`);
+});

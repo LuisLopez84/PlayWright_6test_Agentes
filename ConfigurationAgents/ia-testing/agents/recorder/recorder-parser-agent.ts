@@ -651,9 +651,11 @@ export function parseRecording(filePath: string): any[] {
     }
 
     // ─────────────────────────────────────────
-    // 🔥 ROLE CLICK  (cualquier rol, incluye exact:true)
+    // 🔥 ROLE CLICK  (cualquier rol, incluye exact:true, .first() y .nth(n))
+    // Transversal: cubre getByRole('cell'|'row'|'link'|...).first().click()
+    //              que Playwright codegen genera cuando hay varios elementos con el mismo nombre.
     // ─────────────────────────────────────────
-    const roleClickM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click/);
+    const roleClickM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)(?:\.first\(\)|\.nth\(\d+\))?\.click/);
     if (roleClickM) {
       const role = roleClickM[1];
       const name = roleClickM[2];
@@ -796,15 +798,66 @@ export function parseRecording(filePath: string): any[] {
     }
   });
 
+  // ── Post-procesado: eliminar dblclick redundante antes de fill ───────────
+  // Playwright codegen graba dblclick para seleccionar texto antes de tipear,
+  // pero fill() reemplaza todo el contenido sin necesitar selección previa.
+  // También marca el fill vacío con _editIntent cuando el dblclick indica que
+  // el usuario intentó editar el campo (valor posiblemente no capturado).
+  // Transversal: aplica a cualquier grabación con campos editables.
+  // Salta press_key intermedios (ArrowRight, ArrowLeft, etc.) que codegen
+  // puede grabar entre el dblclick y el fill.
+  const stepsClean: any[] = [];
+  for (let idx = 0; idx < steps.length; idx++) {
+    const curr = steps[idx];
+    if (curr.action !== 'dblclick') { stepsClean.push(curr); continue; }
+
+    const currField = curr.selector || curr.target || '';
+
+    // Buscar el próximo fill/input sobre el mismo campo,
+    // saltando press_key intermedios (ArrowRight, ArrowLeft, etc.)
+    let fillIdx = -1;
+    const intermediateKeyIdxs: number[] = [];
+    for (let k = idx + 1; k < steps.length; k++) {
+      const s = steps[k];
+      if (s.action === 'press_key' || s.action === 'press_enter') {
+        intermediateKeyIdxs.push(k);
+        continue; // saltar teclas
+      }
+      if ((s.action === 'input' || s.action === 'fill') &&
+          (s.selector || s.target || '') === currField) {
+        fillIdx = k;
+      }
+      break; // parar en el primer step que no sea press_key (sea fill o no)
+    }
+
+    if (fillIdx !== -1) {
+      // El fill que sigue al dblclick reemplaza todo el contenido — dblclick redundante
+      console.log(`🔧 dblclick redundante eliminado antes de fill en: "${curr.target}"`);
+      // Marcar el fill como _editIntent si su valor es vacío
+      // (indica que el usuario borró el campo posiblemente para reescribir)
+      if (steps[fillIdx].value === '') {
+        steps[fillIdx] = { ...steps[fillIdx], _editIntent: true };
+        // Marcar también las teclas intermedias (ArrowRight, etc.) para que el ui-agent las omita
+        intermediateKeyIdxs.forEach(k => {
+          steps[k] = { ...steps[k], _editIntent: true };
+        });
+      }
+      continue; // saltar el dblclick
+    }
+
+    stepsClean.push(curr); // dblclick sin fill posterior → conservar
+  }
+  const cleanSteps = stepsClean;
+
   // ── Post-procesado: marcar popup triggers ──────────────────────────
   // El click en la página principal que antecede a acciones de popup
   // debe marcarse con popupTrigger:true para que el ui-agent genere
   // el waitForEvent('popup') + Promise.all correspondiente.
-  for (let i = 1; i < steps.length; i++) {
-    if (steps[i].pageRef === 'popup' && steps[i - 1].action === 'click' && !steps[i - 1].pageRef) {
-      steps[i - 1] = { ...steps[i - 1], popupTrigger: true };
+  for (let i = 1; i < cleanSteps.length; i++) {
+    if (cleanSteps[i].pageRef === 'popup' && cleanSteps[i - 1].action === 'click' && !cleanSteps[i - 1].pageRef) {
+      cleanSteps[i - 1] = { ...cleanSteps[i - 1], popupTrigger: true };
     }
   }
 
-  return steps;
+  return cleanSteps;
 }

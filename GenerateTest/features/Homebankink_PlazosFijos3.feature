@@ -9,8 +9,8 @@ Scenario: Flujo Homebankink_PlazosFijos3
   And hace clic en "Plazos Fijos"
   And selecciona "ACC002" en "#deposit-source-account"
   And hace clic en "Monto a invertir"
-  And completa "Monto a invertir" con "2000"
-  And selecciona "180" en "Plazo"
+  And completa "Monto a invertir" con "1111"
+  And selecciona "90" en "Plazo"
   And hace clic en "Crear Plazo Fijo"
   And hace clic en "Confirmar"
   Then la operación es exitosa
