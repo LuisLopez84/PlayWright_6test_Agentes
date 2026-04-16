@@ -22,15 +22,15 @@ When('hace clic en {string}', async ({ page }, target) => {
   await smartClick(page, target);
 });
 
-When('selecciona {string} en {string}', async ({ page }, value, target) => {
-  console.log(`🔽 Seleccionando: ${value} en ${target}`);
-  await smartSelect(page, target, value);
-});
-
 When('completa {string} con {string}', async ({ page }, value, target) => {
   await smartFill(page, target, value);
 });
 
 Then('la operación es exitosa', async ({ page }) => {
   await expect(page).toBeTruthy();
+});
+
+When('selecciona {string} en {string}', async ({ page }, value, target) => {
+  console.log(`🔽 Seleccionando: ${value} en ${target}`);
+  await smartSelect(page, target, value);
 });

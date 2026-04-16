@@ -130,8 +130,12 @@ ${dialogQueueBlock}`;
 
     // ── press_key → tecla arbitraria ──────────────────────────────────
     if (step.action === 'press_key') {
-      code += `
+      // Omitir teclas de posicionamiento (ArrowRight, etc.) que el parser marcó
+      // como parte de un patrón dblclick→fill incompleto (_editIntent).
+      if (!step._editIntent) {
+        code += `
   await page.keyboard.press('${step.target}');`;
+      }
       i++;
       continue;
     }
@@ -381,9 +385,25 @@ ${dialogQueueBlock}`;
     // ── FILL / INPUT (página principal) ───────────────────────────────
     if ((step.action === 'input' || step.action === 'fill') && !step.pageRef) {
       if (!selector) { i++; continue; }
-      code += `
+      if (value === '' && step._editIntent) {
+        // El recording capturó solo el borrado del campo (fill('')) pero no el valor
+        // que el usuario escribió a continuación. Esto ocurre cuando Playwright codegen
+        // no intercepta el tipeo posterior al fill('').
+        // SOLUCIÓN: edita el recording y añade la línea de fill con el valor correcto
+        // justo antes del Submit (o acción siguiente), luego vuelve a ejecutar npm run generate.
+        code += `
+  // ⚠️  VALOR NO CAPTURADO EN EL RECORDING
+  //     El campo "${selector}" fue limpiado pero el nuevo valor no quedó grabado.
+  //     Para corregirlo, edita el recording y agrega ANTES del siguiente click/Submit:
+  //       await page.getByRole('textbox', { name: '${selector}' }).fill('NUEVO_VALOR');
+  //     Luego vuelve a ejecutar: npm run generate
+  await smartFill(page, \`${selector}\`, ''); // TODO: reemplaza '' con el valor deseado
+  await page.waitForTimeout(500);`;
+      } else {
+        code += `
   await smartFill(page, \`${selector}\`, '${value}');
   await page.waitForTimeout(500);`;
+      }
       i++;
       continue;
     }

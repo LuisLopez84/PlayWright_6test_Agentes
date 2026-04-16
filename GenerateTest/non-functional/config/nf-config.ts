@@ -121,7 +121,7 @@ export const NFConfig: {
           'Content-Type': 'text/xml;charset=UTF-8',   // SOAP — las claves con guión van entre comillas
           'SOAPAction': 'http://tempuri.org/Add',      // SOAP — obligatorio para identificar la operación
           // Si el endpoint requiere autenticación, descomentar y ajustar:
-          // 'Authorization': 'Bearer TU_TOKEN',
+          // 'Authorization': 'Bearer EL_TOKEN',
         },
         body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
   <soapenv:Header/>
