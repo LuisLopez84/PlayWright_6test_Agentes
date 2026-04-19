@@ -1,5 +1,5 @@
 {
-  "Usuario": "text=Try Again",
+  "Usuario": "text=usuario",
   "Book Store Application": "text=Store Application",
   "Pago de Servicios": "text=Servicios",
   "HomeeSOYc": "text=Home",
@@ -26,5 +26,7 @@
   "Framework001": "#submit",
   "Add a New Contact": "text=Contact",
   "Framework Playwright": "button:has-text(\"Sign up\")",
-  "* First Name:": "button:has-text(\"Sign up\")"
+  "* First Name:": "button:has-text(\"Sign up\")",
+  "Préstamo acreditado": "text=Préstamo",
+  "Ingresar": "text=ingresar"
 }

@@ -1,8 +1,8 @@
 /**
- * Homebankink_PlazosFijos3.nf.spec.ts
+ * Homebanking_Prestamos.nf.spec.ts
  *
- * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebankink_PlazosFijos3
- * Targets: 2 | Homebankink_PlazosFijos3 (incremental), Prueba Rendimiento Servicio SOAP (spike)
+ * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebanking_Prestamos
+ * Targets: 2 | Homebanking_Prestamos (incremental), Prueba Rendimiento Servicio SOAP PICOS (spike)
  *
  * AUTO-GENERADO por:
  *   npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
@@ -14,7 +14,7 @@
  *
  * Ejecución individual:
  *   npx playwright test --project=non-functional \
- *     GenerateTest/tests/Homebankink_PlazosFijos3/non-functional/Homebankink_PlazosFijos3.nf.spec.ts
+ *     GenerateTest/tests/Homebanking_Prestamos/non-functional/Homebanking_Prestamos.nf.spec.ts
  */
 
 import { test } from '@playwright/test';
@@ -23,9 +23,9 @@ import { runIncrementalTest, runSpikeTest } from '../../../non-functional/core/l
 import { printSummaryTable } from '../../../non-functional/reporters/summary-reporter';
 import type { LoadTarget } from '../../../non-functional/utils/target-resolver';
 
-// ─── Target 1: Homebankink_PlazosFijos3 [RECORDING] — INCREMENTAL ────
+// ─── Target 1: Homebanking_Prestamos [RECORDING] — INCREMENTAL ────
 const NF_TARGET_0: LoadTarget = {
-  name: 'Homebankink_PlazosFijos3',
+  name: 'Homebanking_Prestamos',
   url: 'https://homebanking-demo-tests.netlify.app',
   method: 'GET',
   headers: {},
@@ -62,9 +62,9 @@ const NF_PARAMS_0 = {
     "durationPerScenarioSeconds": 5
   }; // incremental
 
-// ─── Target 2: Prueba Rendimiento Servicio SOAP [API] — SPIKE ────
+// ─── Target 2: Prueba Rendimiento Servicio SOAP PICOS [API] — SPIKE ────
 const NF_TARGET_1: LoadTarget = {
-  name: 'Prueba Rendimiento Servicio SOAP',
+  name: 'Prueba Rendimiento Servicio SOAP PICOS',
   url: 'http://www.dneonline.com/calculator.asmx',
   method: 'POST',
   headers: {
@@ -125,27 +125,27 @@ const NF_PARAMS_1 = {
 // ─── Test ──────────────────────────────────────────────────────────────────
 test.describe.configure({ mode: 'serial' });
 
-test('Non-Functional — Homebankink_PlazosFijos3', async () => {
+test('Non-Functional — Homebanking_Prestamos', async () => {
   test.setTimeout(0);
 
   console.log('\n' + '═'.repeat(60));
-  console.log('  🚀 Prueba No Funcional: Homebankink_PlazosFijos3');
-  console.log('  📋 Targets: 2 | Homebankink_PlazosFijos3 (incremental) + Prueba Rendimiento Servicio SOAP (spike)');
+  console.log('  🚀 Prueba No Funcional: Homebanking_Prestamos');
+  console.log('  📋 Targets: 2 | Homebanking_Prestamos (incremental) + Prueba Rendimiento Servicio SOAP PICOS (spike)');
   console.log('═'.repeat(60));
 
-  // ── [1/2] Homebankink_PlazosFijos3 — INCREMENTAL ─────────────────────
+  // ── [1/2] Homebanking_Prestamos — INCREMENTAL ─────────────────────
   console.log('\n' + '─'.repeat(60));
-  console.log('  📡 Homebankink_PlazosFijos3 | https://homebanking-demo-tests.netlify.app');
+  console.log('  📡 Homebanking_Prestamos | https://homebanking-demo-tests.netlify.app');
   console.log('  📋 Tipo: INCREMENTAL');
   const summaries_0 = await runIncrementalTest(NF_TARGET_0, NF_PARAMS_0, NFConfig.assertions);
   printSummaryTable(NF_TARGET_0, summaries_0, 'incremental');
 
-  // ── [2/2] Prueba Rendimiento Servicio SOAP — SPIKE ─────────────────────
+  // ── [2/2] Prueba Rendimiento Servicio SOAP PICOS — SPIKE ─────────────────────
   console.log('\n' + '─'.repeat(60));
-  console.log('  📡 Prueba Rendimiento Servicio SOAP | http://www.dneonline.com/calculator.asmx');
+  console.log('  📡 Prueba Rendimiento Servicio SOAP PICOS | http://www.dneonline.com/calculator.asmx');
   console.log('  📋 Tipo: SPIKE');
   const summaries_1 = await runSpikeTest(NF_TARGET_1, NF_PARAMS_1, NFConfig.assertions);
   printSummaryTable(NF_TARGET_1, summaries_1, 'spike');
 
-  console.log('\n  ✅ Prueba no funcional completada: Homebankink_PlazosFijos3\n');
+  console.log('\n  ✅ Prueba no funcional completada: Homebanking_Prestamos\n');
 });
