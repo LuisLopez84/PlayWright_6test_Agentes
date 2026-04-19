@@ -99,12 +99,12 @@ export const NFConfig: {
     // ── TARGET 1: Recording — Prueba INCREMENTAL ──────────────────────────────
     {
       type: 'recording',
-      recording: 'Homebankink_PlazosFijos3', // Indicar el recording del flujo a cual se va a inyectar la prueba no funcional
+      recording: 'Homebanking_PagoServicios', // Indicar el recording del flujo a cual se va a inyectar la prueba no funcional
       testType: 'incremental',
       incremental: {
-        scenarios: 5,           // 5 escalones: 2 → 4 → 6 → 8 → 10 hilos
+        scenarios: 3,           // 5 escalones: 2 → 4 → 6 → 8 → 10 hilos
         initialThreads: 2,      // Primer escalón: 2 usuarios concurrentes
-        finalThreads: 10,        // Último escalón: 6 usuarios concurrentes
+        finalThreads: 6,        // Último escalón: 6 usuarios concurrentes
         durationPerScenarioSeconds: 5, // Cada escalón dura 5 segundos
       },
     },
@@ -112,9 +112,9 @@ export const NFConfig: {
     // ── TARGET 2: API — Prueba de PICOS (spike) para SOAP ───────────────────────────────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/api-testing-rest-soap/soap/Homebankink_PlazosFijos3_Servicio_Operacion_POST_SOAP.spec.ts',
+      apiSpecPath: 'GenerateTest/api-testing-rest-soap/soap/Homebanking_PagoServicios_Servicio_Operacion_POST_SOAP.spec.ts',
       endpoint: {
-        name: 'Prueba Rendimiento Servicio SOAP',
+        name: 'Prueba Rendimiento Servicio SOAP PICOS',
         method: 'POST',
         url: 'http://www.dneonline.com/calculator.asmx',
         headers: {
@@ -135,7 +135,7 @@ export const NFConfig: {
       },
       testType: 'spike',
       spike: {
-        threadsPerScenario: [1, 8, 4, 10, 3], // 5 picos: 1, 8, 4, 10, 3 hilos
+        threadsPerScenario: [1, 15, 4, 10, 3], // 5 picos: 1, 8, 4, 10, 3 hilos
         durationPerScenarioSeconds: [5, 5, 5, 5, 5], // Cada pico dura 5 segundos
       },
     },

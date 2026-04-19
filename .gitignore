@@ -24,9 +24,9 @@ Thumbs.db
 .idea/
 
 # Generated test files (opcional, si se regeneran siempre)
-GenerateTest/tests/**/screenshots/
-GenerateTest/tests/**/videos/
-GenerateTest/tests/**/test-results/
+GenerateTest/testsSuites/**/screenshots/
+GenerateTest/testsSuites/**/videos/
+GenerateTest/testsSuites/**/test-results/
 
 # Large recordings (si son pesados, mejor no versionarlos)
 BoxRecordings/recordings/*.mp4
