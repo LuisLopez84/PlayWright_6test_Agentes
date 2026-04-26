@@ -14,5 +14,9 @@
       "@pages/*": ["ConfigurationTest/tests/pages/*"],
       "@config/*": ["ConfigurationTest/tests/config/*"]
     }
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "BoxAPIsExecute"
+  ]
 }

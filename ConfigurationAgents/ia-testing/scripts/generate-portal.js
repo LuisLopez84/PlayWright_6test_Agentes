@@ -11,10 +11,12 @@ const path          = require('path');
 const { exec }      = require('child_process');
 
 // ─── Rutas ────────────────────────────────────────────────────────────────────
-const ROOT       = process.cwd();
-const XML_FILE   = path.join(ROOT, 'test-results', 'results.xml');
-const REPORT_DIR = path.join(ROOT, 'playwright-report');
-const OUT_FILE   = path.join(REPORT_DIR, 'portal.html');
+const ROOT         = process.cwd();
+const XML_FILE     = path.join(ROOT, 'test-results', 'results.xml');
+const REPORT_DIR   = path.join(ROOT, 'playwright-report');
+const OUT_FILE     = path.join(REPORT_DIR, 'portal.html');
+const CSV_FILE     = path.join(REPORT_DIR, 'report.csv');
+const FEATURES_DIR = path.join(ROOT, 'GenerateTest', 'features');
 
 // ─── Módulos ──────────────────────────────────────────────────────────────────
 const MODULES = [
@@ -254,6 +256,118 @@ function extractNfTables(output) {
   return blocks;
 }
 
+/** API: extrae pares request/response del system-out.
+ *  Cada llamada a restRequest/soapRequest emite bloques delimitados
+ *  con @@API_REQUEST_START@@ ... @@API_REQUEST_END@@
+ *  y @@API_RESPONSE_START@@ ... @@API_RESPONSE_END@@
+ *  Devuelve Array<{ method, url, reqHeaders, reqBody, soapAction,
+ *                   status, statusText, duration, respHeaders, respBody }>
+ */
+function extractApiInteractions(output) {
+  const interactions = [];
+
+  const reqRe  = /@@API_REQUEST_START@@([\s\S]*?)@@API_REQUEST_END@@/g;
+  const respRe = /@@API_RESPONSE_START@@([\s\S]*?)@@API_RESPONSE_END@@/g;
+
+  const reqs  = [];
+  const resps = [];
+
+  let m;
+  while ((m = reqRe.exec(output))  !== null) reqs.push(m[1]);
+  while ((m = respRe.exec(output)) !== null) resps.push(m[1]);
+
+  const parseBlock = (block) => {
+    const lines = block.trim().split('\n');
+    const map = {};
+    for (const line of lines) {
+      const colon = line.indexOf(':');
+      if (colon < 0) continue;
+      const key = line.substring(0, colon).trim().toUpperCase();
+      const val = line.substring(colon + 1).trim();
+      map[key] = val;
+    }
+    return map;
+  };
+
+  const safeJSON = (s) => {
+    try { return JSON.parse(s); } catch { return s; }
+  };
+
+  const count = Math.max(reqs.length, resps.length);
+  for (let i = 0; i < count; i++) {
+    const req  = reqs[i]  ? parseBlock(reqs[i])  : {};
+    const resp = resps[i] ? parseBlock(resps[i]) : {};
+    interactions.push({
+      method:      req['METHOD']     || '?',
+      url:         req['URL']        || '',
+      soapAction:  req['SOAPACTION'] || null,
+      reqHeaders:  safeJSON(req['HEADERS'] || '{}'),
+      reqBody:     req['BODY']       || '',
+      status:      resp['STATUS']    || '',
+      duration:    resp['DURATION']  || '',
+      respHeaders: safeJSON(resp['HEADERS'] || '{}'),
+      respBody:    resp['BODY']      || '',
+    });
+  }
+  return interactions;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PARSER DE FEATURES GHERKIN
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Parsea el contenido de un archivo .feature y devuelve
+ *  { featureName, scenarios: [{ name, steps: [{ keyword, text }] }] }
+ */
+function parseFeatureContent(content) {
+  const lines = content.split(/\r?\n/);
+  const result = { featureName: '', scenarios: [] };
+  let current = null;
+
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+
+    if (line.startsWith('Feature:')) {
+      result.featureName = line.replace('Feature:', '').trim();
+    } else if (line.startsWith('Scenario Outline:') || line.startsWith('Scenario:')) {
+      if (current) result.scenarios.push(current);
+      const label = line.startsWith('Scenario Outline:') ? 'Scenario Outline' : 'Scenario';
+      current = { name: line.replace(/Scenario[^:]*:/, '').trim(), type: label, steps: [], tags: [] };
+    } else if (line.startsWith('@')) {
+      if (current) current.tags.push(...line.split(/\s+/).filter(t => t.startsWith('@')));
+    } else if (current) {
+      const kwMatch = line.match(/^(Given|When|Then|And|But)\s+(.*)/);
+      if (kwMatch) current.steps.push({ keyword: kwMatch[1], text: kwMatch[2] });
+      else if (line.startsWith('|') || line.startsWith('"""')) {
+        // tabla o docstring: añadir como step especial
+        if (current.steps.length) current.steps[current.steps.length - 1].extra =
+          (current.steps[current.steps.length - 1].extra || '') + '\n' + raw;
+      }
+    }
+  }
+  if (current) result.scenarios.push(current);
+  return result;
+}
+
+/** Lee todos los .feature de FEATURES_DIR y devuelve Array de objetos con
+ *  { fileName, featureName, scenarios, rawContent }
+ */
+function readFeatureFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  const files = fs.readdirSync(dir).filter(f => f.endsWith('.feature'));
+  return files.map(f => {
+    const raw     = fs.readFileSync(path.join(dir, f), 'utf-8');
+    const parsed  = parseFeatureContent(raw);
+    return {
+      fileName:    f,
+      featureName: parsed.featureName || f.replace('.feature', ''),
+      scenarios:   parsed.scenarios,
+      rawContent:  raw,
+    };
+  }).sort((a, b) => a.featureName.localeCompare(b.featureName));
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  HELPERS HTML
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -342,13 +456,60 @@ function renderUI(suiteList) {
   return html;
 }
 
-/** API: tabla por endpoint/método */
+/** Renderiza headers como tabla compacta */
+function renderHeadersTable(headers) {
+  if (!headers || typeof headers !== 'object' || !Object.keys(headers).length) {
+    return `<span class="api-no-data">(sin headers)</span>`;
+  }
+  const rows = Object.entries(headers).map(([k, v]) =>
+    `<tr><td class="api-hdr-key">${esc(k)}</td><td class="api-hdr-val">${esc(String(v))}</td></tr>`
+  ).join('');
+  return `<table class="api-headers-table"><tbody>${rows}</tbody></table>`;
+}
+
+/** Intenta formatear un body: JSON → pretty, XML → highlight, texto → plain */
+function formatBody(body) {
+  if (!body || body === '(sin body)' || body === '(none)') {
+    return `<span class="api-no-data">(sin body)</span>`;
+  }
+  const s = String(body).trim();
+  // JSON
+  try {
+    const obj = JSON.parse(s);
+    return `<pre class="api-body api-body-json">${esc(JSON.stringify(obj, null, 2).substring(0, 1200))}</pre>`;
+  } catch { /* no JSON */ }
+  // XML / SOAP
+  if (s.startsWith('<')) {
+    return `<pre class="api-body api-body-xml">${esc(s.substring(0, 1200))}</pre>`;
+  }
+  return `<pre class="api-body">${esc(s.substring(0, 1200))}</pre>`;
+}
+
+/** Extrae código HTTP del campo status "200 OK" → "200" */
+function httpStatusCode(status) {
+  const m = String(status).match(/^(\d{3})/);
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+/** Color del status HTTP */
+function statusColor(code) {
+  if (code >= 200 && code < 300) return '#10b981';
+  if (code >= 300 && code < 400) return '#06b6d4';
+  if (code >= 400 && code < 500) return '#f59e0b';
+  return '#ef4444';
+}
+
+/** API: tabla resumen + paneles request/response por testcase */
 function renderAPI(suiteList) {
   if (!suiteList.length) return noData();
+
   let html = `<div class="mod-section">
-    <p class="mod-info">Validación de servicios REST y SOAP: contratos de respuesta, códigos HTTP y schemas.</p>
-    <table class="data-table">
-      <thead><tr><th>Suite / Spec</th><th>Test Case</th><th>Tipo</th><th>Tiempo</th><th>Estado</th></tr></thead><tbody>`;
+    <p class="mod-info">Validación de servicios REST y SOAP: contratos de respuesta, códigos HTTP y schemas.
+    Los paneles de <b>Request / Response</b> se muestran después de ejecutar las pruebas con <code>npm test</code>.</p>
+
+    <table class="data-table" style="margin-bottom:8px">
+      <thead><tr><th>Spec</th><th>Test Case</th><th>Tipo</th><th>Tiempo</th><th>Estado</th></tr></thead>
+      <tbody>`;
 
   for (const s of suiteList) {
     const specName = s.name.replace(/\\/g,'/').split('/').pop().replace('.spec.ts','');
@@ -360,11 +521,105 @@ function renderAPI(suiteList) {
         <td>${fmtSec(tc.time)}</td><td>${statusBadge(tc.passed)}</td>
       </tr>`;
       if (!tc.passed && tc.failure) {
-        html += `<tr class="row-detail"><td colspan="5"><pre class="error-msg">${esc(tc.failure.substring(0,300))}…</pre></td></tr>`;
+        html += `<tr class="row-detail"><td colspan="5"><pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre></td></tr>`;
       }
     }
   }
-  html += `</tbody></table></div>`;
+  html += `</tbody></table>`;
+
+  // ── Paneles Request / Response por testcase ──────────────────────────────
+  let hasInteractions = false;
+
+  for (const s of suiteList) {
+    const specName = s.name.replace(/\\/g,'/').split('/').pop().replace('.spec.ts','');
+    const type = specName.toUpperCase().includes('SOAP') ? '🧼 SOAP' : '🌐 REST';
+
+    for (const tc of s.testcases) {
+      const interactions = extractApiInteractions(tc.output);
+      if (!interactions.length) continue;
+      hasInteractions = true;
+
+      const panelId = 'api-panel-' + Math.random().toString(36).slice(2, 8);
+      html += `
+      <div class="api-tc-block ${tc.passed ? '' : 'api-tc-fail'}">
+        <div class="api-tc-header">
+          <span class="api-tc-status">${tc.passed ? '✅' : '❌'}</span>
+          <span class="api-tc-badge">${type}</span>
+          <span class="api-tc-name">${esc(tc.name)}</span>
+          <span class="api-tc-time">⏱ ${fmtSec(tc.time)}</span>
+          <button class="ev-toggle-btn" onclick="toggleEvidence('${panelId}')">
+            Ver Request/Response ▾
+          </button>
+        </div>
+        <div id="${panelId}" style="display:none">`;
+
+      for (let idx = 0; idx < interactions.length; idx++) {
+        const it = interactions[idx];
+        const code = httpStatusCode(it.status);
+        const sColor = statusColor(code);
+        const isSoap = it.method.toUpperCase().includes('SOAP') || type.includes('SOAP');
+        const callId = `${panelId}-call-${idx}`;
+
+        html += `
+        <div class="api-interaction">
+          <div class="api-interaction-label">
+            <span class="api-call-num">#${idx + 1}</span>
+            <span class="api-method-badge" style="background:${isSoap?'#8b5cf6':'#6366f1'}">${isSoap ? 'SOAP' : it.method.replace(' (SOAP)','')}</span>
+            <span class="api-url">${esc(it.url)}</span>
+            ${it.status ? `<span class="api-status-pill" style="color:${sColor};border-color:${sColor}">${esc(it.status)}</span>` : ''}
+            ${it.duration ? `<span class="api-duration">⏱ ${esc(it.duration)}</span>` : ''}
+          </div>
+
+          <div class="api-panels">
+            <!-- REQUEST -->
+            <div class="api-panel">
+              <div class="api-panel-title req-title">
+                📤 Request
+                ${it.soapAction && it.soapAction !== '(none)' ? `<span class="api-soap-action">SOAPAction: ${esc(it.soapAction)}</span>` : ''}
+              </div>
+              <div class="api-panel-section">
+                <div class="api-section-label">Headers</div>
+                ${renderHeadersTable(it.reqHeaders)}
+              </div>
+              <div class="api-panel-section">
+                <div class="api-section-label">Body</div>
+                ${formatBody(it.reqBody)}
+              </div>
+            </div>
+
+            <!-- RESPONSE -->
+            <div class="api-panel">
+              <div class="api-panel-title resp-title" style="border-color:${sColor}">
+                📥 Response
+                ${it.status ? `<span class="api-status-big" style="color:${sColor}">${esc(it.status)}</span>` : ''}
+                ${it.duration ? `<span class="api-dur-badge">⏱ ${esc(it.duration)}</span>` : ''}
+              </div>
+              <div class="api-panel-section">
+                <div class="api-section-label">Headers</div>
+                ${renderHeadersTable(it.respHeaders)}
+              </div>
+              <div class="api-panel-section">
+                <div class="api-section-label">Body</div>
+                ${formatBody(it.respBody)}
+              </div>
+            </div>
+          </div>
+        </div>`;
+      }
+
+      html += `</div></div>`; // panelId div, api-tc-block
+    }
+  }
+
+  if (!hasInteractions) {
+    html += `<div class="api-no-interactions">
+      <span>ℹ️</span>
+      <p>Los detalles de Request/Response aparecerán aquí después de la próxima ejecución de <code>npm test</code>.</p>
+      <p>El helper <code>api-helper.ts</code> ya está configurado para registrar las tramas automáticamente.</p>
+    </div>`;
+  }
+
+  html += `</div>`;
   return html;
 }
 
@@ -657,27 +912,168 @@ function renderVisual(suiteList) {
   return html;
 }
 
-/** BDD: features y escenarios */
-function renderBDD(suiteList) {
-  if (!suiteList.length) return noData();
-  let html = `<div class="mod-section">
-    <p class="mod-info">Escenarios en lenguaje natural Gherkin ejecutados con Playwright-BDD. Cada testcase corresponde a un escenario del archivo .feature.</p>
-    <table class="data-table">
-      <thead><tr><th>Escenario</th><th>Suite</th><th>Tiempo</th><th>Estado</th></tr></thead><tbody>`;
+/** Resalta una keyword Gherkin con su color correspondiente */
+function gherkinKeywordSpan(keyword) {
+  const colors = { Given:'#06b6d4', When:'#8b5cf6', Then:'#10b981', And:'#64748b', But:'#f97316' };
+  const col = colors[keyword] || '#64748b';
+  return `<span class="gk-kw" style="color:${col}">${esc(keyword)}</span>`;
+}
 
+/** Resalta valores entre comillas dentro del texto de un step */
+function highlightStepText(text) {
+  return esc(text).replace(/&quot;([^&]*)&quot;/g,
+    '<span class="gk-val">&quot;$1&quot;</span>');
+}
+
+/** BDD: muestra features Gherkin con syntax-highlight + resultado de ejecución */
+function renderBDD(suiteList, features) {
+  // Construir índice de resultados por nombre de feature/escenario
+  // Los tests BDD en el XML tienen hostname 'bdd-ui' y su nombre suele ser
+  // el scenario name o el feature name
+  const resultIndex = {};  // key: nombre normalizado → { passed, time, failure }
   for (const s of suiteList) {
-    const sname = s.name.replace(/\\/g,'/').split('/').pop().replace('.spec.ts','');
     for (const tc of s.testcases) {
-      html += `<tr class="${tc.passed?'':'row-fail'}">
-        <td>${esc(tc.name)}</td><td class="cell-mono">${esc(sname)}</td>
-        <td>${fmtSec(tc.time)}</td><td>${statusBadge(tc.passed)}</td>
-      </tr>`;
-      if (!tc.passed && tc.failure) {
-        html += `<tr class="row-detail"><td colspan="4"><pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre></td></tr>`;
-      }
+      const key = tc.name.toLowerCase().trim();
+      resultIndex[key] = tc;
+    }
+    // También indexar por el nombre del archivo de suite
+    const suiteName = s.name.replace(/\\/g,'/').split('/').pop()
+      .replace('.spec.ts','').replace('.feature','').toLowerCase();
+    if (!resultIndex[suiteName]) {
+      resultIndex[suiteName] = {
+        passed:  s.failures === 0,
+        time:    s.time,
+        failure: null,
+        _suite:  true,
+      };
     }
   }
-  html += `</tbody></table></div>`;
+
+  const hasBddResults = suiteList.length > 0;
+
+  // Si no hay features en disco, caer al render genérico
+  if (!features || !features.length) {
+    if (!hasBddResults) return noData();
+    // Render básico con sólo resultados del XML
+    let html2 = `<div class="mod-section">
+      <p class="mod-info">Escenarios Gherkin ejecutados con Playwright-BDD.</p>
+      <table class="data-table">
+        <thead><tr><th>Escenario</th><th>Suite</th><th>Tiempo</th><th>Estado</th></tr></thead><tbody>`;
+    for (const s of suiteList) {
+      const sn = s.name.replace(/\\/g,'/').split('/').pop().replace('.spec.ts','');
+      for (const tc of s.testcases) {
+        html2 += `<tr class="${tc.passed?'':'row-fail'}">
+          <td>${esc(tc.name)}</td><td class="cell-mono">${esc(sn)}</td>
+          <td>${fmtSec(tc.time)}</td><td>${statusBadge(tc.passed)}</td></tr>`;
+        if (!tc.passed && tc.failure) {
+          html2 += `<tr class="row-detail"><td colspan="4"><pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre></td></tr>`;
+        }
+      }
+    }
+    html2 += `</tbody></table></div>`;
+    return html2;
+  }
+
+  // ── Render principal: features con syntax-highlight ───────────────────────
+  let html = `<div class="mod-section">
+    <p class="mod-info">
+      Escenarios en lenguaje natural <b>Gherkin</b> ejecutados con Playwright-BDD.
+      ${features.length} feature(s) encontrado(s) en <code>GenerateTest/features/</code>.
+      ${hasBddResults
+        ? `Resultados del XML disponibles.`
+        : `<span style="color:var(--warn)">⚠ Sin resultados de ejecución — ejecuta <code>npm test</code> para ver el estado.</span>`}
+    </p>`;
+
+  // Resumen de features en tabla
+  html += `<table class="data-table" style="margin-bottom:24px">
+    <thead><tr><th>Feature</th><th>Archivo</th><th>Escenarios</th><th>Estado</th></tr></thead>
+    <tbody>`;
+  for (const feat of features) {
+    const key  = feat.featureName.toLowerCase().trim();
+    const res  = resultIndex[key] || resultIndex[feat.fileName.replace('.feature','').toLowerCase()];
+    const statLabel = !res ? 'Sin ejecutar'
+      : res.passed    ? 'PASS'
+      : 'FAIL';
+    const statCls = !res ? 'status-none' : res.passed ? 'status-pass' : 'status-fail';
+    const time = res && res.time ? `⏱ ${fmtSec(res.time)}` : '';
+    html += `<tr>
+      <td><b>${esc(feat.featureName)}</b></td>
+      <td class="cell-mono">${esc(feat.fileName)}</td>
+      <td>${feat.scenarios.length}</td>
+      <td><span class="badge ${statCls}">${statLabel}</span> ${time}</td>
+    </tr>`;
+  }
+  html += `</tbody></table>`;
+
+  // Detalle de cada feature con Gherkin
+  for (const feat of features) {
+    const featKey  = feat.featureName.toLowerCase().trim();
+    const featRes  = resultIndex[featKey] || resultIndex[feat.fileName.replace('.feature','').toLowerCase()];
+    const featOk   = !featRes ? null : featRes.passed;
+    const borderCol = featOk === null ? 'var(--border)' : featOk ? '#10b981' : '#ef4444';
+
+    const panelId  = 'bdd-' + feat.fileName.replace(/[^a-z0-9]/gi, '-');
+
+    html += `
+    <div class="bdd-feature-block" style="border-color:${borderCol}">
+      <div class="bdd-feature-header">
+        <span class="bdd-feature-icon">🥒</span>
+        <span class="bdd-feature-name">${esc(feat.featureName)}</span>
+        <span class="bdd-feature-file">${esc(feat.fileName)}</span>
+        ${featOk === null
+          ? `<span class="badge status-none">SIN EJECUTAR</span>`
+          : statusBadge(featOk)}
+        ${featRes && featRes.time ? `<span class="bdd-time">⏱ ${fmtSec(featRes.time)}</span>` : ''}
+        <button class="ev-toggle-btn" onclick="toggleEvidence('${panelId}')">Ver Gherkin ▾</button>
+      </div>
+
+      <div id="${panelId}" style="display:none">`;
+
+    // Mostrar error de ejecución si existe
+    if (featRes && !featRes.passed && featRes.failure) {
+      html += `<div class="bdd-error-wrap">
+        <div class="bdd-error-title">❌ Error de ejecución</div>
+        <pre class="error-msg">${esc(featRes.failure.substring(0, 400))}</pre>
+      </div>`;
+    }
+
+    // Renderizar cada escenario con Gherkin
+    for (const scenario of feat.scenarios) {
+      // Buscar resultado específico del escenario
+      const scKey  = scenario.name.toLowerCase().trim();
+      const scRes  = resultIndex[scKey] || featRes;
+      const scOk   = scRes ? scRes.passed : null;
+
+      html += `
+      <div class="bdd-scenario ${scOk === false ? 'bdd-scenario-fail' : ''}">
+        <div class="bdd-scenario-header">
+          <span class="gk-scenario-kw">${esc(scenario.type)}</span>
+          <span class="gk-scenario-name">${esc(scenario.name)}</span>
+          ${scOk === null
+            ? `<span class="badge status-none" style="font-size:9px">SIN EJECUTAR</span>`
+            : statusBadge(scOk)}
+          ${scRes && scRes.time && !scRes._suite ? `<span class="bdd-time">⏱ ${fmtSec(scRes.time)}</span>` : ''}
+        </div>
+        <div class="bdd-steps">`;
+
+      for (const step of scenario.steps) {
+        html += `
+          <div class="bdd-step">
+            ${gherkinKeywordSpan(step.keyword)}
+            <span class="gk-text">${highlightStepText(step.text)}</span>
+          </div>`;
+        if (step.extra) {
+          html += `<pre class="gk-extra">${esc(step.extra.trim())}</pre>`;
+        }
+      }
+
+      html += `</div></div>`; // bdd-steps, bdd-scenario
+    }
+
+    html += `</div></div>`; // panelId, bdd-feature-block
+  }
+
+  html += `</div>`;
   return html;
 }
 
@@ -896,24 +1292,24 @@ function renderEvidenceGrid(suiteList) {
 //  BUILDER PRINCIPAL
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function renderModuleContent(key, suiteList) {
+function renderModuleContent(key, suiteList, features) {
   let body;
   switch (key) {
-    case 'ui':            body = renderUI(suiteList);            break;
-    case 'api':           body = renderAPI(suiteList);           break;
-    case 'performance':   body = renderPerformance(suiteList);   break;
-    case 'security':      body = renderSecurity(suiteList);      break;
-    case 'accessibility': body = renderAccessibility(suiteList); break;
-    case 'visual':        body = renderVisual(suiteList);        break;
-    case 'bdd':           body = renderBDD(suiteList);           break;
-    case 'nonfunctional': body = renderNonFunctional(suiteList); break;
+    case 'ui':            body = renderUI(suiteList);              break;
+    case 'api':           body = renderAPI(suiteList);             break;
+    case 'performance':   body = renderPerformance(suiteList);     break;
+    case 'security':      body = renderSecurity(suiteList);        break;
+    case 'accessibility': body = renderAccessibility(suiteList);   break;
+    case 'visual':        body = renderVisual(suiteList);          break;
+    case 'bdd':           body = renderBDD(suiteList, features);   break;
+    case 'nonfunctional': body = renderNonFunctional(suiteList);   break;
     default:              return noData();
   }
   // Añade la grilla de evidencias al final de cada tab
   return body + renderEvidenceGrid(suiteList);
 }
 
-function buildPortalHTML(groups, totals, generatedAt) {
+function buildPortalHTML(groups, totals, generatedAt, features) {
   const globalPassed = totals.tests - totals.failures - totals.errors;
   const globalRate   = totals.tests > 0 ? Math.round((globalPassed / totals.tests) * 100) : 0;
   const globalOk     = totals.failures === 0 && totals.errors === 0;
@@ -969,7 +1365,7 @@ function buildPortalHTML(groups, totals, generatedAt) {
     const s    = stats(list);
     const rate = passRate(s.tests, s.failures);
     const ok   = s.failures === 0;
-    const content = renderModuleContent(mod.key, list);
+    const content = renderModuleContent(mod.key, list, features);
     return `
   <section id="sec-${mod.key}" class="mod-section-wrap" style="display:none">
     <div class="mod-header" style="--accent:${mod.color}">
@@ -1030,6 +1426,12 @@ function buildPortalHTML(groups, totals, generatedAt) {
     .global-detail { font-size:12px; color:var(--muted); }
     .meta-info { font-size:12px; color:var(--muted); text-align:right; line-height:1.9; }
     .meta-info b { color:var(--text); }
+    .btn-csv { display:inline-flex; align-items:center; gap:6px; margin-top:6px;
+      padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600;
+      background:linear-gradient(135deg,#10b981,#059669); color:#fff;
+      text-decoration:none; border:none; cursor:pointer;
+      box-shadow:0 0 12px rgba(16,185,129,.35); transition:opacity .2s; }
+    .btn-csv:hover { opacity:.85; }
 
     /* ─── Nav ────────────────────────────────── */
     .nav-bar { position:relative; z-index:10; padding:0 48px; background:rgba(17,24,39,.6);
@@ -1200,6 +1602,103 @@ function buildPortalHTML(groups, totals, generatedAt) {
     .no-data span { font-size:40px; display:block; margin-bottom:12px; }
     .no-data code { background:var(--surface2); padding:2px 8px; border-radius:4px; color:var(--text); }
 
+    /* ─── API Request/Response panels ──────── */
+    .api-tc-block { background:var(--surface); border:1px solid var(--border);
+      border-radius:12px; margin-bottom:16px; overflow:hidden; }
+    .api-tc-fail  { border-color:rgba(239,68,68,.35); }
+    .api-tc-header { display:flex; align-items:center; gap:10px; padding:12px 18px;
+      background:var(--surface2); flex-wrap:wrap; }
+    .api-tc-status { font-size:16px; }
+    .api-tc-badge  { font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px;
+      background:#6366f1; color:#fff; white-space:nowrap; }
+    .api-tc-name   { font-size:13px; font-weight:600; color:#fff; flex:1; min-width:120px; }
+    .api-tc-time   { font-size:11px; color:var(--muted); }
+
+    .api-interaction { border-top:1px solid var(--border); padding:16px 18px; }
+    .api-interaction-label { display:flex; align-items:center; gap:10px;
+      flex-wrap:wrap; margin-bottom:14px; }
+    .api-call-num  { font-size:11px; font-weight:700; background:var(--border);
+      color:var(--muted); padding:2px 7px; border-radius:10px; }
+    .api-method-badge { font-size:11px; font-weight:700; padding:3px 10px;
+      border-radius:6px; color:#fff; }
+    .api-url       { font-size:12px; font-family:monospace; color:var(--text); flex:1;
+      word-break:break-all; }
+    .api-status-pill { font-size:11px; font-weight:700; padding:2px 10px; border-radius:12px;
+      border:1px solid; background:transparent; white-space:nowrap; }
+    .api-duration  { font-size:11px; color:var(--muted); white-space:nowrap; }
+    .api-soap-action { font-size:10px; font-family:monospace; color:var(--muted);
+      margin-left:8px; padding:1px 6px; background:var(--border); border-radius:4px; }
+
+    .api-panels { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+    @media(max-width:900px) { .api-panels { grid-template-columns:1fr; } }
+
+    .api-panel { background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+      overflow:hidden; }
+    .api-panel-title { display:flex; align-items:center; gap:10px; padding:10px 14px;
+      font-size:13px; font-weight:600; color:#fff; border-bottom:2px solid #6366f1; }
+    .req-title  { border-bottom-color:#6366f1; }
+    .resp-title { }
+    .api-status-big { font-weight:700; }
+    .api-dur-badge  { font-size:11px; color:var(--muted); margin-left:auto; }
+
+    .api-panel-section { padding:10px 14px; border-bottom:1px solid var(--border); }
+    .api-panel-section:last-child { border-bottom:none; }
+    .api-section-label { font-size:10px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.8px; color:var(--muted); margin-bottom:7px; }
+
+    .api-headers-table { width:100%; border-collapse:collapse; font-size:11px; }
+    .api-hdr-key { color:var(--muted); padding:3px 8px 3px 0; font-family:monospace;
+      white-space:nowrap; vertical-align:top; width:35%; }
+    .api-hdr-val { color:var(--text); padding:3px 0; word-break:break-all; font-family:monospace; }
+
+    .api-body { background:#0a0d18; border-radius:6px; padding:10px 12px; font-size:11px;
+      font-family:monospace; color:var(--text); overflow-x:auto; max-height:280px;
+      overflow-y:auto; white-space:pre-wrap; word-break:break-all; margin:0; }
+    .api-body-json { color:#93c5fd; }
+    .api-body-xml  { color:#86efac; }
+    .api-no-data   { font-size:11px; color:var(--muted); font-style:italic; }
+
+    .api-no-interactions { background:var(--surface2); border:1px dashed var(--border);
+      border-radius:10px; padding:24px; text-align:center; margin-top:16px; }
+    .api-no-interactions span { font-size:28px; display:block; margin-bottom:10px; }
+    .api-no-interactions p  { font-size:13px; color:var(--muted); margin-bottom:6px; }
+    .api-no-interactions code { background:var(--border); padding:1px 6px; border-radius:4px; color:var(--text); }
+
+    /* ─── BDD / Gherkin viewer ──────────────── */
+    .bdd-feature-block { background:var(--surface); border:1px solid;
+      border-radius:12px; margin-bottom:18px; overflow:hidden; }
+    .bdd-feature-header { display:flex; align-items:center; gap:10px; padding:13px 18px;
+      background:var(--surface2); flex-wrap:wrap; }
+    .bdd-feature-icon   { font-size:18px; }
+    .bdd-feature-name   { font-size:14px; font-weight:700; color:#fff; flex:1; min-width:120px; }
+    .bdd-feature-file   { font-size:10px; font-family:monospace; color:var(--muted);
+      background:var(--border); padding:2px 7px; border-radius:10px; }
+    .bdd-time           { font-size:11px; color:var(--muted); }
+
+    .bdd-error-wrap { padding:12px 18px; background:rgba(239,68,68,.07);
+      border-bottom:1px solid rgba(239,68,68,.2); }
+    .bdd-error-title { font-size:12px; font-weight:600; color:var(--fail); margin-bottom:6px; }
+
+    .bdd-scenario { padding:14px 22px; border-top:1px solid var(--border); }
+    .bdd-scenario-fail { background:rgba(239,68,68,.03); }
+    .bdd-scenario-header { display:flex; align-items:center; gap:10px; margin-bottom:10px;
+      flex-wrap:wrap; }
+    .gk-scenario-kw   { font-size:11px; font-weight:700; text-transform:uppercase;
+      letter-spacing:.8px; color:#8b5cf6; background:rgba(139,92,246,.15);
+      padding:2px 8px; border-radius:10px; white-space:nowrap; }
+    .gk-scenario-name { font-size:13px; font-weight:600; color:#fff; flex:1; }
+
+    .bdd-steps { display:flex; flex-direction:column; gap:4px;
+      padding:8px 14px; background:#0a0d18; border-radius:8px; }
+    .bdd-step  { display:flex; align-items:baseline; gap:8px; font-size:12px;
+      font-family:monospace; line-height:1.6; }
+    .gk-kw    { font-weight:700; min-width:48px; text-align:right; flex-shrink:0; }
+    .gk-text  { color:#e2e8f0; }
+    .gk-val   { color:#fbbf24; }   /* valores entre comillas → amarillo */
+    .gk-extra { background:rgba(255,255,255,.04); border-left:2px solid var(--border);
+      font-size:10px; color:var(--muted); padding:4px 10px; margin:2px 0 2px 56px;
+      border-radius:0 4px 4px 0; font-family:monospace; white-space:pre-wrap; }
+
     /* ─── Evidence grid ─────────────────────── */
     .ev-section { margin-top:32px; border-top:1px solid var(--border); padding-top:28px; }
     .ev-section-header { display:flex; align-items:baseline; gap:14px; margin-bottom:20px; }
@@ -1335,6 +1834,7 @@ function buildPortalHTML(groups, totals, generatedAt) {
     <div>Generado: <b>${generatedAt}</b></div>
     <div>Duración total: <b>${fmtSec(totals.time)}</b></div>
     <div>Fallos: <b style="color:${totals.failures>0 ? '#ef4444' : '#10b981'}">${totals.failures}</b></div>
+    <a href="report.csv" download="report.csv" class="btn-csv">⬇ Descargar CSV</a>
   </div>
 </header>
 
@@ -1472,6 +1972,110 @@ function openInBrowser(filePath) {
   });
 }
 
+// ─── CSV Export ──────────────────────────────────────────────────────────────
+function generateCSV(suites, features, generatedAt) {
+  const csvEsc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v).replace(/"/g, '""');
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s}"` : s;
+  };
+  const row = cols => cols.map(csvEsc).join(',');
+
+  const lines = [];
+
+  // ── Header
+  lines.push(row([
+    'Tipo','Suite','Proyecto/Navegador','Caso de Prueba','Estado',
+    'Duración(s)','Timestamp','LCP(ms)','CLS','TBT(ms)',
+    'Categoría Seguridad','Críticos A11y','Serios A11y','Moderados A11y','Menores A11y',
+    'TPS Promedio','% Error NF','Error'
+  ]));
+
+  for (const suite of suites) {
+    const module = classifySuite(suite);
+    const project = suite.project || suite.browser || '';
+
+    for (const tc of (suite.testcases || [])) {
+      const status = tc.failed ? 'FAIL' : tc.skipped ? 'SKIP' : 'PASS';
+      const dur = tc.time ? parseFloat(tc.time).toFixed(3) : '';
+      const errMsg = tc.failure ? String(tc.failure).replace(/[\r\n]+/g, ' ').substring(0, 200) : '';
+      const output = tc.output || '';
+
+      // Performance metrics
+      let lcp = '', cls = '', tbt = '';
+      if (module === 'performance') {
+        const pm = extractPerfMetrics(tc);
+        if (pm.vital) {
+          lcp = pm.vital.lcp !== undefined ? pm.vital.lcp : '';
+          cls = pm.vital.cls !== undefined ? pm.vital.cls : '';
+          tbt = pm.vital.tbt !== undefined ? pm.vital.tbt : '';
+        }
+      }
+
+      // Security category
+      let secCat = '';
+      if (module === 'security') {
+        secCat = securityCategory(tc.classname || tc.name || '');
+      }
+
+      // Accessibility counts
+      let a11yCrit = '', a11ySer = '', a11yMod = '', a11yMin = '';
+      if (module === 'accessibility') {
+        const am = extractA11yMetrics(tc);
+        if (am.summary) {
+          a11yCrit = am.summary.critical !== undefined ? am.summary.critical : '';
+          a11ySer  = am.summary.serious  !== undefined ? am.summary.serious  : '';
+          a11yMod  = am.summary.moderate !== undefined ? am.summary.moderate : '';
+          a11yMin  = am.summary.minor    !== undefined ? am.summary.minor    : '';
+        }
+      }
+
+      // Non-functional
+      let tps = '', pctErr = '';
+      if (module === 'nonfunctional') {
+        const nfTables = extractNfTables(output);
+        if (nfTables.length > 0) {
+          const last = nfTables[nfTables.length - 1];
+          const lastRow = last.rows && last.rows.length > 0 ? last.rows[last.rows.length - 1] : null;
+          if (lastRow) {
+            tps    = lastRow.tps    || '';
+            pctErr = lastRow.errPct || '';
+          }
+        }
+      }
+
+      lines.push(row([
+        module, suite.name, project, tc.name, status, dur,
+        generatedAt, lcp, cls, tbt,
+        secCat, a11yCrit, a11ySer, a11yMod, a11yMin,
+        tps, pctErr, errMsg
+      ]));
+    }
+
+    // If suite has no testcases, add one summary row
+    if (!suite.testcases || suite.testcases.length === 0) {
+      const status = suite.failures > 0 ? 'FAIL' : 'PASS';
+      lines.push(row([
+        module, suite.name, project, '(suite)', status,
+        suite.time ? parseFloat(suite.time).toFixed(3) : '',
+        generatedAt, '', '', '', '', '', '', '', '', '', '', ''
+      ]));
+    }
+  }
+
+  // ── BDD Feature rows (features without XML results → SIN EJECUTAR)
+  for (const feat of features) {
+    for (const sc of (feat.scenarios || [])) {
+      lines.push(row([
+        'bdd', feat.name, feat.file, sc.name, 'SIN EJECUTAR',
+        '', generatedAt, '', '', '', '', '', '', '', '', '', '', ''
+      ]));
+    }
+  }
+
+  return lines.join('\r\n');
+}
+
 function main() {
   console.log('🚀 Generando portal de reportes...');
   if (!fs.existsSync(REPORT_DIR)) fs.mkdirSync(REPORT_DIR, { recursive: true });
@@ -1488,10 +2092,17 @@ function main() {
 
   const groups      = groupByModule(suites);
   const generatedAt = new Date().toLocaleString('es-CO', { timeZone:'America/Bogota', dateStyle:'medium', timeStyle:'short' });
-  const html        = buildPortalHTML(groups, totals, generatedAt);
+  const features    = readFeatureFiles(FEATURES_DIR);
+  console.log(`🥒 Features Gherkin encontrados: ${features.length}`);
+  const html        = buildPortalHTML(groups, totals, generatedAt, features);
 
   fs.writeFileSync(OUT_FILE, html, 'utf-8');
   console.log(`✅ Portal generado: ${OUT_FILE}`);
+
+  const csv = generateCSV(suites, features, generatedAt);
+  fs.writeFileSync(CSV_FILE, '\uFEFF' + csv, 'utf-8'); // BOM for Excel compatibility
+  console.log(`📊 CSV generado: ${CSV_FILE}`);
+
   openInBrowser(OUT_FILE);
 }
 
