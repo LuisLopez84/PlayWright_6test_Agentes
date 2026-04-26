@@ -12,6 +12,7 @@ import { generatePerformance } from '../agents/generators/performance-agent';
 import { generateAccessibility } from '../agents/generators/accessibility-agent';
 import { generateVisual } from '../agents/generators/visual-agent';
 import { generateSecurity } from '../agents/generators/security-agent';
+import { processBoxAPIsExecute } from '../agents/network/box-api-executor.agent';
 
 import { ensureDir } from '../utils/fs-utils';
 import { buildFeature, generateStepsFromGherkin } from '../agents/core/generator-agent';
@@ -421,10 +422,23 @@ async function runAgents() {
   }
 
   // ============================================
-  // 10. Limpiar directorios huérfanos en GenerateTest/tests/
+  // 10. Procesar BoxAPIsExecute/ — genera specs Playwright desde servicios
+  //     REST, SOAP u otros definidos en BoxAPIsExecute/<TIPO>/<MÉTODO>/*.spec.ts
+  //     → GenerateTest/tests/<Suite>/api/ (o Solo_test_API si sin suite)
+  // ============================================
+  console.log('\n📦 Procesando BoxAPIsExecute con agente IA...');
+  await processBoxAPIsExecute(
+    suiteNames,
+    testsOutputDir,
+    process.env.OPENAI_API_KEY
+  );
+
+  // ============================================
+  // 11. Limpiar directorios huérfanos en GenerateTest/tests/
   //     (creados por runs anteriores con matching incorrecto)
   // ============================================
-  cleanupOrphanSuiteDirs(testsOutputDir, suiteNames);
+  const knownSuitesWithSolo = [...suiteNames, 'Solo_test_API'];
+  cleanupOrphanSuiteDirs(testsOutputDir, knownSuitesWithSolo);
 
   console.log('\n🎉 AI Testing generation completed');
 }

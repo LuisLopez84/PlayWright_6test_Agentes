@@ -19,7 +19,7 @@
   "Email": "[placeholder=\"Email\"]",
   "Edit Contact": "text=Contact",
   "LopezTesterSeniro": "text=Last Name",
-  "Submit": "button:has-text(\"Edit Contact\")",
+  "Submit": "button:has-text(\"Add a New Contact\")",
   "tr:nth-child(72) > td:nth-child(2)": "tr.contactTableBodyRow:has-text(\"John Doe\")",
   "State or Province:": "text=Province:",
   "Luistester LopezTester": "text=luistester lopeztester",
