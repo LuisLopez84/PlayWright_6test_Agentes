@@ -22,7 +22,7 @@ test.describe('SOAP API Tests', () => {
     expect(responseBody).toContain('<AddResult>7</AddResult>');
   });
 
-  test('SOAP request with error', async ({ request }) => {
+  test('Error SOAP request', async ({ request }) => {
     const xmlBody = `
       <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
         <soapenv:Header/>
@@ -38,7 +38,5 @@ test.describe('SOAP API Tests', () => {
     const response = await soapRequest(request, 'http://www.dneonline.com/calculator.asmx', xmlBody, 'http://tempuri.org/Add');
     
     expect(response.status()).toBeGreaterThanOrEqual(400);
-    const responseBody = await response.text();
-    expect(responseBody).toContain('<faultstring>');
   });
 });

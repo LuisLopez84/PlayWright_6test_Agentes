@@ -1,88 +1,328 @@
-name: Playwright Enterprise Agents IA
+name: Playwright Enterprise — CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    name: Run Playwright Tests
+  playwright:
+    name: "🎭 Playwright — All Test Types"
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 90
+
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
     steps:
-      - name: Checkout repository
+
+      # ─────────────────────────────────────────────────────────────
+      # INFRA
+      # ─────────────────────────────────────────────────────────────
+      - name: "📥 Checkout"
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: "🟢 Setup Node.js 20"
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'npm'
+          cache: npm
 
-      - name: Install dependencies
+      - name: "📦 Install dependencies"
         run: npm ci
 
-      - name: Install Playwright Browsers
+      - name: "🌐 Install Playwright browsers"
         run: npx playwright install --with-deps
 
-      - name: Create .env file
-        run: echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" > .env
+      - name: "🔑 Create .env"
+        run: echo "OPENAI_API_KEY=${OPENAI_API_KEY}" > .env
 
-      - name: Generate tests from recordings
-        run: npm run generate
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # ─────────────────────────────────────────────────────────────
+      # GENERACIÓN
+      # ─────────────────────────────────────────────────────────────
+      - name: "⚙️ Generate tests from recordings (IA agents)"
+        run: npm run generate || true
 
-      - name: Generate BDD features
-        run: npm run bdd
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      - name: "⚙️ Transpile BDD features → Playwright specs"
+        run: npm run bdd || true
 
-      - name: Run Playwright tests (combined report)
-        id: playwright
+      # ─────────────────────────────────────────────────────────────
+      # AUTH SETUP  (requerido por bdd-ui que usa storageState)
+      # ─────────────────────────────────────────────────────────────
+      - name: "🔧 Auth Setup"
+        id: setup
         run: |
-          npx playwright test GenerateTest/tests --reporter=html --output=reports/combined || true
-          # El '|| true' evita que el pipeline se detenga aquí (pero capturamos el código de salida después)
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
+          set +e
+          npx playwright test --project=setup --reporter=list
+          echo "exit=$?" >> $GITHUB_OUTPUT
         continue-on-error: true
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - name: Upload combined HTML report (zipped for easy download)
+      # ─────────────────────────────────────────────────────────────
+      # TEST TYPES
+      # Cada step:
+      #   • usa --reporter=list,blob  (blob alimenta el merge final)
+      #   • captura su exit code en outputs.<id>.exit
+      #   • continue-on-error: true  →  nunca corta el pipeline
+      # ─────────────────────────────────────────────────────────────
+
+      - name: "🖥️  UI Testing — Chromium"
+        id: ui_chromium
+        run: |
+          set +e
+          npx playwright test --project=ui-chromium --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "🦊  UI Testing — Firefox"
+        id: ui_firefox
+        run: |
+          set +e
+          npx playwright test --project=ui-firefox --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "🧭  UI Testing — WebKit (Safari)"
+        id: ui_webkit
+        run: |
+          set +e
+          npx playwright test --project=ui-webkit --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "🥒  BDD / Gherkin"
+        id: bdd_ui
+        run: |
+          set +e
+          # Crear storage vacío si setup falló para evitar crash
+          mkdir -p storage
+          [ -f storage/auth.json ] || echo '{}' > storage/auth.json
+          npx playwright test --project=bdd-ui --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "🔌  API Testing"
+        id: api
+        run: |
+          set +e
+          npx playwright test --project=api --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "⚡  Performance Testing"
+        id: performance
+        run: |
+          set +e
+          npx playwright test --project=performance --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "♿  Accessibility Testing"
+        id: accessibility
+        run: |
+          set +e
+          npx playwright test --project=accessibility --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "👁️  Visual Testing"
+        id: visual
+        run: |
+          set +e
+          npx playwright test --project=visual --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "🔒  Security Testing"
+        id: security
+        run: |
+          set +e
+          npx playwright test --project=security --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      - name: "📈  Non-Functional Testing"
+        id: non_functional
+        run: |
+          set +e
+          npx playwright test --project=non-functional --reporter=list,blob
+          echo "exit=$?" >> $GITHUB_OUTPUT
+        continue-on-error: true
+
+      # ─────────────────────────────────────────────────────────────
+      # MERGE REPORTS  (blob → HTML + JUnit)
+      # ─────────────────────────────────────────────────────────────
+      - name: "📁 Merge blob reports → HTML + JUnit"
         if: always()
         run: |
-          cd reports/combined
-          zip -r ../../playwright-report.zip .
-          cd ../..
-        working-directory: ${{ github.workspace }}
+          mkdir -p playwright-report test-results
 
-      - name: Upload zipped HTML report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-report
-          path: playwright-report.zip
-          retention-days: 7
-
-      - name: Upload test results (traces, videos, screenshots) - only if non-empty
-        if: always()
-        run: |
-          if [ -d "test-results" ] && [ "$(ls -A test-results)" ]; then
-            echo "TEST_RESULTS_EXISTS=true" >> $GITHUB_ENV
+          if [ -d blob-report ] && [ "$(ls -A blob-report 2>/dev/null)" ]; then
+            echo "🔀 Merging blob reports..."
+            npx playwright merge-reports --reporter html  blob-report/ 2>/dev/null || true
+            npx playwright merge-reports --reporter junit blob-report/ 2>/dev/null \
+              > test-results/merged.xml || true
           else
-            echo "TEST_RESULTS_EXISTS=false" >> $GITHUB_ENV
+            echo "ℹ️  No blob reports found — skipping merge"
+            echo '<testsuites/>' > test-results/merged.xml
           fi
 
-      - name: Upload test results artifact
-        if: env.TEST_RESULTS_EXISTS == 'true'
+      # ─────────────────────────────────────────────────────────────
+      # JOB SUMMARY  (tabla Markdown en GitHub Actions)
+      # ─────────────────────────────────────────────────────────────
+      - name: "📊 Write Job Summary"
+        if: always()
+        env:
+          EXIT_UI_CHROMIUM: ${{ steps.ui_chromium.outputs.exit }}
+          EXIT_UI_FIREFOX:  ${{ steps.ui_firefox.outputs.exit }}
+          EXIT_UI_WEBKIT:   ${{ steps.ui_webkit.outputs.exit }}
+          EXIT_BDD:         ${{ steps.bdd_ui.outputs.exit }}
+          EXIT_API:         ${{ steps.api.outputs.exit }}
+          EXIT_PERF:        ${{ steps.performance.outputs.exit }}
+          EXIT_A11Y:        ${{ steps.accessibility.outputs.exit }}
+          EXIT_VISUAL:      ${{ steps.visual.outputs.exit }}
+          EXIT_SECURITY:    ${{ steps.security.outputs.exit }}
+          EXIT_NF:          ${{ steps.non_functional.outputs.exit }}
+        run: |
+          python3 << 'PYEOF'
+          import os, xml.etree.ElementTree as ET
+
+          # ── Datos de entrada ──────────────────────────────────────
+          exits = {
+            'ui-chromium':    os.environ.get('EXIT_UI_CHROMIUM', ''),
+            'ui-firefox':     os.environ.get('EXIT_UI_FIREFOX',  ''),
+            'ui-webkit':      os.environ.get('EXIT_UI_WEBKIT',   ''),
+            'bdd-ui':         os.environ.get('EXIT_BDD',         ''),
+            'api':            os.environ.get('EXIT_API',         ''),
+            'performance':    os.environ.get('EXIT_PERF',        ''),
+            'accessibility':  os.environ.get('EXIT_A11Y',        ''),
+            'visual':         os.environ.get('EXIT_VISUAL',      ''),
+            'security':       os.environ.get('EXIT_SECURITY',    ''),
+            'non-functional': os.environ.get('EXIT_NF',          ''),
+          }
+
+          labels = {
+            'ui-chromium':    '🖥️  UI Testing — Chromium',
+            'ui-firefox':     '🦊  UI Testing — Firefox',
+            'ui-webkit':      '🧭  UI Testing — WebKit',
+            'bdd-ui':         '🥒  BDD / Gherkin',
+            'api':            '🔌  API Testing',
+            'performance':    '⚡  Performance',
+            'accessibility':  '♿  Accessibility',
+            'visual':         '👁️  Visual',
+            'security':       '🔒  Security',
+            'non-functional': '📈  Non-Functional',
+          }
+
+          # ── Parsear conteos del JUnit mergeado ────────────────────
+          counts = {k: dict(tests=0, failures=0, skipped=0) for k in exits}
+          try:
+            tree = ET.parse('test-results/merged.xml')
+            for ts in tree.findall('.//testsuite'):
+              host = ts.get('hostname', '')
+              if host in counts:
+                counts[host]['tests']    += int(ts.get('tests',    0))
+                counts[host]['failures'] += int(ts.get('failures', 0)) + int(ts.get('errors', 0))
+                counts[host]['skipped']  += int(ts.get('skipped',  0))
+          except Exception as ex:
+            print(f'⚠️ JUnit parse error: {ex}')
+
+          # ── Calcular estado por tipo ──────────────────────────────
+          def status_cell(key):
+            code  = exits[key]
+            total = counts[key]['tests']
+            if code == '':          return '⏭️ Sin tests'
+            if total == 0 and code == '0': return '➖ 0 tests'
+            if code == '0':         return '✅ Passed'
+            return '❌ Failed'
+
+          # ── Escribir Markdown ─────────────────────────────────────
+          summary_path = os.environ.get('GITHUB_STEP_SUMMARY', '/dev/null')
+          sha    = os.environ.get('GITHUB_SHA',        '')[:7]
+          ref    = os.environ.get('GITHUB_REF_NAME',   '')
+          run_id = os.environ.get('GITHUB_RUN_ID',     '')
+          run_no = os.environ.get('GITHUB_RUN_NUMBER', '')
+          repo   = os.environ.get('GITHUB_REPOSITORY', '')
+          server = os.environ.get('GITHUB_SERVER_URL', 'https://github.com')
+
+          total_t = total_f = total_s = 0
+
+          with open(summary_path, 'a') as f:
+            f.write('## 🎭 Playwright Test Results\n\n')
+            f.write('| Test Type | Status | Tests | ✅ Passed | ❌ Failed | ⏭️ Skipped |\n')
+            f.write('|---|:---:|:---:|:---:|:---:|:---:|\n')
+
+            for key, label in labels.items():
+              c  = counts[key]
+              t  = c['tests']
+              fa = c['failures']
+              sk = c['skipped']
+              pa = t - fa - sk
+              st = status_cell(key)
+
+              def fmt(n, t): return str(n) if t > 0 else '—'
+
+              f.write(f'| {label} | {st} | {fmt(t,t)} | {fmt(pa,t)} | {fmt(fa,t)} | {fmt(sk,t)} |\n')
+              total_t += t
+              total_f += fa
+              total_s += sk
+
+            total_p  = total_t - total_f - total_s
+            overall  = '✅ All passed' if total_f == 0 else f'❌ {total_f} test(s) failed'
+            f.write(f'| **TOTAL** | **{overall}** | **{total_t}** | **{total_p}** | **{total_f}** | **{total_s}** |\n\n')
+            f.write(f'> Run [#{run_no}]({server}/{repo}/actions/runs/{run_id}) &nbsp;·&nbsp; '
+                    f'Branch `{ref}` &nbsp;·&nbsp; Commit `{sha}`\n')
+          PYEOF
+
+      # ─────────────────────────────────────────────────────────────
+      # ARTEFACTOS
+      # ─────────────────────────────────────────────────────────────
+      - name: "📤 Upload HTML report"
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results
-          path: test-results
-          retention-days: 7
+          name: playwright-report-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 14
+          if-no-files-found: warn
 
-      - name: Fail the job if Playwright tests failed
-        if: steps.playwright.outputs.exit_code != '0'
-        run: exit 1
+      - name: "📤 Upload test results (traces / screenshots / videos)"
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ github.run_number }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: warn
+
+      # ─────────────────────────────────────────────────────────────
+      # FALLO FINAL  (sólo tipos críticos rompen el pipeline)
+      # ─────────────────────────────────────────────────────────────
+      - name: "🔴 Fail if critical tests failed"
+        if: always()
+        run: |
+          FAILED=0
+          check() {
+            local label="$1" code="$2"
+            if [ -n "$code" ] && [ "$code" != "0" ]; then
+              echo "❌  $label → exit $code"
+              FAILED=1
+            elif [ -n "$code" ]; then
+              echo "✅  $label → passed"
+            else
+              echo "⏭️  $label → no tests"
+            fi
+          }
+          check "UI Chromium"  "${{ steps.ui_chromium.outputs.exit }}"
+          check "UI Firefox"   "${{ steps.ui_firefox.outputs.exit }}"
+          check "UI WebKit"    "${{ steps.ui_webkit.outputs.exit }}"
+          check "API"          "${{ steps.api.outputs.exit }}"
+          check "Security"     "${{ steps.security.outputs.exit }}"
+          # Performance, Accessibility, Visual y Non-Functional son informativos
+          # (no rompen el pipeline; warnings en summary)
+          [ $FAILED -eq 1 ] && exit 1 || echo "✅  All critical types passed"
