@@ -168,6 +168,16 @@ function groupByModule(suites) {
   return groups;
 }
 
+/** Extrae el nombre de la suite desde el path del testsuite (e.g. GenerateTest/tests/MySuite/ui/...) */
+function extractSuiteName(suiteNameRaw) {
+  const normalized = suiteNameRaw.replace(/\\/g, '/');
+  const m = normalized.match(/GenerateTest\/tests\/([^/]+)/);
+  if (m) return m[1];
+  // fallback: primer segmento con contenido
+  const parts = normalized.split('/').filter(Boolean);
+  return parts[0] || suiteNameRaw;
+}
+
 /** Estadísticas de un grupo de suites */
 function stats(suiteList) {
   return suiteList.reduce(
@@ -1164,6 +1174,90 @@ function noData() {
   </div>`;
 }
 
+/** Renderiza la sección "Test Sets": una tabla por suite con desglose por tipo */
+function renderTestSets(allSuites) {
+  if (!allSuites || allSuites.length === 0) return noData();
+
+  // Agrupar suites por nombre de test set
+  const setsMap = new Map();
+  for (const s of allSuites) {
+    const setName = extractSuiteName(s.name);
+    if (!setsMap.has(setName)) setsMap.set(setName, []);
+    setsMap.get(setName).push(s);
+  }
+
+  let html = '';
+  for (const [setName, suites] of setsMap) {
+    // Totales del set
+    const setTotals = suites.reduce(
+      (a, s) => ({ tests: a.tests+s.tests, failures: a.failures+s.failures, time: a.time+s.time }),
+      { tests: 0, failures: 0, time: 0 }
+    );
+    const setRate  = passRate(setTotals.tests, setTotals.failures);
+    const setOk    = setTotals.failures === 0;
+    const setColor = setTotals.tests === 0 ? 'var(--muted)' : setOk ? 'var(--pass)' : 'var(--fail)';
+
+    html += `
+    <div class="ts-set-block">
+      <div class="ts-set-header">
+        <span class="ts-set-icon">🗂️</span>
+        <span class="ts-set-name">${esc(setName)}</span>
+        <span class="ts-set-badge" style="color:${setColor}">${setTotals.tests > 0 ? setRate + '% éxito' : 'sin datos'}</span>
+        <span class="ts-set-meta">${setTotals.tests} pruebas · ${fmtSec(setTotals.time)}</span>
+      </div>
+      <table class="ts-table">
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>Status</th>
+            <th>Total</th>
+            <th>✅ Pasaron</th>
+            <th>❌ Fallaron</th>
+            <th>⏱ Tiempo</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    for (const mod of MODULES) {
+      const modSuites = suites.filter(s => classifySuite(s) === mod.key);
+      if (modSuites.length === 0) continue;
+      const ms = modSuites.reduce(
+        (a, s) => ({ tests: a.tests+s.tests, failures: a.failures+s.failures, time: a.time+s.time }),
+        { tests: 0, failures: 0, time: 0 }
+      );
+      const ok     = ms.failures === 0;
+      const status = ms.tests === 0 ? '➖' : ok ? '✅' : '❌';
+      const rate   = passRate(ms.tests, ms.failures);
+      html += `
+          <tr>
+            <td><span style="margin-right:6px">${mod.icon}</span>${mod.label}</td>
+            <td><span class="ts-status-badge ${ok ? 'ts-pass' : 'ts-fail'}">${status} ${ms.tests > 0 ? (ok ? 'PASS' : 'FAIL') : 'N/A'}</span></td>
+            <td>${ms.tests}</td>
+            <td style="color:var(--pass)">${ms.tests - ms.failures}</td>
+            <td style="color:${ms.failures > 0 ? 'var(--fail)' : 'var(--muted)'}">${ms.failures}</td>
+            <td style="color:var(--muted)">${fmtSec(ms.time)}</td>
+          </tr>`;
+    }
+
+    html += `
+        </tbody>
+        <tfoot>
+          <tr class="ts-total-row">
+            <td><b>TOTAL</b></td>
+            <td><span class="ts-status-badge ${setOk ? 'ts-pass' : 'ts-fail'}">${setOk ? '✅ PASS' : '❌ FAIL'}</span></td>
+            <td><b>${setTotals.tests}</b></td>
+            <td style="color:var(--pass)"><b>${setTotals.tests - setTotals.failures}</b></td>
+            <td style="color:${setTotals.failures > 0 ? 'var(--fail)' : 'var(--muted)'}"><b>${setTotals.failures}</b></td>
+            <td style="color:var(--muted)"><b>${fmtSec(setTotals.time)}</b></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>`;
+  }
+
+  return html || noData();
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  GRILLA DE EVIDENCIAS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1309,7 +1403,7 @@ function renderModuleContent(key, suiteList, features) {
   return body + renderEvidenceGrid(suiteList);
 }
 
-function buildPortalHTML(groups, totals, generatedAt, features) {
+function buildPortalHTML(groups, totals, generatedAt, features, allSuites) {
   const globalPassed = totals.tests - totals.failures - totals.errors;
   const globalRate   = totals.tests > 0 ? Math.round((globalPassed / totals.tests) * 100) : 0;
   const globalOk     = totals.failures === 0 && totals.errors === 0;
@@ -1788,6 +1882,28 @@ function buildPortalHTML(groups, totals, generatedAt, features) {
       border:1px solid var(--border); border-radius:6px; transition:border-color .2s,color .2s; }
     .lb-dl:hover { border-color:#fff; color:#fff; }
 
+    /* ─── Test Sets tab ──────────────────────── */
+    .ts-set-block { background:var(--surface); border:1px solid var(--border); border-radius:14px;
+      overflow:hidden; margin-bottom:20px; animation:fadeUp .35s ease both; }
+    .ts-set-header { display:flex; align-items:center; gap:12px; padding:14px 20px;
+      background:var(--surface2); border-bottom:1px solid var(--border); flex-wrap:wrap; }
+    .ts-set-icon  { font-size:18px; }
+    .ts-set-name  { font-size:15px; font-weight:700; color:#fff; flex:1; }
+    .ts-set-badge { font-size:13px; font-weight:600; }
+    .ts-set-meta  { font-size:12px; color:var(--muted); }
+    .ts-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .ts-table th { padding:10px 16px; text-align:left; font-size:11px; font-weight:600;
+      text-transform:uppercase; letter-spacing:.7px; color:var(--muted); background:var(--surface2);
+      border-bottom:1px solid var(--border); }
+    .ts-table td { padding:10px 16px; border-bottom:1px solid var(--border); }
+    .ts-table tbody tr:hover { background:rgba(255,255,255,.03); }
+    .ts-table tfoot td { border-top:1px solid var(--border); border-bottom:none; background:var(--surface2); }
+    .ts-total-row td { font-size:13px; }
+    .ts-status-badge { display:inline-block; padding:2px 8px; border-radius:6px;
+      font-size:11px; font-weight:600; }
+    .ts-pass { background:rgba(16,185,129,.15); color:var(--pass); }
+    .ts-fail { background:rgba(239,68,68,.15);  color:var(--fail); }
+
     /* Copy toast */
     .copy-toast { position:fixed; bottom:24px; right:24px; background:#6366f1; color:#fff;
       padding:10px 18px; border-radius:8px; font-size:13px; z-index:9998;
@@ -1842,6 +1958,7 @@ function buildPortalHTML(groups, totals, generatedAt, features) {
 <nav class="nav-bar">
   <button class="nav-btn active" id="tab-overview" onclick="showSection('overview')">📊 Resumen</button>
   ${MODULES.map(m=>`<button class="nav-btn" id="tab-${m.key}" onclick="showSection('${m.key}')">${m.icon} ${m.label}</button>`).join('\n  ')}
+  <button class="nav-btn" id="tab-testsets" onclick="showSection('testsets')">🗂️ Test Sets</button>
 </nav>
 
 <!-- ── Content ──────────────────────────────────────────── -->
@@ -1864,6 +1981,17 @@ function buildPortalHTML(groups, totals, generatedAt, features) {
   </section>
 
   ${sections}
+
+  <!-- Test Sets section -->
+  <section id="sec-testsets" class="mod-section-wrap" style="display:none">
+    <div class="mod-header" style="--accent:#a78bfa">
+      <div class="mod-title">🗂️ Test Sets</div>
+      <div class="mod-stats-row">
+        <span class="ms-item">Todas las suites organizadas por test set</span>
+      </div>
+    </div>
+    ${renderTestSets(allSuites)}
+  </section>
 
 </main>
 
@@ -2094,7 +2222,7 @@ function main() {
   const generatedAt = new Date().toLocaleString('es-CO', { timeZone:'America/Bogota', dateStyle:'medium', timeStyle:'short' });
   const features    = readFeatureFiles(FEATURES_DIR);
   console.log(`🥒 Features Gherkin encontrados: ${features.length}`);
-  const html        = buildPortalHTML(groups, totals, generatedAt, features);
+  const html        = buildPortalHTML(groups, totals, generatedAt, features, suites);
 
   fs.writeFileSync(OUT_FILE, html, 'utf-8');
   console.log(`✅ Portal generado: ${OUT_FILE}`);
