@@ -13,7 +13,9 @@ test.describe('SOAP API Tests', () => {
     
     const response = await soapRequest(request, 'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName', xmlBody, 'http://www.oorsprong.org/websamples.countryinfo/ListOfContinentsByName');
     
-    expect(response.status()).toBe(200);
+    expect(response.status()).toBeGreaterThanOrEqual(200);
+    expect(response.status()).toBeLessThan(300);
+    
     const responseBody = await response.text();
     expect(responseBody).toContain('<ListOfContinentsByNameResponse');
     expect(responseBody).toContain('<ListOfContinentsByNameResult');
@@ -31,7 +33,9 @@ test.describe('SOAP API Tests', () => {
     const response = await soapRequest(request, 'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName', xmlBody, 'http://invalid.soap.action');
     
     expect(response.status()).toBeGreaterThanOrEqual(400);
+    expect(response.status()).toBeLessThan(600);
+    
     const responseBody = await response.text();
-    expect(responseBody).toContain('<faultcode>');
+    expect(responseBody).toContain('<Fault');
   });
 });

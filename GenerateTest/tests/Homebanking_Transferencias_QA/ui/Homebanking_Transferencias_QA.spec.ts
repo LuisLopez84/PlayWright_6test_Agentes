@@ -16,10 +16,10 @@ test('Homebanking_Transferencias_QA', async ({ page }) => {
   await smartClick(page, `Transferencias`);
   await smartSelect(page, `#source-account`, 'ACC002');
   await smartClick(page, `Monto`);
-  await smartFill(page, `Monto`, '1555');
+  await smartFill(page, `Monto`, '1001');
   await page.waitForTimeout(500);
   await smartClick(page, `Descripción (opcional)`);
-  await smartFill(page, `Descripción (opcional)`, 'Proyecto Terminado 100%');
+  await smartFill(page, `Descripción (opcional)`, 'test 002');
   await page.waitForTimeout(500);
   await smartClick(page, `Transferir`);
   // Capturar toast transitorio en paralelo con el click de confirmación.

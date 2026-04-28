@@ -5,7 +5,7 @@ curl -X 'POST' \
 -d '{
 "cuenta_destino": "ACC002",
 "cuenta_origen": "ACC001",
-"monto": 2000,
+"monto": 1500,
 "motivo": "Varios",
 "tipo": "propia"
 }'

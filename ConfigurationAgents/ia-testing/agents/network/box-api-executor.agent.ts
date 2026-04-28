@@ -89,6 +89,78 @@ function extractSoapAction(content: string, xmlBody: string): string | null {
   return null;
 }
 
+// ─── Curl parser ─────────────────────────────────────────────────────────────
+
+/**
+ * Extrae el body del flag -d / --data(-raw) de un comando curl.
+ * Maneja bodies multi-línea envueltos en comillas simples o dobles.
+ */
+function extractCurlBody(raw: string): string | null {
+  const dMatch = raw.match(/(?:^|\s)(?:-d|--data(?:-raw)?)[ \t]+/m);
+  if (!dMatch || dMatch.index === undefined) return null;
+
+  const start = dMatch.index + dMatch[0].length;
+  const rest  = raw.slice(start);
+  if (!rest) return null;
+
+  const q = rest[0];
+  if (q !== "'" && q !== '"') {
+    // Sin comillas: tomar hasta fin de línea
+    return rest.match(/^([^\r\n]+)/)?.[1]?.trim() ?? null;
+  }
+
+  // Buscar la comilla de cierre carácter a carácter.
+  // JSON/XML no contienen el mismo tipo de comilla que el shell usa como wrapper.
+  for (let i = 1; i < rest.length; i++) {
+    if (rest[i] === q) return rest.slice(1, i).trim();
+  }
+  return null;
+}
+
+/**
+ * Parsea un archivo cuyo contenido es un comando curl estándar (multi-línea).
+ * Extrae método HTTP, URL, body y headers relevantes.
+ */
+function parseCurlCommand(filePath: string, raw: string): BoxApiSpec | null {
+  // Método HTTP: -X 'POST' / -X POST
+  const methodMatch = raw.match(/-X\s+['"]?(\w+)['"]?/i);
+  let method: HttpMethod = methodMatch
+    ? (methodMatch[1].toUpperCase() as HttpMethod)
+    : detectMethod(path.basename(path.dirname(filePath)), path.basename(filePath));
+
+  // URL: primer patrón https?://... entre comillas o sin ellas
+  let url = '';
+  const quotedUrl = raw.match(/['"`](https?:\/\/[^'"`\s\\]+(?:\?[^'"`\s\\]*)?)[`'"]/);
+  if (quotedUrl) {
+    url = quotedUrl[1];
+  } else {
+    const bareUrl = raw.match(/(https?:\/\/\S+)/);
+    if (bareUrl) url = bareUrl[1].replace(/[\\,;'"]+$/, '');
+  }
+
+  if (!url) {
+    console.warn(`⚠️  No se encontró URL en comando curl: ${filePath}`);
+    return null;
+  }
+
+  const body        = extractCurlBody(raw);
+  const svcType     = detectServiceType(filePath, body);
+  const soapAction  = svcType === 'SOAP' && body ? extractSoapAction(raw, body) : null;
+
+  return {
+    filePath,
+    fileName: path.basename(filePath),
+    serviceType: svcType,
+    method,
+    url,
+    body,
+    soapAction,
+    suiteName: null,
+  };
+}
+
+// ─── Parser principal ─────────────────────────────────────────────────────────
+
 export function parseBoxApiFile(filePath: string): BoxApiSpec | null {
   const raw = fs.readFileSync(filePath, 'utf-8').trim();
   if (!raw) {
@@ -96,6 +168,13 @@ export function parseBoxApiFile(filePath: string): BoxApiSpec | null {
     return null;
   }
 
+  // Detectar formato curl (comienza con "curl")
+  if (/^curl\b/i.test(raw)) {
+    console.log(`🔧 Formato curl detectado en: ${path.basename(filePath)}`);
+    return parseCurlCommand(filePath, raw);
+  }
+
+  // Formato estándar: línea 1 = URL, línea 2 = vacía, líneas 3+ = body
   const lines = raw.split(/\r?\n/);
   const url = lines[0].trim();
   if (!url || !url.startsWith('http')) {
@@ -119,7 +198,7 @@ export function parseBoxApiFile(filePath: string): BoxApiSpec | null {
     url,
     body,
     soapAction,
-    suiteName: null,  // se resuelve después
+    suiteName: null,
   };
 }
 
