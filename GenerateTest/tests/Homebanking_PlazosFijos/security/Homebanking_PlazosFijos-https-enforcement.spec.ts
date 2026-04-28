@@ -1,10 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 
-test.describe('HTTPS enforcement for Homebanking_Transferencias_QA', () => {
+test.describe('HTTPS enforcement for Homebanking_PlazosFijos', () => {
 
   test('URL base usa HTTPS', async ({ page }) => {
-    await smartGoto(page, 'Homebanking_Transferencias_QA');
+    await smartGoto(page, 'Homebanking_PlazosFijos');
     const currentUrl = page.url();
     expect(
       currentUrl.startsWith('https://'),

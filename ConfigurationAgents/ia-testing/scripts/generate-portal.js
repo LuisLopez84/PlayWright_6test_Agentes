@@ -234,34 +234,72 @@ function securityCategory(tcName) {
   return 'General';
 }
 
+/** Elimina códigos de escape ANSI (colores de terminal) de una cadena */
+function stripAnsi(str) {
+  return str.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+}
+
 /** Non-Functional: extrae tablas JMeter del system-out */
 function extractNfTables(output) {
+  const clean = stripAnsi(output);
+
+  // ── Método primario: bloques JSON estructurados emitidos por summary-reporter ─
+  // Garantiza que TODOS los escenarios aparezcan independientemente de ANSI o formato.
+  const jsonBlocks = [];
+  const jsonRe = /@@NF_DATA_JSON@@([\s\S]*?)@@END_NF_DATA_JSON@@/g;
+  let jm;
+  while ((jm = jsonRe.exec(clean)) !== null) {
+    try {
+      const d = JSON.parse(jm[1]);
+      if (d && Array.isArray(d.scenarios)) {
+        jsonBlocks.push({
+          name:  d.name  || '',
+          url:   d.url   || '',
+          tipo:  (d.tipo || '').toUpperCase(),
+          rows:  d.scenarios.map(s => ({
+            escenario: s.escenario,
+            hilos:     s.hilos,
+            peticiones: s.peticiones,
+            prom:      s.prom,
+            min:       s.min,
+            max:       s.max,
+            errorPct:  s.errorPct  || '-',
+            errorRate: s.errorRate || 0,
+            tps:       s.tps,
+          })),
+          total:  d.total  || null,
+          result: d.result || '',
+        });
+      }
+    } catch (_) { /* JSON malformado — ignorar */ }
+  }
+  if (jsonBlocks.length > 0) return jsonBlocks;
+
+  // ── Fallback: regex sobre tabla de texto (ejecuciones sin bloque JSON) ────────
   const blocks = [];
-  // Cada bloque comienza con "📡 <nombre> | <url>"
   const blockRe = /📡\s*(.+?)\s*\|\s*(https?:\/\/[^\n]+)\s*\n\s*📋\s*Tipo:\s*(\w+)([\s\S]*?)(?=📡|$)/gi;
   let bm;
-  while ((bm = blockRe.exec(output)) !== null) {
-    const name    = bm[1].trim();
-    const url     = bm[2].trim();
-    const tipo    = bm[3].trim().toUpperCase();
-    const body    = bm[4];
+  while ((bm = blockRe.exec(clean)) !== null) {
+    const name = bm[1].trim();
+    const url  = bm[2].trim();
+    const tipo = bm[3].trim().toUpperCase();
+    const body = bm[4];
 
-    // Extraer filas de la tabla
-    const rows    = [];
-    const rowRe   = /\s*#(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+\s*%)\s*│\s*([\d.]+)/g;
+    const rows   = [];
+    const rowRe  = /\s*#(\d+)\s*│\s*(\d+)\s*│\s*(\d+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+\s*%)\s*│\s*([\d.]+)/g;
     let rm;
     while ((rm = rowRe.exec(body)) !== null) {
       rows.push({
         escenario: +rm[1], hilos: +rm[2], peticiones: +rm[3],
         prom: +rm[4], min: +rm[5], max: +rm[6],
-        errorPct: rm[7].trim(), tps: +rm[8],
+        errorPct: rm[7].trim(), errorRate: parseFloat(rm[7]), tps: +rm[8],
       });
     }
-    // Total
-    const totM = body.match(/TOTAL\s*│\s*-\s*│\s*(\d+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+\s*%)\s*│\s*([\d.]+)/);
-    const total = totM ? { peticiones: +totM[1], prom: +totM[2], min: +totM[3], max: +totM[4], errorPct: totM[5].trim(), tps: +totM[6] } : null;
-    const resultM = body.match(/RESULTADO:\s*([^\n]+)/);
-    blocks.push({ name, url, tipo, rows, total, result: resultM ? resultM[1].trim() : '' });
+    const totM  = body.match(/TOTAL\s*│\s*-\s*│\s*(\d+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+)\s*│\s*([\d.]+\s*%)\s*│\s*([\d.]+)/);
+    const total = totM ? { peticiones: +totM[1], prom: +totM[2], min: +totM[3], max: +totM[4], errorPct: totM[5].trim(), errorRate: parseFloat(totM[5]), tps: +totM[6] } : null;
+    const resultM  = body.match(/RESULTADO:\s*([^\n]+)/);
+    const resultRaw = resultM ? stripAnsi(resultM[1]).trim() : '';
+    blocks.push({ name, url, tipo, rows, total, result: resultRaw });
   }
   return blocks;
 }
@@ -1119,36 +1157,42 @@ function renderNonFunctional(suiteList) {
         html += `<p class="mod-info" style="color:var(--muted)">Sin datos de tabla en el output.</p>`;
       }
       for (const blk of blocks) {
-        const errorNum = parseFloat(blk.total ? blk.total.errorPct : '0');
+        const errorNum = blk.total
+          ? (blk.total.errorRate !== undefined ? blk.total.errorRate : parseFloat(blk.total.errorPct))
+          : 0;
         const resultColor = errorNum === 0 ? '#10b981' : errorNum < 20 ? '#f59e0b' : '#ef4444';
         const tipoIcon = blk.tipo === 'SPIKE' ? '⚡' : '🔼';
         html += `
         <div class="nf-block">
-          <div class="nf-block-header">
-            <span>${tipoIcon} <b>${esc(blk.name)}</b></span>
-            <span class="nf-url">${esc(blk.url)}</span>
-            <span class="nf-tipo-badge">${blk.tipo}</span>
-          </div>
           <table class="data-table nf-table">
             <thead>
+              <tr>
+                <th colspan="8" class="nf-suite-th">
+                  <span class="nf-suite-title">${tipoIcon} <b>${esc(blk.name)}</b></span>
+                  <span class="nf-url">${esc(blk.url)}</span>
+                  <span class="nf-tipo-badge">${blk.tipo}</span>
+                </th>
+              </tr>
               <tr><th>Escenario</th><th>Hilos</th><th>Peticiones</th><th>Prom(ms)</th><th>Mín(ms)</th><th>Máx(ms)</th><th>% Error</th><th>TPS</th></tr>
             </thead><tbody>`;
+        const nfVal = (v) => (v === null || v === undefined) ? '-' : v;
+        const nfTps = (v) => (v === null || v === undefined) ? '-' : (+v).toFixed(2);
         for (const row of blk.rows) {
-          const ep = parseFloat(row.errorPct);
+          const ep = row.errorRate !== undefined ? row.errorRate : parseFloat(row.errorPct);
           const ec = ep >= 20 ? 'c-fail' : ep >= 5 ? 'c-warn' : 'c-pass';
           html += `<tr>
             <td>#${row.escenario}</td><td>${row.hilos}</td><td>${row.peticiones}</td>
-            <td>${row.prom}</td><td>${row.min}</td><td>${row.max}</td>
-            <td class="${ec}">${row.errorPct}</td><td>${row.tps.toFixed(2)}</td>
+            <td>${nfVal(row.prom)}</td><td>${nfVal(row.min)}</td><td>${nfVal(row.max)}</td>
+            <td class="${ec}">${row.errorPct}</td><td>${nfTps(row.tps)}</td>
           </tr>`;
         }
         if (blk.total) {
-          const ep2 = parseFloat(blk.total.errorPct);
+          const ep2 = blk.total.errorRate !== undefined ? blk.total.errorRate : parseFloat(blk.total.errorPct);
           const ec2 = ep2 >= 20 ? 'c-fail' : ep2 >= 5 ? 'c-warn' : 'c-pass';
           html += `<tr class="nf-total-row">
             <td><b>TOTAL</b></td><td>—</td><td>${blk.total.peticiones}</td>
-            <td>${blk.total.prom}</td><td>${blk.total.min}</td><td>${blk.total.max}</td>
-            <td class="${ec2}"><b>${blk.total.errorPct}</b></td><td>${blk.total.tps.toFixed(2)}</td>
+            <td>${nfVal(blk.total.prom)}</td><td>${nfVal(blk.total.min)}</td><td>${nfVal(blk.total.max)}</td>
+            <td class="${ec2}"><b>${blk.total.errorPct}</b></td><td>${nfTps(blk.total.tps)}</td>
           </tr>`;
         }
         html += `</tbody></table>`;
@@ -1682,10 +1726,15 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites) {
     .nf-params li { margin-bottom:4px; color:var(--muted); line-height:1.6; }
     .nf-block { background:var(--surface2); border:1px solid var(--border); border-radius:10px;
       padding:14px 18px; margin-top:14px; }
-    .nf-block-header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; font-size:13px; }
-    .nf-url   { font-size:11px; color:var(--muted); font-family:monospace; flex:1; }
+    .nf-url   { font-size:11px; color:var(--muted); font-family:monospace; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .nf-tipo-badge { background:var(--surface); border:1px solid var(--border);
-      padding:2px 10px; border-radius:20px; font-size:11px; font-weight:600; color:var(--text); }
+      padding:2px 10px; border-radius:20px; font-size:11px; font-weight:600; color:var(--text); white-space:nowrap; }
+    .nf-suite-th { text-align:left !important; padding:10px 14px !important;
+      background:var(--surface) !important; color:var(--text) !important;
+      font-size:13px !important; border-bottom:1px solid var(--border); }
+    .nf-suite-title { font-weight:600; margin-right:10px; }
+    .nf-suite-th .nf-url { display:inline; margin-right:10px; }
+    .nf-suite-th .nf-tipo-badge { vertical-align:middle; }
     .nf-total-row td { background:rgba(255,255,255,.04); font-weight:600; }
     .nf-result { margin-top:10px; font-size:13px; font-weight:600; padding:8px 12px;
       background:rgba(255,255,255,.04); border-radius:6px; }

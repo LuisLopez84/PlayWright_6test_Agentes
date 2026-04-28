@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 
 /**
- * Performance tests for Homebanking_Transferencias_QA
+ * Performance tests for Homebanking_PlazosFijos
  * Mide: tiempo de carga, LCP, CLS, TBT y número de recursos.
  * Budgets configurables via variables de entorno:
  *   PERF_BUDGET (ms, default 10000)
@@ -11,7 +11,7 @@ import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-
  *   TBT_BUDGET  (ms, default 600)
  *   MAX_RESOURCES (count, default 200)
  */
-test.describe('Performance tests for Homebanking_Transferencias_QA', () => {
+test.describe('Performance tests for Homebanking_PlazosFijos', () => {
 
   test('page load time', async ({ page }) => {
     const budget = process.env.PERF_BUDGET ? Number(process.env.PERF_BUDGET) : 10000;
