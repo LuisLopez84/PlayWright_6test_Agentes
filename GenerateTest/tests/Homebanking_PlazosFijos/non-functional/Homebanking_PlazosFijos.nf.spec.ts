@@ -1,8 +1,8 @@
 /**
- * Homebanking_Transferencias_QA.nf.spec.ts
+ * Homebanking_PlazosFijos.nf.spec.ts
  *
- * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebanking_Transferencias_QA
- * Targets: 2 | Homebanking_Transferencias_QA (incremental), Prueba Rendimiento Servicio SOAP PICOS (spike)
+ * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebanking_PlazosFijos
+ * Targets: 2 | Homebanking_PlazosFijos (incremental), Prueba Rendimiento Servicio SOAP PICOS (spike)
  *
  * AUTO-GENERADO por:
  *   npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
@@ -14,7 +14,7 @@
  *
  * Ejecución individual:
  *   npx playwright test --project=non-functional \
- *     GenerateTest/tests/Homebanking_Transferencias_QA/non-functional/Homebanking_Transferencias_QA.nf.spec.ts
+ *     GenerateTest/tests/Homebanking_PlazosFijos/non-functional/Homebanking_PlazosFijos.nf.spec.ts
  */
 
 import { test } from '@playwright/test';
@@ -23,9 +23,9 @@ import { runIncrementalTest, runSpikeTest } from '../../../non-functional/core/l
 import { printSummaryTable } from '../../../non-functional/reporters/summary-reporter';
 import type { LoadTarget } from '../../../non-functional/utils/target-resolver';
 
-// ─── Target 1: Homebanking_Transferencias_QA [RECORDING] — INCREMENTAL ────
+// ─── Target 1: Homebanking_PlazosFijos [RECORDING] — INCREMENTAL ────
 const NF_TARGET_0: LoadTarget = {
-  name: 'Homebanking_Transferencias_QA',
+  name: 'Homebanking_PlazosFijos',
   url: 'https://homebanking-demo-tests.netlify.app',
   method: 'GET',
   headers: {},
@@ -65,18 +65,21 @@ const NF_PARAMS_0 = {
 // ─── Target 2: Prueba Rendimiento Servicio SOAP PICOS [API] — SPIKE ────
 const NF_TARGET_1: LoadTarget = {
   name: 'Prueba Rendimiento Servicio SOAP PICOS',
-  url: 'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName',
+  url: 'http://www.dneonline.com/calculator.asmx',
   method: 'POST',
   headers: {
     "Content-Type": "text/xml;charset=UTF-8",
     "SOAPAction": "http://tempuri.org/Add"
   },
-  body: `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-<soap:Body>
-<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
-</ListOfContinentsByName>
-</soap:Body>
-</soap:Envelope>`,
+  body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+<soapenv:Header/>
+<soapenv:Body>
+<tem:Add>
+<tem:intA>5</tem:intA>
+<tem:intB>2</tem:intB>
+</tem:Add>
+</soapenv:Body>
+</soapenv:Envelope>`,
   type: 'api',
   testType: 'spike',
   incremental: {
@@ -122,27 +125,27 @@ const NF_PARAMS_1 = {
 // ─── Test ──────────────────────────────────────────────────────────────────
 test.describe.configure({ mode: 'serial' });
 
-test('Non-Functional — Homebanking_Transferencias_QA', async () => {
+test('Non-Functional — Homebanking_PlazosFijos', async () => {
   test.setTimeout(0);
 
   console.log('\n' + '═'.repeat(60));
-  console.log('  🚀 Prueba No Funcional: Homebanking_Transferencias_QA');
-  console.log('  📋 Targets: 2 | Homebanking_Transferencias_QA (incremental) + Prueba Rendimiento Servicio SOAP PICOS (spike)');
+  console.log('  🚀 Prueba No Funcional: Homebanking_PlazosFijos');
+  console.log('  📋 Targets: 2 | Homebanking_PlazosFijos (incremental) + Prueba Rendimiento Servicio SOAP PICOS (spike)');
   console.log('═'.repeat(60));
 
-  // ── [1/2] Homebanking_Transferencias_QA — INCREMENTAL ─────────────────────
+  // ── [1/2] Homebanking_PlazosFijos — INCREMENTAL ─────────────────────
   console.log('\n' + '─'.repeat(60));
-  console.log('  📡 Homebanking_Transferencias_QA | https://homebanking-demo-tests.netlify.app');
+  console.log('  📡 Homebanking_PlazosFijos | https://homebanking-demo-tests.netlify.app');
   console.log('  📋 Tipo: INCREMENTAL');
   const summaries_0 = await runIncrementalTest(NF_TARGET_0, NF_PARAMS_0, NFConfig.assertions);
   printSummaryTable(NF_TARGET_0, summaries_0, 'incremental');
 
   // ── [2/2] Prueba Rendimiento Servicio SOAP PICOS — SPIKE ─────────────────────
   console.log('\n' + '─'.repeat(60));
-  console.log('  📡 Prueba Rendimiento Servicio SOAP PICOS | http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName');
+  console.log('  📡 Prueba Rendimiento Servicio SOAP PICOS | http://www.dneonline.com/calculator.asmx');
   console.log('  📋 Tipo: SPIKE');
   const summaries_1 = await runSpikeTest(NF_TARGET_1, NF_PARAMS_1, NFConfig.assertions);
   printSummaryTable(NF_TARGET_1, summaries_1, 'spike');
 
-  console.log('\n  ✅ Prueba no funcional completada: Homebanking_Transferencias_QA\n');
+  console.log('\n  ✅ Prueba no funcional completada: Homebanking_PlazosFijos\n');
 });

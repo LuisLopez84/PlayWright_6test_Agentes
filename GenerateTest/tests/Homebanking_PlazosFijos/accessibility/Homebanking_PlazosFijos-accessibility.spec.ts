@@ -3,15 +3,15 @@ import AxeBuilder from '@axe-core/playwright';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 
 /**
- * Accessibility tests for Homebanking_Transferencias_QA
+ * Accessibility tests for Homebanking_PlazosFijos
  * Usa axe-core para detectar violaciones WCAG 2.1 AA.
  * El test SIEMPRE pasa — las violaciones se reportan en consola (no fallan el CI).
  * Para hacer que el test falle en violaciones críticas, descomenta el expect.
  */
-test.describe('Accessibility tests for Homebanking_Transferencias_QA', () => {
+test.describe('Accessibility tests for Homebanking_PlazosFijos', () => {
 
   test('axe scan — sin violaciones críticas', async ({ page }) => {
-    await smartGoto(page, 'Homebanking_Transferencias_QA');
+    await smartGoto(page, 'Homebanking_PlazosFijos');
     // Esperar estabilidad de la página
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(500);
@@ -25,7 +25,7 @@ test.describe('Accessibility tests for Homebanking_Transferencias_QA', () => {
     const moderate   = results.violations.filter(v => v.impact === 'moderate');
     const minor      = results.violations.filter(v => v.impact === 'minor');
 
-    console.log(`♿ Accessibility scan for Homebanking_Transferencias_QA:`);
+    console.log(`♿ Accessibility scan for Homebanking_PlazosFijos:`);
     console.log(`   Critical: ${critical.length} | Serious: ${serious.length} | Moderate: ${moderate.length} | Minor: ${minor.length}`);
 
     if (results.violations.length > 0) {
@@ -38,7 +38,7 @@ test.describe('Accessibility tests for Homebanking_Transferencias_QA', () => {
     }
 
     // Test informativo: siempre pasa. Descomentar la línea siguiente para exigir 0 críticos:
-    // expect(critical.length, `${critical.length} violaciones críticas en Homebanking_Transferencias_QA`).toBe(0);
+    // expect(critical.length, `${critical.length} violaciones críticas en Homebanking_PlazosFijos`).toBe(0);
     expect(true).toBe(true);
   });
 

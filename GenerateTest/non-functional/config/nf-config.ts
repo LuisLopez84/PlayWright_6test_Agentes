@@ -99,7 +99,7 @@ export const NFConfig: {
     // ── TARGET 1: Recording — Prueba INCREMENTAL ──────────────────────────────
     {
       type: 'recording',
-      recording: 'Homebanking_Transferencias_QA', // Indicar el recording del flujo a cual se va a inyectar la prueba no funcional sin el .spec.ts
+      recording: 'Homebanking_PlazosFijos', // Indicar el recording del flujo a cual se va a inyectar la prueba no funcional sin el .spec.ts
       testType: 'incremental',
       incremental: {
         scenarios: 5,           // 5 escalones: 1 → 2 → 3 → 4 → 5 hilos
@@ -112,23 +112,26 @@ export const NFConfig: {
     // ── TARGET 2: API — Prueba de PICOS (spike) para SOAP ───────────────────────────────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_Transferencias_QA/api/Homebanking_Transferencias_QA_Servicio_Operacion_Metodo_SOAP_GET_generated.spec.ts',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_PlazosFijos/api/Homebanking_PlazosFijos_Servicio_Operacion_SOAP_POST_generated.spec.ts',
       endpoint: {
         name: 'Prueba Rendimiento Servicio SOAP PICOS',
         method: 'POST',
-        url: 'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName',
+        url: 'http://www.dneonline.com/calculator.asmx',
         headers: {
           'Content-Type': 'text/xml;charset=UTF-8',   // SOAP — las claves con guión van entre comillas
           'SOAPAction': 'http://tempuri.org/Add',      // SOAP — obligatorio para identificar la operación
           // Si el endpoint requiere autenticación, descomentar y ajustar:
           // 'Authorization': 'Bearer EL_TOKEN',
         },
-        body: `<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-<soap:Body>
-<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
-</ListOfContinentsByName>
-</soap:Body>
-</soap:Envelope>`,
+        body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+<soapenv:Header/>
+<soapenv:Body>
+<tem:Add>
+<tem:intA>5</tem:intA>
+<tem:intB>2</tem:intB>
+</tem:Add>
+</soapenv:Body>
+</soapenv:Envelope>`,
       },
       testType: 'spike',
       spike: {

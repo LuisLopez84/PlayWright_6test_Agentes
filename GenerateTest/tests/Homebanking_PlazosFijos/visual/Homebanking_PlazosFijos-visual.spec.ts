@@ -2,15 +2,15 @@ import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 
 /**
- * Visual regression test for Homebanking_Transferencias_QA
+ * Visual regression test for Homebanking_PlazosFijos
  * Compara capturas de pantalla con baseline. En la primera ejecución,
  * usa --update-snapshots para generar los baselines:
  *   npx playwright test --update-snapshots --project=visual
  */
-test.describe('Visual regression for Homebanking_Transferencias_QA', () => {
+test.describe('Visual regression for Homebanking_PlazosFijos', () => {
 
   test('screenshot comparison', async ({ page }) => {
-    await smartGoto(page, 'Homebanking_Transferencias_QA');
+    await smartGoto(page, 'Homebanking_PlazosFijos');
 
     // Esperar a que la página esté completamente estable
     await page.waitForLoadState('domcontentloaded');
@@ -30,7 +30,7 @@ test.describe('Visual regression for Homebanking_Transferencias_QA', () => {
       `
     }).catch(() => {});
 
-    await expect(page).toHaveScreenshot('Homebanking_Transferencias_QA.png', {
+    await expect(page).toHaveScreenshot('Homebanking_PlazosFijos.png', {
       fullPage: true,
       maxDiffPixelRatio: 0.05, // Tolerar 5% de diferencia pixel
       animations: 'disabled',

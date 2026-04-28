@@ -38,5 +38,7 @@ test.describe('SOAP API Tests', () => {
     const response = await soapRequest(request, 'http://www.dneonline.com/calculator.asmx', xmlBody, 'http://tempuri.org/Add');
     
     expect(response.status()).toBeGreaterThanOrEqual(400);
+    const responseBody = await response.text();
+    expect(responseBody).toContain('<faultstring>');
   });
 });

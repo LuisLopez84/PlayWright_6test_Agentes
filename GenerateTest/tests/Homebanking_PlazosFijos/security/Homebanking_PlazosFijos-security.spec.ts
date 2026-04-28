@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
-test.describe('Security tests for Homebanking_Transferencias_QA', () => {
+test.describe('Security tests for Homebanking_PlazosFijos', () => {
 
   test('security headers', async ({ request }) => {
     const response = await request.get('https://homebanking-demo-tests.netlify.app');
@@ -21,7 +21,7 @@ test.describe('Security tests for Homebanking_Transferencias_QA', () => {
   });
 
   test('XSS injection protection', async ({ page }) => {
-    await smartGoto(page, 'Homebanking_Transferencias_QA');
+    await smartGoto(page, 'Homebanking_PlazosFijos');
     const payload = "<script>alert('xss')</script>";
     await smartFill(page, 'Usuario', payload);
     await smartFill(page, 'Contraseña', payload);

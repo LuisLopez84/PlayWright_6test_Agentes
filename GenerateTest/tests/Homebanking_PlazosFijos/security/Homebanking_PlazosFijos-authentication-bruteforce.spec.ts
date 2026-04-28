@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
 import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
 
-test.describe('Brute force protection for Homebanking_Transferencias_QA', () => {
+test.describe('Brute force protection for Homebanking_PlazosFijos', () => {
 
   test('Protección contra brute force via API', async ({ request }) => {
     const loginEndpoint = 'https://homebanking-demo-tests.netlify.app/login';
@@ -27,7 +27,7 @@ test.describe('Brute force protection for Homebanking_Transferencias_QA', () => 
   });
 
   test('Protección contra brute force via UI', async ({ page }) => {
-    await smartGoto(page, 'Homebanking_Transferencias_QA');
+    await smartGoto(page, 'Homebanking_PlazosFijos');
 
     // Intentar login con credenciales incorrectas 3 veces
     for (let i = 0; i < 3; i++) {

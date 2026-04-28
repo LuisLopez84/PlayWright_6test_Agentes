@@ -180,4 +180,41 @@ export function printSummaryTable(
     console.log(` \x1b[31m❌ RESULTADO: ${fmt(totalErrorRate, 2)}% de errores — FALLO\x1b[0m`);
   }
   console.log(DOUBLE_LINE + '\n');
+
+  // ── Bloque JSON estructurado para portal.html ─────────────────────────────
+  // Emite TODOS los escenarios sin depender de regex ANSI ni formato de tabla.
+  // El portal lo usa como fuente primaria; la tabla de texto queda solo para terminal.
+  const resultText =
+    totals.totalRequests === 0      ? '' :
+    totalErrorRate === 0            ? '0% de errores — Prueba EXITOSA' :
+    totalErrorRate < 5              ? `${fmt(totalErrorRate, 2)}% de errores — Revisar` :
+                                      `${fmt(totalErrorRate, 2)}% de errores — FALLO`;
+
+  const nfJson = {
+    name: target.name,
+    url:  target.url,
+    tipo: testType.toUpperCase(),
+    scenarios: summaries.map((s) => ({
+      escenario: s.scenarioIndex + 1,
+      hilos:     s.threads,
+      peticiones: s.totalRequests,
+      prom:      s.totalRequests > 0 ? s.avgResponseTime  : null,
+      min:       s.totalRequests > 0 ? s.minResponseTime  : null,
+      max:       s.totalRequests > 0 ? s.maxResponseTime  : null,
+      errorPct:  s.totalRequests > 0 ? `${fmt(s.errorRate, 2)} %` : '-',
+      errorRate: s.totalRequests > 0 ? s.errorRate : 0,
+      tps:       s.totalRequests > 0 ? s.throughput : null,
+    })),
+    total: totals.totalRequests > 0 ? {
+      peticiones: totals.totalRequests,
+      prom:      totals.avgResponseTime,
+      min:       totals.minResponseTime,
+      max:       totals.maxResponseTime,
+      errorPct:  `${fmt(totals.errorRate, 2)} %`,
+      errorRate: totals.errorRate,
+      tps:       totals.throughput,
+    } : null,
+    result: resultText,
+  };
+  console.log(`@@NF_DATA_JSON@@${JSON.stringify(nfJson)}@@END_NF_DATA_JSON@@`);
 }
