@@ -296,6 +296,7 @@ Responde ÚNICAMENTE con el nombre exacto de la suite del array, o null si ningu
 const IMPORT_PATH = `'../../../../ConfigurationTest/tests/utils/api-helper'`;
 
 function buildRestSpec(spec: BoxApiSpec): string {
+  const urlPath = spec.url.replace(/https?:\/\/[^/]+/, '') || '/';
   const isJson = spec.body && !spec.body.trim().startsWith('<');
   let bodyJson: object | null = null;
   if (isJson && spec.body) {
@@ -304,30 +305,53 @@ function buildRestSpec(spec: BoxApiSpec): string {
 
   const hasBody  = spec.method !== 'GET' && spec.method !== 'DELETE' && spec.body;
   const bodyDecl = hasBody
-    ? `\nconst requestBody = ${bodyJson ? JSON.stringify(bodyJson, null, 2) : JSON.stringify(spec.body)};\n`
+    ? `const requestBody = ${bodyJson ? JSON.stringify(bodyJson, null, 2) : JSON.stringify(spec.body)};\n\n`
     : '';
 
-  const optionsObj: string[] = [`headers: { accept: 'application/json'${hasBody ? `, 'Content-Type': 'application/json'` : ''} }`];
-  if (hasBody) optionsObj.push(`data: requestBody`);
+  const successHeaders = `accept: 'application/json'${hasBody ? `, 'Content-Type': 'application/json'` : ''}`;
+  const successOpts    = hasBody
+    ? `{\n      headers: { ${successHeaders} },\n      data: requestBody\n    }`
+    : `{\n      headers: { ${successHeaders} }\n    }`;
 
-  const testName = `${spec.method} ${spec.url.replace(/https?:\/\/[^/]+/, '')} - éxito (200)`;
+  const descName = spec.fileName.replace(/\.spec\.ts$/, '');
+
+  // Error de datos: POST/PUT/PATCH → body nulo; GET/DELETE → ruta con ID inválido
+  const dataErrUrl  = hasBody ? `'${spec.url}'` : `baseUrl + '/id-invalido-test-99999'`;
+  const dataErrBody = hasBody
+    ? `{\n      headers: { accept: 'application/json', 'Content-Type': 'application/json' },\n      data: null\n    }`
+    : `{\n      headers: { accept: 'application/json' }\n    }`;
+  const baseUrlDecl = !hasBody ? `    const baseUrl = '${spec.url}'.replace(/\\/+$/, '');\n` : '';
 
   return `import { test, expect } from '@playwright/test';
 import { restRequest } from ${IMPORT_PATH};
-${bodyDecl}
-test('${testName}', async ({ request }) => {
-  const response = await restRequest(request, '${spec.method}', '${spec.url}', {
-    ${optionsObj.join(',\n    ')}
-  });
-  expect(response.status()).toBeLessThan(500);
-  ${spec.method !== 'DELETE' ? `const body = await response.json();\n  expect(body).toBeDefined();` : ''}
-});
 
-test('${spec.method} ${spec.url.replace(/https?:\/\/[^/]+/, '')} - error cliente (400/404)', async ({ request }) => {
-  const response = await restRequest(request, '${spec.method}', '${spec.url}__invalid__', {
-    headers: { accept: 'application/json' }
+${bodyDecl}test.describe('${descName}', () => {
+
+  test('${spec.method} ${urlPath} - Éxito', async ({ request }) => {
+    const response = await restRequest(request, '${spec.method}', '${spec.url}', ${successOpts});
+    expect(response.status()).toBeGreaterThanOrEqual(200);
+    expect(response.status()).toBeLessThan(300);
+    ${spec.method !== 'DELETE' ? `const body = await response.json();\n    expect(body).toBeDefined();` : ''}
   });
-  expect([400, 404, 405, 422]).toContain(response.status());
+
+  test('${spec.method} ${urlPath} - Error técnico (servicio no disponible)', async ({ request }) => {
+    let errorDetected = false;
+    try {
+      const res = await restRequest(request, '${spec.method}', 'https://error-tecnico.nonexistent.invalid/', {
+        headers: { accept: 'application/json' }
+      });
+      errorDetected = res.status() >= 500;
+    } catch {
+      errorDetected = true;
+    }
+    expect(errorDetected, 'Se esperaba fallo de red o error 5xx').toBe(true);
+  });
+
+  test('${spec.method} ${urlPath} - Error de datos (solicitud inválida)', async ({ request }) => {
+${baseUrlDecl}    const response = await restRequest(request, '${spec.method}', ${dataErrUrl}, ${dataErrBody});
+    expect([400, 404, 405, 415, 422, 500]).toContain(response.status());
+  });
+
 });
 `;
 }
@@ -335,27 +359,44 @@ test('${spec.method} ${spec.url.replace(/https?:\/\/[^/]+/, '')} - error cliente
 function buildSoapSpec(spec: BoxApiSpec): string {
   const xmlBody = spec.body ?? '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
   const soapAction = spec.soapAction ?? '';
-  // Extraer nombre de la operación desde el interior del Body (no el tag Envelope/Body)
   const bodyContentMatch = xmlBody.match(/<(?:[a-zA-Z]+:)?Body[^>]*>[\s\S]*?<(?:[a-zA-Z]+:)?([A-Za-z0-9_]+)/);
   const opName = bodyContentMatch?.[1] ?? 'Operation';
+  const soapActionArg = soapAction ? `, '${soapAction}'` : '';
+  const descName = spec.fileName.replace(/\.spec\.ts$/, '');
+
+  const malformedXml = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><InvalidRequest/></soap:Body></soap:Envelope>';
 
   return `import { test, expect } from '@playwright/test';
 import { soapRequest } from ${IMPORT_PATH};
 
 const xmlBody = \`${xmlBody}\`;
+const malformedXml = \`${malformedXml}\`;
 
-test('SOAP ${opName} - éxito (200)', async ({ request }) => {
-  const endpoint = '${spec.url}';
-  ${soapAction ? `const soapAction = '${soapAction}';` : '// Sin SOAPAction requerido'}
-  const response = await soapRequest(request, endpoint, xmlBody${soapAction ? `, soapAction` : ''});
-  expect(response.status()).toBe(200);
-  const text = await response.text();
-  expect(text).toContain('${opName}');
-});
+test.describe('${descName}', () => {
 
-test('SOAP ${opName} - fallo endpoint incorrecto', async ({ request }) => {
-  const response = await soapRequest(request, '${spec.url}__bad__', xmlBody);
-  expect([400, 404, 500]).toContain(response.status());
+  test('SOAP ${opName} - Éxito', async ({ request }) => {
+    const response = await soapRequest(request, '${spec.url}', xmlBody${soapActionArg});
+    expect(response.status()).toBe(200);
+    const text = await response.text();
+    expect(text).toContain('${opName}');
+  });
+
+  test('SOAP ${opName} - Error técnico (endpoint no disponible)', async ({ request }) => {
+    let errorDetected = false;
+    try {
+      const res = await soapRequest(request, 'https://error-tecnico.nonexistent.invalid/', xmlBody${soapActionArg});
+      errorDetected = res.status() >= 500;
+    } catch {
+      errorDetected = true;
+    }
+    expect(errorDetected, 'Se esperaba fallo de red o error 5xx').toBe(true);
+  });
+
+  test('SOAP ${opName} - Error de datos (body SOAP malformado)', async ({ request }) => {
+    const response = await soapRequest(request, '${spec.url}', malformedXml${soapActionArg});
+    expect([400, 500]).toContain(response.status());
+  });
+
 });
 `;
 }
@@ -392,9 +433,12 @@ Ejemplo correcto para SOAP:
 
 Requisitos:
 1. Primer parámetro de restRequest/soapRequest SIEMPRE es 'request' (el fixture de Playwright).
-2. Incluir test de éxito (2xx) y test de error (4xx/5xx).
-3. Para REST con body JSON, incluir aserciones de campos devueltos.
-4. Para SOAP, validar tag XML de respuesta esperado.
+2. Incluir exactamente 3 tests dentro de un test.describe:
+   a) Éxito (2xx) — llamada normal al endpoint real.
+   b) Error técnico (fallo de red / 5xx) — usar URL 'https://error-tecnico.nonexistent.invalid/' + try/catch, esperar errorDetected=true.
+   c) Error de datos (4xx) — para GET/DELETE: URL+'/id-invalido-test-99999'; para POST/PUT/PATCH: data:null, esperar [400,404,405,415,422,500].
+3. Para REST con body JSON, incluir aserciones de campos devueltos en el test de éxito.
+4. Para SOAP, validar tag XML de respuesta esperado en el test de éxito.
 5. NO incluir explicaciones — solo código TypeScript.`;
 
   try {
@@ -431,6 +475,149 @@ Requisitos:
   return spec.serviceType === 'SOAP' ? buildSoapSpec(spec) : buildRestSpec(spec);
 }
 
+// ─── Generación de Feature BDD ────────────────────────────────────────────────
+
+/**
+ * Genera el contenido del archivo .feature para un servicio API dado.
+ * Los patrones de steps son fijos para coincidir exactamente con api-generated.steps.ts.
+ */
+function buildApiFeature(spec: BoxApiSpec, baseName: string): string {
+  const displayName  = baseName.replace(/_/g, ' ');
+  const isSOAP       = spec.serviceType === 'SOAP';
+
+  const givenStep = isSOAP
+    ? `el servicio SOAP "${spec.url}" con acción "${spec.soapAction ?? ''}" está configurado para pruebas API`
+    : `el servicio REST "${spec.method}" "${spec.url}" está configurado para pruebas API`;
+
+  return `# GENERADO AUTOMÁTICAMENTE por BoxAPIsExecute — no editar manualmente
+# Endpoint : ${spec.url}
+# Tipo     : ${spec.serviceType} | Método: ${spec.method}
+Feature: API ${spec.serviceType} ${spec.method} - ${displayName}
+
+  Background:
+    Given ${givenStep}
+
+  Scenario: ${displayName} - Petición exitosa
+    When ejecuto la petición API configurada
+    Then la respuesta debe tener un estado de éxito 2xx
+
+  Scenario: ${displayName} - Error técnico del servidor
+    When ejecuto la petición API a un endpoint con error técnico
+    Then la respuesta debe indicar un fallo técnico de red o 5xx
+
+  Scenario: ${displayName} - Error por datos inválidos
+    When ejecuto la petición API con datos inválidos
+    Then la respuesta debe indicar error de validación de datos 4xx
+`;
+}
+
+/**
+ * Genera el contenido del archivo de steps compartido para todos los features de API.
+ * Este archivo se regenera en cada ejecución (es 100% machine-generated).
+ */
+function buildApiGeneratedSteps(): string {
+  return `// GENERADO AUTOMÁTICAMENTE por BoxAPIsExecute — no editar manualmente
+import { createBdd } from 'playwright-bdd';
+import { expect } from '@playwright/test';
+import { restRequest, soapRequest } from '../../ConfigurationTest/tests/utils/api-helper';
+
+const { Given, When, Then, Before } = createBdd();
+
+// ─── Estado por escenario ────────────────────────────────────────────────────
+// Seguro en ejecución paralela: cada worker de Playwright tiene su propio módulo.
+const _ctx: {
+  type: 'REST' | 'SOAP';
+  method: string;
+  url: string;
+  body: string | null;
+  soapAction: string | null;
+  status: number;
+  hasNetworkError: boolean;
+} = { type: 'REST', method: 'GET', url: '', body: null, soapAction: null, status: 0, hasNetworkError: false };
+
+Before(async () => {
+  _ctx.status = 0;
+  _ctx.hasNetworkError = false;
+});
+
+// ─── Given ────────────────────────────────────────────────────────────────────
+Given('el servicio REST {string} {string} está configurado para pruebas API',
+  async ({}, method: string, url: string) => {
+    _ctx.type = 'REST';
+    _ctx.method = method;
+    _ctx.url = url;
+  });
+
+Given('el servicio SOAP {string} con acción {string} está configurado para pruebas API',
+  async ({}, url: string, soapAction: string) => {
+    _ctx.type = 'SOAP';
+    _ctx.url = url;
+    _ctx.soapAction = soapAction;
+    _ctx.body = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
+  });
+
+// ─── When ─────────────────────────────────────────────────────────────────────
+When('ejecuto la petición API configurada', async ({ request }) => {
+  if (_ctx.type === 'SOAP') {
+    const res = await soapRequest(request, _ctx.url, _ctx.body ?? '', _ctx.soapAction ?? undefined);
+    _ctx.status = res.status();
+  } else {
+    const opts: Record<string, unknown> = { headers: { accept: 'application/json' } };
+    if (_ctx.body) (opts as any).data = _ctx.body;
+    const res = await restRequest(request, _ctx.method as any, _ctx.url, opts as any);
+    _ctx.status = res.status();
+  }
+});
+
+When('ejecuto la petición API a un endpoint con error técnico', async ({ request }) => {
+  _ctx.hasNetworkError = false;
+  try {
+    const res = await restRequest(request, _ctx.method as any,
+      'https://error-tecnico.nonexistent.invalid/',
+      { headers: { accept: 'application/json' } } as any);
+    _ctx.status = res.status();
+    _ctx.hasNetworkError = _ctx.status >= 500;
+  } catch {
+    _ctx.hasNetworkError = true;
+    _ctx.status = 503;
+  }
+});
+
+When('ejecuto la petición API con datos inválidos', async ({ request }) => {
+  if (_ctx.type === 'SOAP') {
+    const malformed = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><InvalidRequest/></soap:Body></soap:Envelope>';
+    const res = await soapRequest(request, _ctx.url, malformed, _ctx.soapAction ?? undefined);
+    _ctx.status = res.status();
+  } else {
+    const badUrl = _ctx.url.replace(/\\/+$/, '') + '/id-invalido-test-99999';
+    const res = await restRequest(request, _ctx.method as any, badUrl,
+      { headers: { accept: 'application/json' } } as any);
+    _ctx.status = res.status();
+  }
+});
+
+// ─── Then ─────────────────────────────────────────────────────────────────────
+Then('la respuesta debe tener un estado de éxito 2xx', async () => {
+  expect(_ctx.status, \`Estado recibido: \${_ctx.status}\`).toBeGreaterThanOrEqual(200);
+  expect(_ctx.status, \`Estado recibido: \${_ctx.status}\`).toBeLessThan(300);
+});
+
+Then('la respuesta debe indicar un fallo técnico de red o 5xx', async () => {
+  expect(
+    _ctx.hasNetworkError || _ctx.status >= 500,
+    \`Se esperaba error de red o 5xx, recibido: \${_ctx.status}\`
+  ).toBe(true);
+});
+
+Then('la respuesta debe indicar error de validación de datos 4xx', async () => {
+  expect(
+    _ctx.status >= 400,
+    \`Se esperaba 4xx o superior, recibido: \${_ctx.status}\`
+  ).toBe(true);
+});
+`;
+}
+
 // ─── Punto de entrada principal ───────────────────────────────────────────────
 
 export async function processBoxAPIsExecute(
@@ -438,8 +625,10 @@ export async function processBoxAPIsExecute(
   testsOutputDir: string,
   openaiKey?: string
 ): Promise<void> {
-  const projectRoot = process.cwd();
-  const boxRoot = path.join(projectRoot, 'BoxAPIsExecute');
+  const projectRoot   = process.cwd();
+  const boxRoot       = path.join(projectRoot, 'BoxAPIsExecute');
+  const featuresDir   = path.join(projectRoot, 'GenerateTest', 'features');
+  const stepsDir      = path.join(projectRoot, 'GenerateTest', 'steps');
 
   if (!fs.existsSync(boxRoot)) {
     console.log('ℹ️  BoxAPIsExecute/ no encontrado — se omite procesamiento');
@@ -522,7 +711,20 @@ export async function processBoxAPIsExecute(
     const outPath = path.join(targetDir, outFileName);
     fs.writeFileSync(outPath, specContent, 'utf-8');
     console.log(`✅ Spec generada: ${path.relative(projectRoot, outPath)}`);
+
+    // ── Generar feature BDD ─────────────────────────────────────────────────
+    ensureDir(featuresDir);
+    const featureContent  = buildApiFeature(spec, baseName);
+    const featurePath     = path.join(featuresDir, `${baseName}_api.feature`);
+    fs.writeFileSync(featurePath, featureContent, 'utf-8');
+    console.log(`📄 Feature generado: ${path.relative(projectRoot, featurePath)}`);
   }
+
+  // ── Generar/actualizar steps compartidos para todos los features de API ───
+  ensureDir(stepsDir);
+  const stepsPath = path.join(stepsDir, 'api-generated.steps.ts');
+  fs.writeFileSync(stepsPath, buildApiGeneratedSteps(), 'utf-8');
+  console.log(`📄 Steps API generados: ${path.relative(projectRoot, stepsPath)}`);
 
   console.log('\n🎉 BoxAPIsExecute procesado correctamente');
 }

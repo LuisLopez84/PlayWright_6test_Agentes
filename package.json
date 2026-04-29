@@ -14,7 +14,8 @@
     "report": "npx playwright show-report",
     "pw:record": "npx playwright codegen",
     "reports-index": "node ConfigurationAgents/ia-testing/scripts/generate-reports-index.js",
-    "generate:nf": "ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts"
+    "generate:nf": "ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts",
+    "test:api": "npm run generate && npx playwright test --project=api && node ConfigurationAgents/ia-testing/scripts/split-reports.js && npm run portal"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.8.2",

@@ -214,20 +214,17 @@ async function runAgents() {
   ensureDir(outputDir);
   ensureDir(featureDir);
 
+  // ============================================
+  // 0. Recolectar recordings (pueden no existir)
+  // ============================================
+  const files = fs.existsSync(recordingsDir) ? fs.readdirSync(recordingsDir) : [];
+
   if (!fs.existsSync(recordingsDir)) {
-    console.log('❌ No recordings folder found');
-    return;
+    console.log('⚠️ Carpeta de recordings no encontrada — se procesará solo BoxAPIsExecute');
+  } else if (files.length === 0) {
+    console.log('⚠️ No hay recordings — se procesará solo BoxAPIsExecute');
   }
 
-  const files = fs.readdirSync(recordingsDir);
-  if (files.length === 0) {
-    console.log('⚠️ No recordings found');
-    return;
-  }
-
-  // ============================================
-  // 0. Recolectar nombres de suites (recordings)
-  // ============================================
   const suiteNames: string[] = [];
   for (const file of files) {
     if (file.endsWith('.ts') || file.endsWith('.js')) {
@@ -235,10 +232,12 @@ async function runAgents() {
       suiteNames.push(name);
     }
   }
-  console.log(`📋 Suites disponibles: ${suiteNames.join(', ')}`);
+  if (suiteNames.length > 0) {
+    console.log(`📋 Suites disponibles: ${suiteNames.join(', ')}`);
+  }
 
   // ============================================
-  // Procesar cada recording
+  // Procesar cada recording (se omite si no hay)
   // ============================================
   for (const file of files) {
     try {
