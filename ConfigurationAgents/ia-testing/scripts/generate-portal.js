@@ -10,6 +10,14 @@ const fs            = require('fs');
 const path          = require('path');
 const { exec }      = require('child_process');
 
+// ─── Motor estadístico PNF ────────────────────────────────────────────────────
+let statEngine = null;
+try {
+  statEngine = require(
+    path.join(__dirname, '..', '..', '..', 'GenerateTest', 'non-functional', 'analysis', 'statistical-engine.js')
+  );
+} catch (_) { /* opcional — el tab se mostrará sin análisis si no está disponible */ }
+
 // ─── Rutas ────────────────────────────────────────────────────────────────────
 const ROOT         = process.cwd();
 const XML_FILE     = path.join(ROOT, 'test-results', 'results.xml');
@@ -302,6 +310,413 @@ function extractNfTables(output) {
     blocks.push({ name, url, tipo, rows, total, result: resultRaw });
   }
   return blocks;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  ANÁLISIS ESTADÍSTICO PNF
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/** Extrae TODOS los bloques NF de las suites no-funcionales */
+function extractAllNfBlocks(nfSuiteList) {
+  const all = [];
+  for (const s of nfSuiteList) {
+    for (const tc of s.testcases) {
+      const blocks = extractNfTables(tc.output);
+      all.push(...blocks);
+    }
+  }
+  return all;
+}
+
+/** Genera concepto profesional con OpenAI (async). Fallback: análisis basado en reglas. */
+async function generateAiConcept(analyses) {
+  if (!analyses || analyses.length === 0) return null;
+
+  const summaryLines = analyses.map((a, i) => {
+    const bp   = a.breakpoint  != null ? a.breakpoint.toFixed(1)  : 'N/A';
+    const bp95 = a.breakpoint95 != null ? a.breakpoint95.toFixed(1) : 'N/A';
+    const sat  = a.saturationPct != null ? a.saturationPct.toFixed(1) + '%' : 'N/A';
+    const r2   = a.r2   != null ? a.r2.toFixed(4)   : 'N/A';
+    const rmse = a.rmse != null ? a.rmse.toFixed(3)  : 'N/A';
+    const L    = a.L    != null ? a.L.toFixed(2)     : 'N/A';
+    const k    = a.k    != null ? a.k.toFixed(4)     : 'N/A';
+    const x0   = a.x0   != null ? a.x0.toFixed(2)    : 'N/A';
+    const errRate = a.totalData ? a.totalData.errorRate : 0;
+    const maxTps  = Math.max(...(a.ys || [0])).toFixed(2);
+    return [
+      `Target ${i + 1}: "${a.name}" | URL: ${a.url} | Tipo: ${a.tipo}`,
+      `  Modelo logístico: L=${L} TPS, k=${k}, x0=${x0} usuarios`,
+      `  Bondad ajuste: R²=${r2}, RMSE=${rmse}`,
+      `  Breakpoint (inflexión): ${bp} usuarios [${a.breakpointType}]`,
+      `  Saturación 95%: ${bp95} usuarios`,
+      `  Saturación al máximo probado: ${sat}`,
+      `  TPS máximo observado: ${maxTps}`,
+      `  Tasa de error total: ${(errRate || 0).toFixed(2)}%`,
+    ].join('\n');
+  }).join('\n\n');
+
+  const prompt = `Actúa como consultor senior en ingeniería de rendimiento (SRE/Performance Engineering).
+Analiza los siguientes resultados de pruebas de carga no funcionales con regresión logística aplicada y proporciona un concepto profesional completo en español.
+
+${summaryLines}
+
+Estructura tu análisis en estas secciones (usa títulos con ##):
+
+## Interpretación del Modelo de Regresión
+Explica qué significa la curva logística para el comportamiento del servicio bajo carga.
+
+## Capacidad Máxima y Punto de Saturación
+Analiza el parámetro L (TPS máximo) y el breakpoint (punto de inflexión).
+
+## Nivel de Saturación Actual
+Evalúa el nivel de saturación alcanzado en las pruebas y el riesgo operacional.
+
+## Calidad del Ajuste Estadístico
+Interpreta R², RMSE y lo que implican para la confiabilidad de la proyección.
+
+## Riesgos Identificados
+Lista los riesgos específicos detectados (errores, saturación alta, curva plana, etc.).
+
+## Recomendaciones de Escalabilidad
+Da recomendaciones concretas y accionables para ingeniería de capacidad.
+
+## Diagnóstico General
+Veredicto final: Verde (servicio estable), Amarillo (requiere atención) o Rojo (acción urgente), con justificación.
+
+Sé técnico, directo y profesional. Máximo 600 palabras en total.`;
+
+  // ── Intento con OpenAI ──────────────────────────────────────────────────────
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      let OpenAI;
+      try { OpenAI = require('openai').default || require('openai'); } catch (_) {}
+      if (OpenAI) {
+        const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+        const resp = await client.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 1800,
+          temperature: 0.25,
+        });
+        const text = resp.choices[0]?.message?.content;
+        if (text) return text;
+      }
+    } catch (e) {
+      console.warn('⚠️  OpenAI no disponible para análisis PNF:', e.message);
+    }
+  }
+
+  // ── Fallback: análisis basado en reglas ─────────────────────────────────────
+  return generateRuleBasedConcept(analyses);
+}
+
+/** Análisis profesional basado en reglas cuando no hay API key de OpenAI */
+function generateRuleBasedConcept(analyses) {
+  const sections = [];
+  sections.push('## Interpretación del Modelo de Regresión');
+
+  const hasLogistic = analyses.some(a => a.tienesAjuste);
+  if (hasLogistic) {
+    sections.push(
+      'La regresión logística aplicada modela el comportamiento de saturación del servicio bajo carga incremental. ' +
+      'La curva sigue la forma sigmoide característica de sistemas con recursos limitados: crecimiento inicial rápido, ' +
+      'seguido de desaceleración hasta alcanzar la capacidad máxima teórica (parámetro L).'
+    );
+  } else {
+    sections.push(
+      'No se logró ajustar un modelo logístico con los datos disponibles (mínimo 3 escenarios requeridos). ' +
+      'Se presentan los resultados empíricos sin proyección de curva.'
+    );
+  }
+
+  sections.push('\n## Capacidad Máxima y Punto de Saturación');
+  for (const a of analyses) {
+    if (a.tienesAjuste && a.L != null && a.breakpoint != null) {
+      sections.push(
+        `**${a.name}**: Capacidad máxima estimada L = **${a.L.toFixed(2)} TPS**. ` +
+        `El breakpoint se sitúa en **${a.breakpoint.toFixed(1)} usuarios** — ` +
+        'por encima de este umbral el rendimiento marginal por usuario adicional cae significativamente. ' +
+        (a.breakpoint95 != null
+          ? `La saturación al 95% de L se alcanza alrededor de **${a.breakpoint95.toFixed(1)} usuarios**.`
+          : '')
+      );
+    }
+  }
+
+  sections.push('\n## Nivel de Saturación Actual');
+  for (const a of analyses) {
+    const sat = a.saturationPct;
+    if (sat != null) {
+      const nivel = sat >= 90 ? '🔴 CRÍTICO' : sat >= 70 ? '🟡 ELEVADO' : '🟢 NORMAL';
+      sections.push(`**${a.name}**: Saturación al **${sat.toFixed(1)}%** de la capacidad máxima. Nivel: ${nivel}.`);
+    }
+  }
+
+  sections.push('\n## Calidad del Ajuste Estadístico');
+  for (const a of analyses) {
+    if (a.r2 != null) {
+      const calidad = a.r2 >= 0.95 ? 'excelente' : a.r2 >= 0.85 ? 'buena' : a.r2 >= 0.70 ? 'aceptable' : 'pobre';
+      sections.push(
+        `**${a.name}**: R² = **${a.r2.toFixed(4)}** (${calidad}), RMSE = ${a.rmse.toFixed(3)} TPS. ` +
+        (a.r2 < 0.70
+          ? 'Se recomienda ejecutar más escenarios intermedios para mejorar la confiabilidad del modelo.'
+          : 'El modelo es confiable para proyecciones de capacidad.')
+      );
+    }
+  }
+
+  sections.push('\n## Riesgos Identificados');
+  const riesgos = [];
+  for (const a of analyses) {
+    const errRate = a.totalData ? (a.totalData.errorRate || 0) : 0;
+    if (errRate >= 5)   riesgos.push(`• **${a.name}**: Tasa de error ${errRate.toFixed(2)}% — umbral de alerta superado (≥5%).`);
+    if (errRate >= 20)  riesgos.push(`• **${a.name}**: Tasa de error crítica (${errRate.toFixed(2)}%) — servicio degradado.`);
+    if (a.saturationPct != null && a.saturationPct >= 90)
+      riesgos.push(`• **${a.name}**: Saturación al ${a.saturationPct.toFixed(0)}% — sin margen de headroom en producción.`);
+    if (a.r2 != null && a.r2 < 0.70)
+      riesgos.push(`• **${a.name}**: R² = ${a.r2.toFixed(3)} — ajuste de curva insuficiente; ejecutar más escenarios.`);
+  }
+  sections.push(riesgos.length > 0 ? riesgos.join('\n') : '• No se identificaron riesgos críticos en los datos analizados.');
+
+  sections.push('\n## Recomendaciones de Escalabilidad');
+  sections.push(
+    '• Definir el breakpoint como umbral de alerta de producción: configurar alertas cuando los usuarios concurrentes superen ese valor.\n' +
+    '• Realizar pruebas de carga hasta el 120% del breakpoint estimado para validar el comportamiento post-saturación.\n' +
+    '• Evaluar estrategias de escalado horizontal antes de alcanzar el 80% de la capacidad máxima L.\n' +
+    '• Incrementar el número de escenarios (mínimo 5) para mejorar la confiabilidad del modelo logístico.\n' +
+    '• Monitorear TPS y error rate en producción con alertas configuradas en el 75% de L.'
+  );
+
+  sections.push('\n## Diagnóstico General');
+  const overallErrors = analyses.reduce((mx, a) => {
+    const er = a.totalData ? (a.totalData.errorRate || 0) : 0;
+    return Math.max(mx, er);
+  }, 0);
+  const overallSat = analyses.reduce((mx, a) => Math.max(mx, a.saturationPct || 0), 0);
+  const overallR2  = analyses.reduce((mn, a) => a.r2 != null ? Math.min(mn, a.r2) : mn, 1);
+
+  if (overallErrors >= 20 || overallSat >= 95) {
+    sections.push('🔴 **ROJO — Acción urgente requerida.** El servicio opera con riesgo crítico de saturación o errores que comprometen la disponibilidad.');
+  } else if (overallErrors >= 5 || overallSat >= 75 || overallR2 < 0.70) {
+    sections.push('🟡 **AMARILLO — Requiere atención.** Se detectan señales de saturación o calidad del modelo insuficiente. Planificar escalado y pruebas adicionales.');
+  } else {
+    sections.push('🟢 **VERDE — Servicio estable.** Los indicadores de rendimiento están dentro de márgenes aceptables. Continuar monitoreo y establecer baseline de capacidad.');
+  }
+
+  return sections.join('\n');
+}
+
+/** Computa el análisis estadístico PNF y el concepto IA de forma asíncrona */
+async function computeStatisticalAnalysis(nfSuiteList) {
+  if (!statEngine || !nfSuiteList || nfSuiteList.length === 0) {
+    return { analyses: [], aiConcept: null };
+  }
+  const blocks   = extractAllNfBlocks(nfSuiteList);
+  const analyses = statEngine.analyzeNfBlocks(blocks);
+  const aiConcept = await generateAiConcept(analyses);
+  return { analyses, aiConcept };
+}
+
+/** Renderiza el contenido del tab "Análisis Estadístico PNF" (server-side HTML shell) */
+function renderStatisticalAnalysis(statisticalAnalysis) {
+  const { analyses, aiConcept } = statisticalAnalysis || {};
+
+  if (!analyses || analyses.length === 0) {
+    return `<div class="no-data">
+      <span>📭</span>
+      <p>No hay datos de pruebas no funcionales para analizar.</p>
+      <p>Ejecuta pruebas con <code>npx playwright test --config GenerateTest/non-functional/nf.playwright.config.ts</code> y regenera el portal.</p>
+    </div>`;
+  }
+
+  // Preparar JSON para inyectar en el cliente
+  const safeAnalyses = analyses.map(a => ({
+    name:          a.name,
+    url:           a.url,
+    tipo:          a.tipo,
+    tienesAjuste:  a.tienesAjuste,
+    L:             a.L,
+    k:             a.k,
+    x0:            a.x0,
+    r2:            a.r2,
+    rmse:          a.rmse,
+    mae:           a.mae,
+    breakpoint:    a.breakpoint,
+    breakpointType:a.breakpointType,
+    saturationPct: a.saturationPct,
+    breakpoint95:  a.breakpoint95,
+    xs:            a.xs,
+    ys:            a.ys,
+    ypred:         a.ypred,
+    residuals:     a.residuals,
+    scenarios:     a.scenarios,
+    totalData:     a.totalData,
+  }));
+
+  const aiHtml = aiConcept
+    ? aiConcept
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+        .replace(/^## (.+)$/gm, '<h4 class="ai-section-title">$1</h4>')
+        .replace(/^• (.+)$/gm, '<li>$1</li>')
+        .replace(/(<li>[\s\S]*?<\/li>)+/g, m => `<ul>${m}</ul>`)
+        .replace(/\n{2,}/g, '<br><br>')
+        .replace(/\n/g, '<br>')
+    : '<p style="color:var(--muted)">Sin concepto IA (configura OPENAI_API_KEY para habilitar el análisis).</p>';
+
+  const aiSource = process.env.OPENAI_API_KEY ? 'GPT-4o-mini (OpenAI)' : 'Análisis basado en reglas estadísticas';
+
+  let html = `<div class="mod-section" id="pnf-analysis-root">
+    <p class="mod-info">
+      Proyección estadística mediante <b>regresión logística no lineal</b> sobre los resultados de pruebas de carga.
+      Modela la saturación del servicio: <code>TPS = L / (1 + e<sup>-k(x-x₀)</sup>)</code>
+    </p>
+
+    <!-- ── Botón PDF ─────────────────────────────────────────────── -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
+      <button class="btn-pdf" onclick="downloadPnfPdf()" id="btn-pdf-pnf">
+        ⬇ Descargar Informe PDF
+      </button>
+      <span style="font-size:12px;color:var(--muted)">Incluye gráficas, parámetros estadísticos y concepto profesional</span>
+    </div>
+
+    <!-- ── Concepto IA ───────────────────────────────────────────── -->
+    <div class="ai-concept-card" id="ai-concept-block">
+      <div class="ai-concept-header">
+        <span class="ai-concept-icon">🤖</span>
+        <span class="ai-concept-title">Concepto Profesional — ${esc(aiSource)}</span>
+        <button class="ai-toggle-btn" onclick="toggleAiConcept()">Ocultar ▴</button>
+      </div>
+      <div class="ai-concept-body" id="ai-concept-body">
+        ${aiHtml}
+      </div>
+    </div>`;
+
+  // Una sección por target analizado
+  for (let i = 0; i < analyses.length; i++) {
+    const a   = analyses[i];
+    const bp  = a.breakpoint  != null ? a.breakpoint.toFixed(1)  : '—';
+    const L   = a.L           != null ? a.L.toFixed(2)           : '—';
+    const r2  = a.r2          != null ? (a.r2 * 100).toFixed(2) + '%' : '—';
+    const rmse= a.rmse        != null ? a.rmse.toFixed(3)         : '—';
+    const sat = a.saturationPct != null ? a.saturationPct.toFixed(1) + '%' : '—';
+    const bp95= a.breakpoint95  != null ? a.breakpoint95.toFixed(1) : '—';
+    const tipoIcon = a.tipo === 'SPIKE' ? '⚡' : '🔼';
+
+    html += `
+    <!-- ── Target ${i + 1} ─────────────────────────────────────── -->
+    <div class="pnf-target-block">
+      <div class="suite-header" style="border-bottom:1px solid var(--border);margin-bottom:20px;padding-bottom:14px">
+        <span class="suite-name" style="font-size:15px">${tipoIcon} ${esc(a.name)}</span>
+        <span class="nf-tipo-badge">${esc(a.tipo)}</span>
+        <span style="font-size:12px;color:var(--muted);margin-left:auto">${esc(a.url)}</span>
+      </div>
+
+      <!-- Métricas clave -->
+      <div class="pnf-kpi-row">
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">Capacidad Máx. (L)</span>
+          <span class="pnf-kpi-value" style="color:#6366f1">${L} TPS</span>
+        </div>
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">Breakpoint</span>
+          <span class="pnf-kpi-value" style="color:#059669">${bp} usuarios</span>
+          <span class="pnf-kpi-sub">${esc(a.breakpointType)}</span>
+        </div>
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">Saturación 95% en</span>
+          <span class="pnf-kpi-value" style="color:#f59e0b">${bp95} usuarios</span>
+        </div>
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">R² (bondad ajuste)</span>
+          <span class="pnf-kpi-value" style="color:${a.r2 != null && a.r2 >= 0.85 ? '#10b981' : '#f59e0b'}">${r2}</span>
+        </div>
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">RMSE</span>
+          <span class="pnf-kpi-value">${rmse} TPS</span>
+        </div>
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">Saturación al máx.</span>
+          <span class="pnf-kpi-value" style="color:${a.saturationPct != null && a.saturationPct >= 90 ? '#ef4444' : a.saturationPct != null && a.saturationPct >= 70 ? '#f59e0b' : '#10b981'}">${sat}</span>
+        </div>
+      </div>
+
+      <!-- Gráficas Chart.js -->
+      <div class="pnf-charts-grid">
+        <div class="pnf-chart-card">
+          <div class="pnf-chart-title">Regresión Logística — TPS vs Usuarios</div>
+          <div class="pnf-chart-wrap"><canvas id="chart-reg-${i}" height="220"></canvas></div>
+        </div>
+        <div class="pnf-chart-card">
+          <div class="pnf-chart-title">Residuales del Modelo</div>
+          <div class="pnf-chart-wrap"><canvas id="chart-resid-${i}" height="220"></canvas></div>
+        </div>
+        <div class="pnf-chart-card">
+          <div class="pnf-chart-title">TPS por Escenario — Zonas de Carga</div>
+          <div class="pnf-chart-wrap"><canvas id="chart-tps-${i}" height="220"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Tabla de escenarios -->
+      <table class="data-table nf-table" style="margin-top:16px">
+        <thead>
+          <tr>
+            <th>Escenario</th><th>Hilos</th><th>Peticiones</th>
+            <th>Prom(ms)</th><th>Mín(ms)</th><th>Máx(ms)</th>
+            <th>% Error</th><th>TPS real</th><th>TPS modelo</th><th>Residual</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+    for (let j = 0; j < a.scenarios.length; j++) {
+      const row    = a.scenarios[j];
+      const pred   = a.ypred   && a.ypred[j]    != null ? (+a.ypred[j]).toFixed(2)    : '—';
+      const resid  = a.residuals && a.residuals[j] != null ? (+a.residuals[j]).toFixed(2) : '—';
+      const ep     = row.errorRate !== undefined ? +row.errorRate : parseFloat(row.errorPct || '0');
+      const ec     = ep >= 20 ? 'c-fail' : ep >= 5 ? 'c-warn' : 'c-pass';
+      const residN = a.residuals && a.residuals[j] != null ? +a.residuals[j] : 0;
+      const residColor = residN >= 0 ? '#10b981' : '#ef4444';
+
+      html += `<tr>
+            <td>#${row.escenario || j + 1}</td>
+            <td>${row.hilos}</td>
+            <td>${row.peticiones}</td>
+            <td>${row.prom != null ? row.prom : '—'}</td>
+            <td>${row.min  != null ? row.min  : '—'}</td>
+            <td>${row.max  != null ? row.max  : '—'}</td>
+            <td class="${ec}">${row.errorPct || '—'}</td>
+            <td><b>${row.tps != null ? (+row.tps).toFixed(2) : '—'}</b></td>
+            <td style="color:#a78bfa">${pred}</td>
+            <td style="color:${residColor};font-weight:600">${resid}</td>
+          </tr>`;
+    }
+
+    if (a.totalData) {
+      const t = a.totalData;
+      const tEp = (t.errorRate || 0);
+      const tEc = tEp >= 20 ? 'c-fail' : tEp >= 5 ? 'c-warn' : 'c-pass';
+      html += `<tr class="nf-total-row">
+            <td><b>TOTAL</b></td><td>—</td><td>${t.peticiones}</td>
+            <td>${t.prom != null ? t.prom : '—'}</td>
+            <td>${t.min  != null ? t.min  : '—'}</td>
+            <td>${t.max  != null ? t.max  : '—'}</td>
+            <td class="${tEc}"><b>${t.errorPct}</b></td>
+            <td><b>${t.tps != null ? (+t.tps).toFixed(2) : '—'}</b></td>
+            <td>—</td><td>—</td>
+          </tr>`;
+    }
+
+    html += `</tbody></table>
+    </div>`;
+  }
+
+  html += `</div>
+  <!-- Datos del análisis para Chart.js (client-side) -->
+  <script>
+    var NF_ANALYSIS_DATA = ${JSON.stringify({ analyses: safeAnalyses })};
+  </script>`;
+
+  return html;
 }
 
 /** API: extrae pares request/response del system-out.
@@ -1447,7 +1862,7 @@ function renderModuleContent(key, suiteList, features) {
   return body + renderEvidenceGrid(suiteList);
 }
 
-function buildPortalHTML(groups, totals, generatedAt, features, allSuites) {
+function buildPortalHTML(groups, totals, generatedAt, features, allSuites, statisticalAnalysis) {
   const globalPassed = totals.tests - totals.failures - totals.errors;
   const globalRate   = totals.tests > 0 ? Math.round((globalPassed / totals.tests) * 100) : 0;
   const globalOk     = totals.failures === 0 && totals.errors === 0;
@@ -1975,7 +2390,80 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites) {
       .header,.main{padding:18px 16px;} .nav-bar{padding:0 16px;} .footer{padding:16px;}
       .cards-grid{grid-template-columns:1fr;} .metrics-grid{grid-template-columns:1fr;}
     }
+
+    /* ─── Análisis Estadístico PNF ───────────────────────────────── */
+    .btn-pdf {
+      display:inline-flex; align-items:center; gap:8px; padding:10px 20px;
+      background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff;
+      border:none; border-radius:10px; font-size:13px; font-weight:600;
+      cursor:pointer; box-shadow:0 0 18px rgba(99,102,241,.4);
+      transition:opacity .2s,transform .2s;
+    }
+    .btn-pdf:hover { opacity:.88; transform:translateY(-1px); }
+    .btn-pdf:disabled { opacity:.5; cursor:wait; }
+
+    .ai-concept-card {
+      background:linear-gradient(135deg,rgba(99,102,241,.08),rgba(139,92,246,.05));
+      border:1px solid rgba(99,102,241,.3); border-radius:14px; margin-bottom:28px; overflow:hidden;
+    }
+    .ai-concept-header {
+      display:flex; align-items:center; gap:10px; padding:14px 20px;
+      background:rgba(99,102,241,.12); border-bottom:1px solid rgba(99,102,241,.2);
+    }
+    .ai-concept-icon { font-size:20px; }
+    .ai-concept-title { font-size:14px; font-weight:700; color:#c4b5fd; flex:1; }
+    .ai-toggle-btn {
+      background:none; border:1px solid rgba(99,102,241,.4); color:#a78bfa;
+      border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer;
+    }
+    .ai-toggle-btn:hover { background:rgba(99,102,241,.15); }
+    .ai-concept-body {
+      padding:20px 24px; font-size:13px; line-height:1.8; color:var(--text);
+    }
+    .ai-section-title {
+      font-size:13px; font-weight:700; color:#c4b5fd; margin:14px 0 6px;
+      padding-left:10px; border-left:3px solid #6366f1;
+    }
+    .ai-concept-body ul { margin:6px 0 6px 20px; }
+    .ai-concept-body li { margin-bottom:4px; }
+
+    .pnf-target-block {
+      background:var(--surface); border:1px solid var(--border); border-radius:14px;
+      padding:24px; margin-bottom:28px;
+    }
+    .pnf-kpi-row {
+      display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr));
+      gap:12px; margin-bottom:24px;
+    }
+    .pnf-kpi-card {
+      background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+      padding:12px 14px; display:flex; flex-direction:column; gap:4px;
+    }
+    .pnf-kpi-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.7px; }
+    .pnf-kpi-value { font-size:20px; font-weight:700; }
+    .pnf-kpi-sub   { font-size:10px; color:var(--muted); }
+
+    .pnf-charts-grid {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+      gap:16px; margin-bottom:4px;
+    }
+    .pnf-chart-card {
+      background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+      padding:14px;
+    }
+    .pnf-chart-title { font-size:12px; font-weight:600; color:var(--muted); margin-bottom:10px; }
+    .pnf-chart-wrap  { position:relative; }
+
+    @media(max-width:768px){
+      .pnf-charts-grid { grid-template-columns:1fr; }
+      .pnf-kpi-row     { grid-template-columns:repeat(2,1fr); }
+    }
   </style>
+  <!-- Chart.js para gráficas interactivas PNF -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- jsPDF + html2canvas para exportar PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -2008,6 +2496,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites) {
   <button class="nav-btn active" id="tab-overview" onclick="showSection('overview')">📊 Resumen</button>
   ${MODULES.map(m=>`<button class="nav-btn" id="tab-${m.key}" onclick="showSection('${m.key}')">${m.icon} ${m.label}</button>`).join('\n  ')}
   <button class="nav-btn" id="tab-testsets" onclick="showSection('testsets')">🗂️ Test Sets</button>
+  <button class="nav-btn" id="tab-pnfanalysis" onclick="showSection('pnfanalysis')">📊 Análisis Estadístico PNF</button>
 </nav>
 
 <!-- ── Content ──────────────────────────────────────────── -->
@@ -2040,6 +2529,19 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites) {
       </div>
     </div>
     ${renderTestSets(allSuites)}
+  </section>
+
+  <!-- Análisis Estadístico PNF -->
+  <section id="sec-pnfanalysis" class="mod-section-wrap" style="display:none">
+    <div class="mod-header" style="--accent:#6366f1">
+      <div class="mod-title">📊 Análisis Estadístico PNF</div>
+      <div class="mod-stats-row">
+        <span class="ms-item">Regresión logística no lineal sobre resultados de pruebas de carga</span>
+        <span class="ms-sep">·</span>
+        <span class="ms-item" style="color:#6366f1">TPS = L / (1 + e<sup>-k(x-x₀)</sup>)</span>
+      </div>
+    </div>
+    ${renderStatisticalAnalysis(statisticalAnalysis)}
   </section>
 
 </main>
@@ -2128,6 +2630,254 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites) {
     const t = document.getElementById('copyToast');
     t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
+  /* ════════════════════════════════════════════════════════════════════
+     ANÁLISIS ESTADÍSTICO PNF — Chart.js + jsPDF
+     ════════════════════════════════════════════════════════════════════ */
+
+  /* Toggle del panel IA */
+  function toggleAiConcept() {
+    const body = document.getElementById('ai-concept-body');
+    const btn  = document.querySelector('.ai-toggle-btn');
+    if (!body) return;
+    const visible = body.style.display !== 'none';
+    body.style.display = visible ? 'none' : '';
+    if (btn) btn.textContent = visible ? 'Mostrar ▾' : 'Ocultar ▴';
+  }
+
+  /* Función logística para la curva de regresión */
+  function logisticFn(x, L, k, x0) {
+    const arg = Math.min(500, Math.max(-500, -k * (x - x0)));
+    return L / (1 + Math.exp(arg));
+  }
+
+  /* Paleta de colores */
+  const C = { data:'#2563EB', fit:'#DC2626', bp:'#059669', sat:'#F59E0B',
+              cap:'#7C3AED', pos:'#16A34A', neg:'#DC2626',
+              zoneOk:'#16A34A', zoneCaution:'#F59E0B', zoneRisk:'#DC2626' };
+
+  /* Inicializa todos los gráficos cuando se activa el tab */
+  const _pnfChartInstances = {};
+
+  function initPnfCharts() {
+    if (typeof Chart === 'undefined' || typeof NF_ANALYSIS_DATA === 'undefined') return;
+    const analyses = NF_ANALYSIS_DATA.analyses || [];
+
+    analyses.forEach((a, i) => {
+      if (_pnfChartInstances['reg_' + i])  { _pnfChartInstances['reg_' + i].destroy(); }
+      if (_pnfChartInstances['resid_' + i]){ _pnfChartInstances['resid_' + i].destroy(); }
+      if (_pnfChartInstances['tps_' + i])  { _pnfChartInstances['tps_' + i].destroy(); }
+
+      /* ── Gráfica 1: Regresión logística ── */
+      const ctxReg = document.getElementById('chart-reg-' + i);
+      if (ctxReg && a.xs && a.xs.length) {
+        const scatterData = a.xs.map((x, j) => ({ x, y: a.ys[j] }));
+        const xMin = Math.max(0, Math.min(...a.xs) * 0.7);
+        const xMax = Math.max(...a.xs) * 1.45;
+        const curveData = [];
+        if (a.tienesAjuste && a.L && a.k && a.x0 != null) {
+          const steps = 120;
+          for (let s = 0; s <= steps; s++) {
+            const x = xMin + (xMax - xMin) * s / steps;
+            curveData.push({ x, y: logisticFn(x, a.L, a.k, a.x0) });
+          }
+        }
+        const datasets = [
+          { type:'scatter', label:'Datos reales (TPS)', data:scatterData,
+            backgroundColor:C.data, pointRadius:7, pointHoverRadius:9,
+            borderColor:'#fff', borderWidth:1.5, order:2 }
+        ];
+        if (curveData.length) {
+          datasets.push({ type:'line', label:'Regresión logística', data:curveData,
+            borderColor:C.fit, borderWidth:2.5, pointRadius:0, fill:false, order:1, tension:0 });
+        }
+        if (a.breakpoint) {
+          datasets.push({ type:'line', label:'Breakpoint ' + a.breakpoint.toFixed(1) + ' usuarios',
+            data:[{x:a.breakpoint,y:0},{x:a.breakpoint,y:a.L||Math.max(...a.ys)*1.2}],
+            borderColor:C.bp, borderWidth:2, borderDash:[6,4], pointRadius:0, fill:false, order:0 });
+        }
+        if (a.L) {
+          datasets.push({ type:'line', label:'Cap. máx. L=' + a.L.toFixed(2),
+            data:[{x:xMin,y:a.L},{x:xMax,y:a.L}],
+            borderColor:C.cap, borderWidth:1.5, borderDash:[4,4], pointRadius:0, fill:false, order:0 });
+        }
+        _pnfChartInstances['reg_' + i] = new Chart(ctxReg, {
+          data: { datasets },
+          options: {
+            responsive:true, animation:{duration:600},
+            plugins:{
+              legend:{ labels:{ color:'#94a3b8', font:{size:11} } },
+              tooltip:{ callbacks:{ label: ctx => ctx.dataset.label + ': ' + (+ctx.parsed.y).toFixed(2) + ' TPS' } }
+            },
+            scales:{
+              x:{ type:'linear', title:{ display:true, text:'Usuarios Concurrentes', color:'#64748b' },
+                  ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' } },
+              y:{ title:{ display:true, text:'TPS', color:'#64748b' },
+                  ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' }, min:0 }
+            }
+          }
+        });
+      }
+
+      /* ── Gráfica 2: Residuales ── */
+      const ctxResid = document.getElementById('chart-resid-' + i);
+      if (ctxResid && a.residuals && a.residuals.length) {
+        const labels = a.xs.map(x => x + ' u.');
+        const resColors = a.residuals.map(r => r >= 0 ? C.pos : C.neg);
+        _pnfChartInstances['resid_' + i] = new Chart(ctxResid, {
+          type:'bar',
+          data:{ labels, datasets:[{
+            label:'Residual (real − modelo)',
+            data: a.residuals,
+            backgroundColor: resColors,
+            borderRadius: 4,
+          }]},
+          options:{
+            responsive:true, animation:{duration:600},
+            plugins:{ legend:{ labels:{ color:'#94a3b8', font:{size:11} } } },
+            scales:{
+              x:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' } },
+              y:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' },
+                  title:{ display:true, text:'TPS', color:'#64748b' } }
+            }
+          }
+        });
+      }
+
+      /* ── Gráfica 3: TPS por escenario con zonas de riesgo ── */
+      const ctxTps = document.getElementById('chart-tps-' + i);
+      if (ctxTps && a.xs && a.xs.length) {
+        const labels = a.xs.map(x => x + ' u.');
+        const bp   = a.breakpoint  || 0;
+        const bp95 = a.breakpoint95 || 0;
+        const barColors = a.xs.map(x => {
+          if (a.tienesAjuste && bp && x <= bp) return C.zoneOk;
+          if (a.tienesAjuste && bp95 && x <= bp95) return C.zoneCaution;
+          return C.zoneRisk;
+        });
+        _pnfChartInstances['tps_' + i] = new Chart(ctxTps, {
+          type:'bar',
+          data:{ labels, datasets:[{
+            label:'TPS por escenario', data: a.ys,
+            backgroundColor: barColors, borderRadius:5,
+          }]},
+          options:{
+            responsive:true, animation:{duration:600},
+            plugins:{
+              legend:{ labels:{ color:'#94a3b8', font:{size:11} } },
+              tooltip:{ callbacks:{ label: ctx => 'TPS: ' + (+ctx.parsed.y).toFixed(2) } }
+            },
+            scales:{
+              x:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' } },
+              y:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' },
+                  title:{ display:true, text:'TPS', color:'#64748b' }, min:0 }
+            }
+          }
+        });
+      }
+    });
+  }
+
+  /* Activa los charts la primera vez que se muestra el tab PNF.
+     NOTA: NO se redefine showSection (causaría recursión por hoisting).
+     Se usa un event listener sobre el botón de navegación. */
+  let _pnfChartsReady = false;
+  document.addEventListener('DOMContentLoaded', function () {
+    const pnfTab = document.getElementById('tab-pnfanalysis');
+    if (pnfTab) {
+      pnfTab.addEventListener('click', function () {
+        if (!_pnfChartsReady) {
+          setTimeout(initPnfCharts, 120);
+          _pnfChartsReady = true;
+        }
+      });
+    }
+  });
+
+  /* ── PDF download ──────────────────────────────────────────────── */
+  async function downloadPnfPdf() {
+    const btn = document.getElementById('btn-pdf-pnf');
+    if (!window.jspdf || !window.html2canvas) {
+      alert('Las librerías de PDF (jsPDF / html2canvas) no se cargaron. Verifica la conexión a internet.');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = '⏳ Generando PDF...';
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const root      = document.getElementById('pnf-analysis-root');
+      const aiBlock   = document.getElementById('ai-concept-block');
+
+      // Forzar expansión del panel IA
+      const aiBody = document.getElementById('ai-concept-body');
+      const wasHidden = aiBody && aiBody.style.display === 'none';
+      if (wasHidden) aiBody.style.display = '';
+
+      const canvas = await html2canvas(root, {
+        backgroundColor: '#111827',
+        scale: 1.6,
+        useCORS: true,
+        logging: false,
+        windowWidth: 1280,
+      });
+
+      if (wasHidden) aiBody.style.display = 'none';
+
+      const imgData = canvas.toDataURL('image/png', 0.95);
+      const pdf     = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+      const pdfW    = pdf.internal.pageSize.getWidth();
+      const pdfH    = pdf.internal.pageSize.getHeight();
+      const margin  = 10;
+      const usableW = pdfW - margin * 2;
+      const imgH    = (canvas.height / canvas.width) * usableW;
+
+      // Portada
+      pdf.setFillColor(13, 15, 26);
+      pdf.rect(0, 0, pdfW, pdfH, 'F');
+      pdf.setTextColor(194, 181, 253);
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Informe de Proyección Estadística PNF', pdfW / 2, 28, { align:'center' });
+      pdf.setFontSize(11);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('TPS = L / (1 + e^(-k*(x-x0))) — Regresión Logística No Lineal', pdfW / 2, 36, { align:'center' });
+      pdf.text('Generado: ' + new Date().toLocaleString('es-CO', { timeZone:'America/Bogota' }), pdfW / 2, 43, { align:'center' });
+
+      // Imagen del análisis (puede ocupar varias páginas)
+      let yPos = 52;
+      let remaining = imgH;
+      let srcY = 0;
+
+      while (remaining > 0) {
+        const pageH = pdfH - yPos - margin;
+        const slice = Math.min(remaining, pageH);
+        const sliceRatio = slice / imgH;
+        const srcSliceH  = canvas.height * sliceRatio;
+
+        const sliceCanvas  = document.createElement('canvas');
+        sliceCanvas.width  = canvas.width;
+        sliceCanvas.height = srcSliceH;
+        const ctx = sliceCanvas.getContext('2d');
+        ctx.drawImage(canvas, 0, srcY, canvas.width, srcSliceH, 0, 0, canvas.width, srcSliceH);
+
+        pdf.addImage(sliceCanvas.toDataURL('image/png', 0.92), 'PNG', margin, yPos, usableW, slice);
+
+        srcY      += srcSliceH;
+        remaining -= slice;
+        yPos       = margin;
+        if (remaining > 0) pdf.addPage();
+      }
+
+      pdf.save('Informe_Proyeccion_Estadistica_PNF.pdf');
+    } catch (e) {
+      alert('Error al generar el PDF: ' + e.message);
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⬇ Descargar Informe PDF';
+    }
   }
 </script>
 </body>
@@ -2253,7 +3003,7 @@ function generateCSV(suites, features, generatedAt) {
   return lines.join('\r\n');
 }
 
-function main() {
+async function main() {
   console.log('🚀 Generando portal de reportes...');
   if (!fs.existsSync(REPORT_DIR)) fs.mkdirSync(REPORT_DIR, { recursive: true });
 
@@ -2271,7 +3021,24 @@ function main() {
   const generatedAt = new Date().toLocaleString('es-CO', { timeZone:'America/Bogota', dateStyle:'medium', timeStyle:'short' });
   const features    = readFeatureFiles(FEATURES_DIR);
   console.log(`🥒 Features Gherkin encontrados: ${features.length}`);
-  const html        = buildPortalHTML(groups, totals, generatedAt, features, suites);
+
+  // ── Análisis Estadístico PNF
+  let statisticalAnalysis = { analyses: [], aiConcept: null };
+  try {
+    const nfSuites = groups['nonfunctional'] || [];
+    if (nfSuites.length > 0) {
+      console.log('📊 Computando análisis estadístico PNF...');
+      statisticalAnalysis = await computeStatisticalAnalysis(nfSuites);
+      const n = statisticalAnalysis.analyses.length;
+      const hasAI = !!statisticalAnalysis.aiConcept;
+      const src = process.env.OPENAI_API_KEY ? 'GPT-4o-mini' : 'reglas';
+      console.log('   → ' + n + ' target(s) analizados | Concepto IA: ' + (hasAI ? src : 'N/A'));
+    }
+  } catch (e) {
+    console.warn('Análisis estadístico PNF no disponible:', e.message);
+  }
+
+  const html        = buildPortalHTML(groups, totals, generatedAt, features, suites, statisticalAnalysis);
 
   fs.writeFileSync(OUT_FILE, html, 'utf-8');
   console.log(`✅ Portal generado: ${OUT_FILE}`);
@@ -2283,4 +3050,4 @@ function main() {
   openInBrowser(OUT_FILE);
 }
 
-main();
+main().catch(e => { console.error(e.message); process.exit(1); });
