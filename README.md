@@ -19,6 +19,7 @@
 11. [Tipos de prueba generados](#tipos-de-prueba-generados)
 12. [Arquitectura y agentes IA](#arquitectura-y-agentes-ia)
 13. [Auto-healing de 6 capas](#auto-healing-de-6-capas)
+
 14. [Estructura de carpetas](#estructura-de-carpetas)
 15. [Scripts de package.json](#scripts-de-packagejson)
 16. [Solución de problemas](#solución-de-problemas)

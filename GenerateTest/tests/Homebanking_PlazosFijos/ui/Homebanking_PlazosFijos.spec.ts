@@ -16,7 +16,7 @@ test('Homebanking_PlazosFijos', async ({ page }) => {
   await smartClick(page, `Plazos Fijos`);
   await smartSelect(page, `#deposit-source-account`, 'ACC002');
   await smartClick(page, `Monto a invertir`);
-  await smartFill(page, `Monto a invertir`, '1001');
+  await smartFill(page, `Monto a invertir`, '2222');
   await page.waitForTimeout(500);
   await smartSelect(page, `Plazo`, '360');
   await smartClick(page, `Crear Plazo Fijo`);
