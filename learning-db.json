@@ -324,8 +324,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 44,
-      "lastUsed": "2026-05-01T21:43:33.750Z"
+      "successCount": 46,
+      "lastUsed": "2026-05-01T23:44:47.394Z"
     },
     {
       "selector": "text=Try Again",
@@ -341,8 +341,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 59,
-      "lastUsed": "2026-05-01T21:43:42.732Z"
+      "successCount": 64,
+      "lastUsed": "2026-05-01T23:46:08.551Z"
     },
     {
       "selector": "text=Try Again",
@@ -358,8 +358,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 82,
-      "lastUsed": "2026-05-01T21:43:50.966Z"
+      "successCount": 87,
+      "lastUsed": "2026-05-01T23:46:10.275Z"
     },
     {
       "selector": "#neterrorTryAgainButton",
@@ -370,8 +370,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "text=ingresar",
-      "successCount": 43,
-      "lastUsed": "2026-05-01T21:43:53.400Z"
+      "successCount": 48,
+      "lastUsed": "2026-05-01T23:46:11.338Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -710,8 +710,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 57,
-      "lastUsed": "2026-05-01T21:43:47.596Z"
+      "successCount": 59,
+      "lastUsed": "2026-05-01T23:45:00.769Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Pago de Servicios": [
@@ -1661,43 +1661,43 @@
   "https://homebanking-demo-tests.netlify.app/|click|Plazos Fijos": [
     {
       "selector": "Plazos Fijos",
-      "successCount": 21,
-      "lastUsed": "2026-05-01T21:44:03.405Z"
+      "successCount": 23,
+      "lastUsed": "2026-05-01T23:45:17.633Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|#deposit-source-account": [
     {
       "selector": "#deposit-source-account",
-      "successCount": 21,
-      "lastUsed": "2026-05-01T21:44:06.019Z"
+      "successCount": 23,
+      "lastUsed": "2026-05-01T23:45:21.112Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto a invertir": [
     {
       "selector": "Monto a invertir",
-      "successCount": 21,
-      "lastUsed": "2026-05-01T21:44:07.312Z"
+      "successCount": 23,
+      "lastUsed": "2026-05-01T23:45:22.998Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Monto a invertir": [
     {
       "selector": "Monto a invertir",
-      "successCount": 20,
-      "lastUsed": "2026-05-01T21:44:11.626Z"
+      "successCount": 1,
+      "lastUsed": "2026-05-01T23:45:28.496Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|Plazo": [
     {
       "selector": "Plazo",
-      "successCount": 20,
-      "lastUsed": "2026-05-01T21:44:14.956Z"
+      "successCount": 21,
+      "lastUsed": "2026-05-01T23:45:32.044Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Crear Plazo Fijo": [
     {
       "selector": "Crear Plazo Fijo",
-      "successCount": 11,
-      "lastUsed": "2026-05-01T21:44:19.677Z"
+      "successCount": 12,
+      "lastUsed": "2026-05-01T23:45:34.877Z"
     }
   ],
   "https://demoqa.com/alerts|click|#promtButton": [
