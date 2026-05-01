@@ -91,37 +91,67 @@ export const NFConfig: {
 
   // ─────────────────────────────────────────────────────────────────────────────
   // PASO 1 — TARGETS ******CONFIGURAR*******
-  // Cada target genera un spec en GenerateTest/tests/<suiteName>/non-functional/
-  // Cada target puede tener su propio testType, incremental y spike.
+  //
+  // SIMULTANEIDAD: para correr Incremental + Picos al mismo tiempo (misma o
+  // diferente API) define un target por tipo de prueba. El standalone spec y los
+  // specs generados los ejecutan en paralelo automáticamente.
+  //
+  // PATRONES disponibles:
+  //   A) Misma API  → INCREMENTAL y SPIKE simultáneos
+  //   B) APIs distintas → cada una con su propio tipo de prueba
+  //   C) Solo un tipo → un único target (comportamiento anterior)
+  //
+  // Cada target genera un spec independiente en GenerateTest/tests/<suite>/non-functional/
   // ─────────────────────────────────────────────────────────────────────────────
   targets: [
 
-    // ── TARGET 1: Recording — Prueba INCREMENTAL ──────────────────────────────
-    {
-      type: 'recording',
-      recording: 'Homebanking_PlazosFijos', // Indicar el recording del flujo a cual se va a inyectar la prueba no funcional sin el .spec.ts
-      testType: 'incremental',
-      incremental: {
-        scenarios: 5,           // 5 escalones: 1 → 2 → 3 → 4 → 5 hilos
-        initialThreads: 1,      // Primer escalón: 1 usuarios concurrentes
-        finalThreads: 5,        // Último escalón: 5 usuarios concurrentes
-        durationPerScenarioSeconds: 3, // Cada escalón dura 3 segundos
-      },
-    },
+    // ════════════════════════════════════════════════════════════════════════════
+    // PATRÓN A — MISMA API con INCREMENTAL + SPIKE simultáneos
+    // Ambos targets apuntan al mismo endpoint; se lanzarán en paralelo.
+    // ════════════════════════════════════════════════════════════════════════════
 
-    // ── TARGET 2: API — Prueba de PICOS (spike) para SOAP ───────────────────────────────
+    // ── TARGET 1a: Misma API SOAP — Prueba INCREMENTAL ───────────────────────
     {
       type: 'api',
       apiSpecPath: 'GenerateTest/tests/Homebanking_PlazosFijos/api/Homebanking_PlazosFijos_Servicio_Operacion_SOAP_POST_generated.spec.ts',
       endpoint: {
-        name: 'Prueba Rendimiento Servicio SOAP PICOS',
+        name: 'SOAP Calculator — INCREMENTAL',   // nombre único → distinguible en el reporte
         method: 'POST',
         url: 'http://www.dneonline.com/calculator.asmx',
         headers: {
-          'Content-Type': 'text/xml;charset=UTF-8',   // SOAP — las claves con guión van entre comillas
-          'SOAPAction': 'http://tempuri.org/Add',      // SOAP — obligatorio para identificar la operación
-          // Si el endpoint requiere autenticación, descomentar y ajustar:
-          // 'Authorization': 'Bearer EL_TOKEN',
+          'Content-Type': 'text/xml;charset=UTF-8',
+          'SOAPAction': 'http://tempuri.org/Add',
+        },
+        body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+<soapenv:Header/>
+<soapenv:Body>
+<tem:Add>
+<tem:intA>5</tem:intA>
+<tem:intB>2</tem:intB>
+</tem:Add>
+</soapenv:Body>
+</soapenv:Envelope>`,
+      },
+      testType: 'incremental',
+      incremental: {
+        scenarios: 5,                    // 5 escalones: 1 → 2 → 3 → 4 → 5 hilos
+        initialThreads: 1,
+        finalThreads: 5,
+        durationPerScenarioSeconds: 3,
+      },
+    },
+
+    // ── TARGET 1b: Misma API SOAP — Prueba de PICOS (simultánea con 1a) ──────
+    {
+      type: 'api',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_PlazosFijos/api/Homebanking_PlazosFijos_Servicio_Operacion_SOAP_POST_generated.spec.ts',
+      endpoint: {
+        name: 'SOAP Calculator — PICOS',         // nombre único → distinguible en el reporte
+        method: 'POST',
+        url: 'http://www.dneonline.com/calculator.asmx',
+        headers: {
+          'Content-Type': 'text/xml;charset=UTF-8',
+          'SOAPAction': 'http://tempuri.org/Add',
         },
         body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
 <soapenv:Header/>
@@ -135,36 +165,40 @@ export const NFConfig: {
       },
       testType: 'spike',
       spike: {
-        threadsPerScenario: [1, 15, 4, 10, 3], // 5 picos: 1, 8, 4, 10, 3 hilos
-        durationPerScenarioSeconds: [5, 5, 5, 5, 5], // Cada pico dura 5 segundos
+        threadsPerScenario: [1, 15, 4, 10, 3],
+        durationPerScenarioSeconds: [5, 5, 5, 5, 5],
       },
     },
 
-    // Puedes agregar más targets aquí — cada uno con su propio testType:
-    // {
-    //   type: 'recording',
-    //   recording: 'OtroRecording',
-    //   testType: 'spike',
-    //   spike: { threadsPerScenario: [5, 20], durationPerScenarioSeconds: [10, 10] },
-    // },
+    // ════════════════════════════════════════════════════════════════════════════
+    // PATRÓN B — APIs DISTINTAS con tipos de prueba diferentes (simultáneas)
+    // Descomenta y ajusta si quieres probar dos endpoints distintos al mismo tiempo.
+    // ════════════════════════════════════════════════════════════════════════════
 
-// ── TARGET 3: API — Prueba de PICOS (spike) para REST ───────────────────────────────
-//Descomentarear si se necesita enviar test no funcional a REST
-//    {
-//    type: 'api',
-//    apiSpecPath: 'GenerateTest/api-testing-rest-soap/rest/Homebankink_Transferencias_ConsultaCliente_GET.spec.ts',
-//    endpoint: {
-//        name: 'Dashboard Cliente',
-//        method: 'GET',
-//        url: 'https://homebanking-demo.onrender.com/cliente/dashboard',
-//        headers: { accept: 'application/json' },
-//        },
-//        testType: 'spike',
-//        spike: {
-//        threadsPerScenario: [1, 8, 4, 10, 3],
-//        durationPerScenarioSeconds: [5, 5, 5, 5, 5],
-//        },
-//    },
+    // ── TARGET 2a: Recording UI — INCREMENTAL (diferente suite) ──────────────
+     {
+       type: 'recording',
+       recording: 'Homebanking_PlazosFijos',
+       testType: 'incremental',
+       incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
+     },
+
+    // ── TARGET 2b: API REST — PICOS (simultánea con 2a) ──────────────────────
+    // {
+    //   type: 'api',
+    //   apiSpecPath: 'GenerateTest/api-testing-rest-soap/rest/Homebankink_Transferencias_ConsultaCliente_GET.spec.ts',
+    //   endpoint: {
+    //     name: 'REST Dashboard — PICOS',
+    //     method: 'GET',
+    //     url: 'https://homebanking-demo.onrender.com/cliente/dashboard',
+    //     headers: { accept: 'application/json' },
+    //   },
+    //   testType: 'spike',
+    //   spike: {
+    //     threadsPerScenario: [1, 8, 4, 10, 3],
+    //     durationPerScenarioSeconds: [5, 5, 5, 5, 5],
+    //   },
+    // },
 
   ],
 

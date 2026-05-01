@@ -20,7 +20,9 @@ import { resolveTargets } from './utils/target-resolver';
 import { runIncrementalTest, runSpikeTest } from './core/load-engine';
 import { printSummaryTable } from './reporters/summary-reporter';
 
-test.describe.configure({ mode: 'serial' });
+// mode: 'parallel' permite que Playwright ejecute simultáneamente specs
+// generados por generate-nf-tests.ts cuando hay más de un worker disponible.
+test.describe.configure({ mode: 'parallel' });
 
 test('Prueba No Funcional — Standalone', async () => {
   test.setTimeout(0);
@@ -40,20 +42,33 @@ test('Prueba No Funcional — Standalone', async () => {
     return;
   }
 
-  console.log(`\n  📋 Targets: ${targets.length}`);
+  console.log(`\n  📋 Targets: ${targets.length} — ejecutando en PARALELO`);
   for (const t of targets) {
     console.log(`     • [${t.type.toUpperCase()}] ${t.name} → ${t.url} | Tipo: ${t.testType.toUpperCase()}`);
   }
 
-  for (const target of targets) {
-    console.log(`\n${'─'.repeat(60)}`);
-    console.log(`  📡 ${target.name} | ${target.url} | Tipo: ${target.testType.toUpperCase()}`);
+  // Todos los targets arrancan simultáneamente.
+  // Las peticiones HTTP son I/O-bound, por lo que el event loop de Node las
+  // distribuye sin bloquear: incremental y spike sobre la misma (o distinta) API
+  // generan carga concurrente real.
+  const results = await Promise.all(
+    targets.map(async (target) => {
+      console.log(`\n${'─'.repeat(60)}`);
+      console.log(`  📡 [INICIO] ${target.name} | ${target.url} | Tipo: ${target.testType.toUpperCase()}`);
 
-    // Cada target usa su propio testType, incremental y spike resueltos
-    const summaries = target.testType === 'incremental'
-      ? await runIncrementalTest(target, target.incremental, NFConfig.assertions)
-      : await runSpikeTest(target, target.spike, NFConfig.assertions);
+      const summaries = target.testType === 'incremental'
+        ? await runIncrementalTest(target, target.incremental, NFConfig.assertions)
+        : await runSpikeTest(target, target.spike, NFConfig.assertions);
 
+      return { target, summaries };
+    }),
+  );
+
+  // Imprimir todos los resúmenes una vez que todos los targets terminaron
+  console.log('\n' + '═'.repeat(60));
+  console.log('  📊 RESULTADOS FINALES');
+  console.log('═'.repeat(60));
+  for (const { target, summaries } of results) {
     printSummaryTable(target, summaries, target.testType);
   }
 

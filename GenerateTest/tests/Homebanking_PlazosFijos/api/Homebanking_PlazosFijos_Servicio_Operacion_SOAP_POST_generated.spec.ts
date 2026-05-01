@@ -25,7 +25,7 @@ test.describe('SOAP API Tests', () => {
   test('Error técnico (fallo de red / 5xx)', async ({ request }) => {
     try {
       await soapRequest(request, 'https://error-tecnico.nonexistent.invalid/', xmlBody, soapAction);
-      expect(false).toBe(true); // Forzar fallo si no se lanza error
+      expect(false).toBe(true); // Forzar fallo si no lanza error
     } catch (error) {
       expect(error).toBeDefined();
     }
@@ -37,7 +37,7 @@ test.describe('SOAP API Tests', () => {
 <soapenv:Body>
 <tem:Add>
 <tem:intA>null</tem:intA>
-<tem:intB>null</tem:intB>
+<tem:intB>2</tem:intB>
 </tem:Add>
 </soapenv:Body>
 </soapenv:Envelope>`, soapAction);
