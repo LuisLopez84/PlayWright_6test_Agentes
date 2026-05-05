@@ -1,20 +1,21 @@
 /**
  * box-api-executor.agent.ts
  *
- * Escanea BoxAPIsExecute/ (REST, SOAP y cualquier subcarpeta futura),
- * usa OpenAI para analizar cada servicio y genera specs Playwright válidas
- * en GenerateTest/tests/<Suite>/api/ o GenerateTest/tests/Solo_test_API/api/.
+ * Escanea BoxAPIsExecute/ (REST, SOAP y subcarpetas futuras),
+ * analiza cada servicio y genera specs Playwright en GenerateTest/tests/<Suite>/api/.
  *
- * Formato de los archivos fuente (.spec.ts en BoxAPIsExecute):
+ * Formato de archivos fuente (.spec.ts en BoxAPIsExecute):
  *   Línea 1 : URL / endpoint
  *   Línea 2 : (vacía, opcional)
  *   Línea 3+: body (JSON o XML)
- *   Si hay SoapAction se puede indicar en un comentario // SOAPAction: <valor>
+ *   Si hay SoapAction: comentario // SOAPAction: <valor>
  */
 
 import fs from 'fs';
 import path from 'path';
-import OpenAI from 'openai';
+// Risk 3: usar singleton compartido en lugar de instanciar OpenAI directamente
+import type OpenAI from 'openai';
+import { openai as sharedOpenai, hasOpenAI } from '../../utils/openai-client';
 import { ensureDir } from '../../utils/fs-utils';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -23,94 +24,75 @@ export type ServiceType = 'REST' | 'SOAP' | 'GraphQL' | 'gRPC' | 'UNKNOWN';
 export type HttpMethod  = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS';
 
 export interface BoxApiSpec {
-  filePath: string;
-  fileName: string;
+  filePath:    string;
+  fileName:    string;
   serviceType: ServiceType;
-  method: HttpMethod;
-  url: string;
-  body: string | null;
-  soapAction: string | null;
-  suiteName: string | null;  // null → Solo_test_API
+  method:      HttpMethod;
+  url:         string;
+  body:        string | null;
+  soapAction:  string | null;
+  suiteName:   string | null;
+  headers?:    Record<string, string>; // Risk 7: headers extraídos de curl -H
 }
 
-// ─── Parser ───────────────────────────────────────────────────────────────────
+// ─── Detección de tipo / método ───────────────────────────────────────────────
 
 function detectServiceType(folderPath: string, body: string | null): ServiceType {
   const upper = folderPath.toUpperCase();
   if (upper.includes(`${path.sep}SOAP${path.sep}`) || upper.includes('/SOAP/')) return 'SOAP';
   if (upper.includes(`${path.sep}GRAPHQL${path.sep}`) || upper.includes('/GRAPHQL/')) return 'GraphQL';
   if (upper.includes(`${path.sep}GRPC${path.sep}`) || upper.includes('/GRPC/')) return 'gRPC';
-  if (body && body.trim().startsWith('<') && body.includes('soapenv:') || body?.includes('soap:')) return 'SOAP';
+  // Risk 1 (ya corregido): OR dentro de paréntesis para que la guarda startsWith aplique a ambos
+  if (body && body.trim().startsWith('<') && (body.includes('soapenv:') || body.includes('soap:'))) return 'SOAP';
   return 'REST';
 }
 
 function detectMethod(folderName: string, fileName: string): HttpMethod {
   const upper = (folderName + '_' + fileName).toUpperCase();
-  if (upper.includes('DELETE')) return 'DELETE';
-  if (upper.includes('PATCH'))  return 'PATCH';
-  if (upper.includes('PUT'))    return 'PUT';
-  if (upper.includes('POST'))   return 'POST';
-  if (upper.includes('HEAD'))   return 'HEAD';
+  if (upper.includes('DELETE'))  return 'DELETE';
+  if (upper.includes('PATCH'))   return 'PATCH';
+  if (upper.includes('PUT'))     return 'PUT';
+  if (upper.includes('POST'))    return 'POST';
+  if (upper.includes('HEAD'))    return 'HEAD';
   if (upper.includes('OPTIONS')) return 'OPTIONS';
   return 'GET';
 }
 
 function extractSoapAction(content: string, xmlBody: string): string | null {
-  // Prioridad 1: comentario explícito // SOAPAction: <valor>
   const commentMatch = content.match(/\/\/\s*SOAPAction[:\s]+(.+)/i);
   if (commentMatch) return commentMatch[1].trim();
 
-  // Prioridad 2: namespace específico del servicio (no el estándar soap/wsdl)
-  // Busca xmlns:prefix="<ns>" donde el prefix se usa en la operación Body
   const nsPrefixMatch = xmlBody.match(/<[a-zA-Z]+:Body[^>]*>[\s\S]*?<([a-zA-Z]+):([A-Za-z0-9_]+)/);
   if (nsPrefixMatch) {
-    const prefix = nsPrefixMatch[1];
+    const prefix    = nsPrefixMatch[1];
     const operation = nsPrefixMatch[2];
     const nsForPrefix = xmlBody.match(new RegExp(`xmlns:${prefix}="([^"]+)"`));
     if (nsForPrefix) {
       const ns = nsForPrefix[1].replace(/\/$/, '');
-      // Ignorar namespaces estándar soap/wsdl
-      if (!ns.includes('xmlsoap.org') && !ns.includes('w3.org')) {
-        return `${ns}/${operation}`;
-      }
+      if (!ns.includes('xmlsoap.org') && !ns.includes('w3.org')) return `${ns}/${operation}`;
     }
-    // Si no hay namespace específico o es genérico, retornar solo la operación
     return operation;
   }
 
-  // Prioridad 3: operación dentro de Body sin prefijo
   const bareOpMatch = xmlBody.match(/<[a-zA-Z]+:Body[^>]*>[\s\S]*?<([A-Za-z0-9_]+)\s+xmlns="([^"]+)"/);
   if (bareOpMatch) {
     const operation = bareOpMatch[1];
     const ns = bareOpMatch[2].replace(/\/$/, '');
     return `${ns}/${operation}`;
   }
-
   return null;
 }
 
-// ─── Curl parser ─────────────────────────────────────────────────────────────
+// ─── Curl parser ──────────────────────────────────────────────────────────────
 
-/**
- * Extrae el body del flag -d / --data(-raw) de un comando curl.
- * Maneja bodies multi-línea envueltos en comillas simples o dobles.
- */
 function extractCurlBody(raw: string): string | null {
   const dMatch = raw.match(/(?:^|\s)(?:-d|--data(?:-raw)?)[ \t]+/m);
   if (!dMatch || dMatch.index === undefined) return null;
-
   const start = dMatch.index + dMatch[0].length;
   const rest  = raw.slice(start);
   if (!rest) return null;
-
   const q = rest[0];
-  if (q !== "'" && q !== '"') {
-    // Sin comillas: tomar hasta fin de línea
-    return rest.match(/^([^\r\n]+)/)?.[1]?.trim() ?? null;
-  }
-
-  // Buscar la comilla de cierre carácter a carácter.
-  // JSON/XML no contienen el mismo tipo de comilla que el shell usa como wrapper.
+  if (q !== "'" && q !== '"') return rest.match(/^([^\r\n]+)/)?.[1]?.trim() ?? null;
   for (let i = 1; i < rest.length; i++) {
     if (rest[i] === q) return rest.slice(1, i).trim();
   }
@@ -118,17 +100,28 @@ function extractCurlBody(raw: string): string | null {
 }
 
 /**
- * Parsea un archivo cuyo contenido es un comando curl estándar (multi-línea).
- * Extrae método HTTP, URL, body y headers relevantes.
+ * Risk 7: extrae headers del flag -H 'Name: Value' en comandos curl.
  */
+function extractCurlHeaders(raw: string): Record<string, string> {
+  const headers: Record<string, string> = {};
+  const re = /-H\s+['"]([^'"]+)['"]/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(raw)) !== null) {
+    const idx = m[1].indexOf(': ');
+    if (idx !== -1) {
+      const key = m[1].slice(0, idx).trim().toLowerCase();
+      headers[key] = m[1].slice(idx + 2).trim();
+    }
+  }
+  return headers;
+}
+
 function parseCurlCommand(filePath: string, raw: string): BoxApiSpec | null {
-  // Método HTTP: -X 'POST' / -X POST
   const methodMatch = raw.match(/-X\s+['"]?(\w+)['"]?/i);
-  let method: HttpMethod = methodMatch
+  const method: HttpMethod = methodMatch
     ? (methodMatch[1].toUpperCase() as HttpMethod)
     : detectMethod(path.basename(path.dirname(filePath)), path.basename(filePath));
 
-  // URL: primer patrón https?://... entre comillas o sin ellas
   let url = '';
   const quotedUrl = raw.match(/['"`](https?:\/\/[^'"`\s\\]+(?:\?[^'"`\s\\]*)?)[`'"]/);
   if (quotedUrl) {
@@ -138,77 +131,45 @@ function parseCurlCommand(filePath: string, raw: string): BoxApiSpec | null {
     if (bareUrl) url = bareUrl[1].replace(/[\\,;'"]+$/, '');
   }
 
-  if (!url) {
-    console.warn(`⚠️  No se encontró URL en comando curl: ${filePath}`);
-    return null;
-  }
+  if (!url) { console.warn(`⚠️ No se encontró URL en comando curl: ${filePath}`); return null; }
 
-  const body        = extractCurlBody(raw);
-  const svcType     = detectServiceType(filePath, body);
-  const soapAction  = svcType === 'SOAP' && body ? extractSoapAction(raw, body) : null;
+  const body       = extractCurlBody(raw);
+  const headers    = extractCurlHeaders(raw); // Risk 7
+  const svcType    = detectServiceType(filePath, body);
+  const soapAction = svcType === 'SOAP' && body ? extractSoapAction(raw, body) : null;
 
-  return {
-    filePath,
-    fileName: path.basename(filePath),
-    serviceType: svcType,
-    method,
-    url,
-    body,
-    soapAction,
-    suiteName: null,
-  };
+  return { filePath, fileName: path.basename(filePath), serviceType: svcType, method, url, body, soapAction, suiteName: null, headers };
 }
 
 // ─── Parser principal ─────────────────────────────────────────────────────────
 
 export function parseBoxApiFile(filePath: string): BoxApiSpec | null {
   const raw = fs.readFileSync(filePath, 'utf-8').trim();
-  if (!raw) {
-    console.warn(`⚠️  Archivo vacío, se omite: ${filePath}`);
-    return null;
-  }
+  if (!raw) { console.warn(`⚠️ Archivo vacío, se omite: ${filePath}`); return null; }
 
-  // Detectar formato curl (comienza con "curl")
   if (/^curl\b/i.test(raw)) {
     console.log(`🔧 Formato curl detectado en: ${path.basename(filePath)}`);
     return parseCurlCommand(filePath, raw);
   }
 
-  // Formato estándar: línea 1 = URL, línea 2 = vacía, líneas 3+ = body
   const lines = raw.split(/\r?\n/);
-  const url = lines[0].trim();
-  if (!url || !url.startsWith('http')) {
-    console.warn(`⚠️  Sin URL válida en línea 1 de: ${filePath}`);
-    return null;
-  }
+  const url   = lines[0].trim();
+  if (!url || !url.startsWith('http')) { console.warn(`⚠️ Sin URL válida en línea 1 de: ${filePath}`); return null; }
 
-  const bodyLines = lines.slice(2).join('\n').trim();
-  const body = bodyLines || null;
-
-  const dir      = path.dirname(filePath);
-  const method   = detectMethod(path.basename(dir), path.basename(filePath));
-  const svcType  = detectServiceType(filePath, body);
+  const bodyLines  = lines.slice(2).join('\n').trim();
+  const body       = bodyLines || null;
+  const dir        = path.dirname(filePath);
+  const method     = detectMethod(path.basename(dir), path.basename(filePath));
+  const svcType    = detectServiceType(filePath, body);
   const soapAction = svcType === 'SOAP' && body ? extractSoapAction(raw, body) : null;
 
-  return {
-    filePath,
-    fileName: path.basename(filePath),
-    serviceType: svcType,
-    method,
-    url,
-    body,
-    soapAction,
-    suiteName: null,
-  };
+  return { filePath, fileName: path.basename(filePath), serviceType: svcType, method, url, body, soapAction, suiteName: null };
 }
 
 // ─── Matching de suite ────────────────────────────────────────────────────────
 
 function normalizeName(name: string): string {
-  return name
-    .replace(/\.spec\.(ts|js)$/, '')
-    .replace(/[-\s]+/g, '_')
-    .toLowerCase();
+  return name.replace(/\.spec\.(ts|js)$/, '').replace(/[-\s]+/g, '_').toLowerCase();
 }
 
 function extractSuitePrefix(fileName: string): string {
@@ -217,8 +178,8 @@ function extractSuitePrefix(fileName: string): string {
   if (match) return match[1];
   const parts = noExt.split('_');
   if (parts.length > 2) {
-    // Si es genérico como "Servicio_Operacion_Metodo" → sin suite
-    if (/^servicio|operacion|metodo$/i.test(parts[0])) return '';
+    // Risk 6: excluir tanto keywords ES como EN genéricos
+    if (/^(?:servicio|operacion|metodo|service|operation|method)$/i.test(parts[0])) return '';
     parts.pop();
     return parts.join('_');
   }
@@ -236,15 +197,12 @@ function prefixSimilarity(a: string, b: string): number {
 function findMatchingSuite(fileName: string, suites: string[], threshold = 0.70): string | null {
   const prefix = extractSuitePrefix(fileName);
   if (!prefix) return null;
-
   const normalizedPrefix = normalizeName(prefix);
   const sorted = [...suites].sort((a, b) => b.length - a.length);
-
   for (const suite of sorted) {
     const ns = normalizeName(suite);
     if (normalizedPrefix === ns || normalizedPrefix.startsWith(ns + '_')) return suite;
   }
-
   let best: { suite: string; score: number } | null = null;
   for (const suite of sorted) {
     const score = prefixSimilarity(prefix, suite);
@@ -253,11 +211,9 @@ function findMatchingSuite(fileName: string, suites: string[], threshold = 0.70)
   return best?.suite ?? null;
 }
 
-async function findMatchingSuiteWithAI(
-  spec: BoxApiSpec,
-  suites: string[],
-  openai: OpenAI
-): Promise<string | null> {
+// Risk 3: usa sharedOpenai en lugar de recibir instancia como parámetro
+async function findMatchingSuiteWithAI(spec: BoxApiSpec, suites: string[]): Promise<string | null> {
+  if (!hasOpenAI || !sharedOpenai) return null;
   try {
     const prompt = `Eres un asistente que mapea archivos de tests de API a suites de Playwright.
 
@@ -269,7 +225,7 @@ Suites disponibles: ${JSON.stringify(suites)}
 
 Responde ÚNICAMENTE con el nombre exacto de la suite del array, o null si ninguna coincide.`;
 
-    const response = await openai.chat.completions.create({
+    const response = await sharedOpenai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0,
@@ -278,12 +234,8 @@ Responde ÚNICAMENTE con el nombre exacto de la suite del array, o null si ningu
 
     const answer = response.choices[0]?.message?.content?.trim() ?? '';
     if (!answer || answer === 'null') return null;
-
     const matched = suites.find(s => s === answer || normalizeName(s) === normalizeName(answer));
-    if (matched) {
-      console.log(`🤖 IA → suite: "${matched}" para "${spec.fileName}"`);
-      return matched;
-    }
+    if (matched) { console.log(`🤖 IA → suite: "${matched}" para "${spec.fileName}"`); return matched; }
     return null;
   } catch (err) {
     console.error('⚠️ Error IA suite matching:', err);
@@ -296,30 +248,29 @@ Responde ÚNICAMENTE con el nombre exacto de la suite del array, o null si ningu
 const IMPORT_PATH = `'../../../../ConfigurationTest/tests/utils/api-helper'`;
 
 function buildRestSpec(spec: BoxApiSpec): string {
-  const urlPath = spec.url.replace(/https?:\/\/[^/]+/, '') || '/';
-  const isJson = spec.body && !spec.body.trim().startsWith('<');
+  const urlPath  = spec.url.replace(/https?:\/\/[^/]+/, '') || '/';
+  const isJson   = spec.body && !spec.body.trim().startsWith('<');
   let bodyJson: object | null = null;
-  if (isJson && spec.body) {
-    try { bodyJson = JSON.parse(spec.body); } catch { /* keep raw */ }
-  }
+  if (isJson && spec.body) { try { bodyJson = JSON.parse(spec.body); } catch {} }
 
-  const hasBody  = spec.method !== 'GET' && spec.method !== 'DELETE' && spec.body;
+  const hasBody = spec.method !== 'GET' && spec.method !== 'DELETE' && spec.body;
   const bodyDecl = hasBody
     ? `const requestBody = ${bodyJson ? JSON.stringify(bodyJson, null, 2) : JSON.stringify(spec.body)};\n\n`
     : '';
 
-  const successHeaders = `accept: 'application/json'${hasBody ? `, 'Content-Type': 'application/json'` : ''}`;
-  const successOpts    = hasBody
+  // Risk 7: incluir headers extraídos del curl si existen
+  const curlHeaders   = spec.headers ?? {};
+  const authHeaderStr = curlHeaders['authorization'] ? `, 'Authorization': '${curlHeaders['authorization']}'` : '';
+  const successHeaders = `accept: 'application/json'${hasBody ? `, 'Content-Type': 'application/json'` : ''}${authHeaderStr}`;
+  const successOpts   = hasBody
     ? `{\n      headers: { ${successHeaders} },\n      data: requestBody\n    }`
     : `{\n      headers: { ${successHeaders} }\n    }`;
 
-  const descName = spec.fileName.replace(/\.spec\.ts$/, '');
-
-  // Error de datos: POST/PUT/PATCH → body nulo; GET/DELETE → ruta con ID inválido
+  const descName    = spec.fileName.replace(/\.spec\.ts$/, '');
   const dataErrUrl  = hasBody ? `'${spec.url}'` : `baseUrl + '/id-invalido-test-99999'`;
   const dataErrBody = hasBody
-    ? `{\n      headers: { accept: 'application/json', 'Content-Type': 'application/json' },\n      data: null\n    }`
-    : `{\n      headers: { accept: 'application/json' }\n    }`;
+    ? `{\n      headers: { accept: 'application/json', 'Content-Type': 'application/json'${authHeaderStr} },\n      data: null\n    }`
+    : `{\n      headers: { accept: 'application/json'${authHeaderStr} }\n    }`;
   const baseUrlDecl = !hasBody ? `    const baseUrl = '${spec.url}'.replace(/\\/+$/, '');\n` : '';
 
   return `import { test, expect } from '@playwright/test';
@@ -357,13 +308,12 @@ ${baseUrlDecl}    const response = await restRequest(request, '${spec.method}', 
 }
 
 function buildSoapSpec(spec: BoxApiSpec): string {
-  const xmlBody = spec.body ?? '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
+  const xmlBody    = spec.body ?? '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
   const soapAction = spec.soapAction ?? '';
   const bodyContentMatch = xmlBody.match(/<(?:[a-zA-Z]+:)?Body[^>]*>[\s\S]*?<(?:[a-zA-Z]+:)?([A-Za-z0-9_]+)/);
-  const opName = bodyContentMatch?.[1] ?? 'Operation';
+  const opName     = bodyContentMatch?.[1] ?? 'Operation';
   const soapActionArg = soapAction ? `, '${soapAction}'` : '';
-  const descName = spec.fileName.replace(/\.spec\.ts$/, '');
-
+  const descName   = spec.fileName.replace(/\.spec\.ts$/, '');
   const malformedXml = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><InvalidRequest/></soap:Body></soap:Envelope>';
 
   return `import { test, expect } from '@playwright/test';
@@ -378,7 +328,11 @@ test.describe('${descName}', () => {
     const response = await soapRequest(request, '${spec.url}', xmlBody${soapActionArg});
     expect(response.status()).toBe(200);
     const text = await response.text();
-    expect(text).toContain('${opName}');
+    // Risk 8: WSDL puede usar ${opName} o ${opName}Response como tag de respuesta
+    expect(
+      text.includes('${opName}'),
+      'Respuesta debe contener tag ${opName} o ${opName}Response'
+    ).toBe(true);
   });
 
   test('SOAP ${opName} - Error técnico (endpoint no disponible)', async ({ request }) => {
@@ -401,17 +355,22 @@ test.describe('${descName}', () => {
 `;
 }
 
-async function buildSpecWithAI(spec: BoxApiSpec, openai: OpenAI): Promise<string> {
-  const restSignature = `restRequest(request: APIRequestContext, method: 'GET'|'POST'|'PUT'|'DELETE'|'PATCH', url: string, options?: { data?: any; headers?: Record<string,string>; params?: Record<string,string> }): Promise<APIResponse>`;
-  const soapSignature = `soapRequest(request: APIRequestContext, url: string, xmlBody: string, soapAction?: string): Promise<APIResponse>`;
+// Risk 3: buildSpecWithAI usa sharedOpenai en lugar de parámetro OpenAI
+async function buildSpecWithAI(spec: BoxApiSpec): Promise<string> {
+  if (!hasOpenAI || !sharedOpenai) {
+    return spec.serviceType === 'SOAP' ? buildSoapSpec(spec) : buildRestSpec(spec);
+  }
+
+  const restSignature = `restRequest(request, method, url, options?)`;
+  const soapSignature = `soapRequest(request, url, xmlBody, soapAction?)`;
 
   const prompt = `Eres un experto en pruebas de APIs con Playwright. Genera un archivo TypeScript (.spec.ts) completo y válido.
 
-FIRMAS EXACTAS DE LAS FUNCIONES (no cambiar):
+FIRMAS EXACTAS (no cambiar):
 - REST: ${restSignature}
 - SOAP: ${soapSignature}
 
-IMPORTS REQUERIDOS (exactamente así):
+IMPORTS REQUERIDOS:
 import { test, expect } from '@playwright/test';
 import { restRequest${spec.serviceType === 'SOAP' ? ', soapRequest' : ''} } from ${IMPORT_PATH};
 
@@ -422,48 +381,41 @@ Datos del servicio:
 ${spec.body ? `- Body:\n${spec.body}` : '- Sin body'}
 ${spec.soapAction ? `- SOAPAction: ${spec.soapAction}` : ''}
 
-Ejemplo correcto para REST POST:
-  const response = await restRequest(request, 'POST', 'https://api.example.com/users', {
-    headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-    data: { name: 'John' }
-  });
-
-Ejemplo correcto para SOAP:
-  const response = await soapRequest(request, 'http://service.com/api', xmlBody, 'http://ns/Action');
-
 Requisitos:
-1. Primer parámetro de restRequest/soapRequest SIEMPRE es 'request' (el fixture de Playwright).
-2. Incluir exactamente 3 tests dentro de un test.describe:
+1. Primer parámetro de restRequest/soapRequest SIEMPRE es 'request'.
+2. Incluir EXACTAMENTE 3 tests dentro de un test.describe:
    a) Éxito (2xx) — llamada normal al endpoint real.
-   b) Error técnico (fallo de red / 5xx) — usar URL 'https://error-tecnico.nonexistent.invalid/' + try/catch, esperar errorDetected=true.
-   c) Error de datos (4xx) — para GET/DELETE: URL+'/id-invalido-test-99999'; para POST/PUT/PATCH: data:null, esperar [400,404,405,415,422,500].
-3. Para REST con body JSON, incluir aserciones de campos devueltos en el test de éxito.
-4. Para SOAP, validar tag XML de respuesta esperado en el test de éxito.
-5. NO incluir explicaciones — solo código TypeScript.`;
+   b) Error técnico — URL 'https://error-tecnico.nonexistent.invalid/' + try/catch.
+   c) Error de datos (4xx) — data:null o URL+'/id-invalido-test-99999'.
+3. NO incluir explicaciones — solo código TypeScript.`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await sharedOpenai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.2,
       max_tokens: 800,
     });
 
-    const content = response.choices[0]?.message?.content?.trim() ?? '';
-    // Extraer código del bloque markdown si lo envuelve
+    const content  = response.choices[0]?.message?.content?.trim() ?? '';
     const codeMatch = content.match(/```(?:typescript|ts)?\n?([\s\S]+?)```/);
-    const code = codeMatch ? codeMatch[1].trim() : content;
+    const code     = codeMatch ? codeMatch[1].trim() : content;
 
-    // Asegurar que el import de api-helper sea la ruta correcta
     const fixed = code.replace(
       /import\s*\{[^}]*\}\s*from\s*['"][^'"]*api-helper[^'"]*['"]\s*;?/g,
       `import { restRequest, soapRequest } from ${IMPORT_PATH};`
     );
 
-    // Verificar firma correcta: el primer arg de restRequest/soapRequest debe ser 'request'
-    const hasCorrectRestSig   = !fixed.includes('restRequest(') || /restRequest\(\s*request\s*,/.test(fixed);
-    const hasCorrectSoapSig   = !fixed.includes('soapRequest(') || /soapRequest\(\s*request\s*,/.test(fixed);
-    const hasTestAndExpect    = fixed.includes('test(') && fixed.includes('expect(');
+    const hasCorrectRestSig = !fixed.includes('restRequest(') || /restRequest\(\s*request\s*,/.test(fixed);
+    const hasCorrectSoapSig = !fixed.includes('soapRequest(') || /soapRequest\(\s*request\s*,/.test(fixed);
+    const hasTestAndExpect  = fixed.includes('test(') && fixed.includes('expect(');
+
+    // Risk 5: verificar que la IA generó exactamente 3 tests
+    const testCount = (fixed.match(/\btest\s*\(/g) || []).length;
+    if (testCount < 3) {
+      console.warn(`⚠️ IA generó ${testCount}/3 tests esperados para ${spec.fileName} — usando fallback local`);
+      return spec.serviceType === 'SOAP' ? buildSoapSpec(spec) : buildRestSpec(spec);
+    }
 
     if (hasTestAndExpect && hasCorrectRestSig && hasCorrectSoapSig) return fixed;
     console.warn('⚠️ Respuesta de IA con firma incorrecta, usando fallback local');
@@ -471,19 +423,14 @@ Requisitos:
     console.error('⚠️ Error generando spec con IA:', err);
   }
 
-  // Fallback local
   return spec.serviceType === 'SOAP' ? buildSoapSpec(spec) : buildRestSpec(spec);
 }
 
-// ─── Generación de Feature BDD ────────────────────────────────────────────────
+// ─── Feature BDD ──────────────────────────────────────────────────────────────
 
-/**
- * Genera el contenido del archivo .feature para un servicio API dado.
- * Los patrones de steps son fijos para coincidir exactamente con api-generated.steps.ts.
- */
 function buildApiFeature(spec: BoxApiSpec, baseName: string): string {
-  const displayName  = baseName.replace(/_/g, ' ');
-  const isSOAP       = spec.serviceType === 'SOAP';
+  const displayName = baseName.replace(/_/g, ' ');
+  const isSOAP      = spec.serviceType === 'SOAP';
 
   const givenStep = isSOAP
     ? `el servicio SOAP "${spec.url}" con acción "${spec.soapAction ?? ''}" está configurado para pruebas API`
@@ -512,19 +459,33 @@ Feature: API ${spec.serviceType} ${spec.method} - ${displayName}
 }
 
 /**
- * Genera el contenido del archivo de steps compartido para todos los features de API.
- * Este archivo se regenera en cada ejecución (es 100% machine-generated).
+ * Risk 9: recibe specs para embeber los body SOAP reales en un lookup table.
+ * Así el Given BDD usa el XML real del archivo fuente, no uno genérico.
  */
-function buildApiGeneratedSteps(): string {
+function buildApiGeneratedSteps(specs: BoxApiSpec[]): string {
+  // Lookup url → body SOAP real (escapado para template literal)
+  const soapEntries = specs
+    .filter(s => s.serviceType === 'SOAP' && s.body)
+    .map(s => {
+      const safe = (s.body ?? '').replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+      return `  '${s.url}': \`${safe}\`,`;
+    })
+    .join('\n');
+
+  const soapBodiesBlock = soapEntries
+    ? `\nconst SOAP_BODIES: Record<string, string> = {\n${soapEntries}\n};\n`
+    : `\nconst SOAP_BODIES: Record<string, string> = {};\n`;
+
   return `// GENERADO AUTOMÁTICAMENTE por BoxAPIsExecute — no editar manualmente
+// Para customizar, agrega el comentario "// CUSTOMIZADO" en la primera línea
+// y este archivo no será sobreescrito en el próximo npm run generate.
 import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
 import { restRequest, soapRequest } from '../../ConfigurationTest/tests/utils/api-helper';
 
 const { Given, When, Then, Before } = createBdd();
-
+${soapBodiesBlock}
 // ─── Estado por escenario ────────────────────────────────────────────────────
-// Seguro en ejecución paralela: cada worker de Playwright tiene su propio módulo.
 const _ctx: {
   type: 'REST' | 'SOAP';
   method: string;
@@ -535,25 +496,33 @@ const _ctx: {
   hasNetworkError: boolean;
 } = { type: 'REST', method: 'GET', url: '', body: null, soapAction: null, status: 0, hasNetworkError: false };
 
+// Risk 4 (ya corregido): Before resetea TODOS los campos
 Before(async () => {
-  _ctx.status = 0;
+  _ctx.type            = 'REST';
+  _ctx.method          = 'GET';
+  _ctx.url             = '';
+  _ctx.body            = null;
+  _ctx.soapAction      = null;
+  _ctx.status          = 0;
   _ctx.hasNetworkError = false;
 });
 
 // ─── Given ────────────────────────────────────────────────────────────────────
 Given('el servicio REST {string} {string} está configurado para pruebas API',
   async ({}, method: string, url: string) => {
-    _ctx.type = 'REST';
+    _ctx.type   = 'REST';
     _ctx.method = method;
-    _ctx.url = url;
+    _ctx.url    = url;
   });
 
 Given('el servicio SOAP {string} con acción {string} está configurado para pruebas API',
   async ({}, url: string, soapAction: string) => {
-    _ctx.type = 'SOAP';
-    _ctx.url = url;
+    _ctx.type       = 'SOAP';
+    _ctx.url        = url;
     _ctx.soapAction = soapAction;
-    _ctx.body = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
+    // Risk 9: usar body real del archivo fuente si está disponible
+    _ctx.body = SOAP_BODIES[url]
+      ?? '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
   });
 
 // ─── When ─────────────────────────────────────────────────────────────────────
@@ -575,11 +544,11 @@ When('ejecuto la petición API a un endpoint con error técnico', async ({ reque
     const res = await restRequest(request, _ctx.method as any,
       'https://error-tecnico.nonexistent.invalid/',
       { headers: { accept: 'application/json' } } as any);
-    _ctx.status = res.status();
+    _ctx.status          = res.status();
     _ctx.hasNetworkError = _ctx.status >= 500;
   } catch {
     _ctx.hasNetworkError = true;
-    _ctx.status = 503;
+    _ctx.status          = 503;
   }
 });
 
@@ -623,50 +592,40 @@ Then('la respuesta debe indicar error de validación de datos 4xx', async () => 
 export async function processBoxAPIsExecute(
   suiteNames: string[],
   testsOutputDir: string,
-  openaiKey?: string
+  _openaiKey?: string  // Risk 3: ignorado — se usa el singleton de openai-client.ts
 ): Promise<void> {
-  const projectRoot   = process.cwd();
-  const boxRoot       = path.join(projectRoot, 'BoxAPIsExecute');
-  const featuresDir   = path.join(projectRoot, 'GenerateTest', 'features');
-  const stepsDir      = path.join(projectRoot, 'GenerateTest', 'steps');
+  const projectRoot = process.cwd();
+  const boxRoot     = path.join(projectRoot, 'BoxAPIsExecute');
+  const featuresDir = path.join(projectRoot, 'GenerateTest', 'features');
+  const stepsDir    = path.join(projectRoot, 'GenerateTest', 'steps');
 
   if (!fs.existsSync(boxRoot)) {
-    console.log('ℹ️  BoxAPIsExecute/ no encontrado — se omite procesamiento');
+    console.log('ℹ️ BoxAPIsExecute/ no encontrado — se omite procesamiento');
     return;
   }
 
-  const openai: OpenAI | null = openaiKey
-    ? new OpenAI({ apiKey: openaiKey })
-    : null;
+  // Risk 3: usar singleton compartido
+  const hasAI = hasOpenAI && !!sharedOpenai;
+  console.log(hasAI
+    ? '🤖 OpenAI disponible — generación asistida por IA activada'
+    : '⚙️  Sin OPENAI_API_KEY — generando con lógica local');
 
-  if (openai) {
-    console.log('🤖 OpenAI disponible — generación de tramas asistida por IA activada');
-  } else {
-    console.log('⚙️  Sin OPENAI_API_KEY — generando tramas con lógica local');
-  }
-
-  // Recopilar todos los .spec.ts dentro de BoxAPIsExecute (recursivo)
+  // Recopilar todos los .spec.ts en BoxAPIsExecute (recursivo)
   const specFiles: string[] = [];
   function walk(dir: string) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (entry.isFile() && entry.name.endsWith('.spec.ts')) {
-        specFiles.push(full);
-      }
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile() && entry.name.endsWith('.spec.ts')) specFiles.push(full);
     }
   }
   walk(boxRoot);
 
-  if (!specFiles.length) {
-    console.log('ℹ️  No se encontraron archivos .spec.ts en BoxAPIsExecute/');
-    return;
-  }
-
-  console.log(`\n📦 BoxAPIsExecute: ${specFiles.length} archivo(s) encontrado(s)\n`);
+  if (!specFiles.length) { console.log('ℹ️ No se encontraron .spec.ts en BoxAPIsExecute/'); return; }
+  console.log(`\n📦 BoxAPIsExecute: ${specFiles.length} archivo(s)\n`);
 
   const SOLO_API_DIR = 'Solo_test_API';
+  const collectedSpecs: BoxApiSpec[] = []; // Risk 9: acumular para SOAP_BODIES
 
   for (const filePath of specFiles) {
     console.log(`\n🔍 Procesando: ${path.relative(projectRoot, filePath)}`);
@@ -676,55 +635,57 @@ export async function processBoxAPIsExecute(
 
     // Matching de suite
     let suite = findMatchingSuite(spec.fileName, suiteNames);
-    if (!suite && openai) {
-      suite = await findMatchingSuiteWithAI(spec, suiteNames, openai);
-    }
+    if (!suite && hasAI) suite = await findMatchingSuiteWithAI(spec, suiteNames);
 
     const targetSuite = suite ?? SOLO_API_DIR;
     spec.suiteName = targetSuite;
-
-    if (!suite) {
-      console.log(`📁 Sin suite coincidente → generando en "${SOLO_API_DIR}"`);
-    } else {
-      console.log(`✅ Suite detectada: "${suite}"`);
-    }
+    console.log(suite ? `✅ Suite detectada: "${suite}"` : `📁 Sin suite → "${SOLO_API_DIR}"`);
 
     // Generar spec content
     let specContent: string;
-    if (openai) {
+    if (hasAI) {
       console.log(`🤖 Generando trama con OpenAI para ${spec.fileName}...`);
-      specContent = await buildSpecWithAI(spec, openai);
+      specContent = await buildSpecWithAI(spec);
     } else {
       specContent = spec.serviceType === 'SOAP' ? buildSoapSpec(spec) : buildRestSpec(spec);
     }
 
-    // Determinar nombre del archivo de salida — incluye tipo+método para evitar colisiones
-    const baseName = spec.fileName.replace(/\.spec\.ts$/, '');
-    // Si el nombre ya contiene el método/tipo evitar duplicarlo
-    const methodTag  = baseName.toUpperCase().includes(spec.method)    ? '' : `_${spec.method}`;
-    const typeTag    = baseName.toUpperCase().includes(spec.serviceType) ? '' : `_${spec.serviceType}`;
-    const outFileName = `${baseName}${typeTag}${methodTag}_generated.spec.ts`;
+    // Risk 10: nombre sin sufijo _generated
+    const baseName    = spec.fileName.replace(/\.spec\.ts$/, '');
+    const methodTag   = baseName.toUpperCase().includes(spec.method)      ? '' : `_${spec.method}`;
+    const typeTag     = baseName.toUpperCase().includes(spec.serviceType)  ? '' : `_${spec.serviceType}`;
+    const outFileName = `${baseName}${typeTag}${methodTag}.spec.ts`;
 
     const targetDir = path.join(testsOutputDir, targetSuite, 'api');
     ensureDir(targetDir);
+    fs.writeFileSync(path.join(targetDir, outFileName), specContent, 'utf-8');
+    console.log(`✅ Spec generada: ${path.relative(projectRoot, path.join(targetDir, outFileName))}`);
 
-    const outPath = path.join(targetDir, outFileName);
-    fs.writeFileSync(outPath, specContent, 'utf-8');
-    console.log(`✅ Spec generada: ${path.relative(projectRoot, outPath)}`);
-
-    // ── Generar feature BDD ─────────────────────────────────────────────────
+    // Feature BDD
     ensureDir(featuresDir);
-    const featureContent  = buildApiFeature(spec, baseName);
-    const featurePath     = path.join(featuresDir, `${baseName}_api.feature`);
-    fs.writeFileSync(featurePath, featureContent, 'utf-8');
+    const featurePath = path.join(featuresDir, `${baseName}_api.feature`);
+    fs.writeFileSync(featurePath, buildApiFeature(spec, baseName), 'utf-8');
     console.log(`📄 Feature generado: ${path.relative(projectRoot, featurePath)}`);
+
+    collectedSpecs.push(spec); // Risk 9: acumular
   }
 
-  // ── Generar/actualizar steps compartidos para todos los features de API ───
+  // Risk 2: no sobreescribir api-generated.steps.ts si tiene contenido customizado
   ensureDir(stepsDir);
   const stepsPath = path.join(stepsDir, 'api-generated.steps.ts');
-  fs.writeFileSync(stepsPath, buildApiGeneratedSteps(), 'utf-8');
-  console.log(`📄 Steps API generados: ${path.relative(projectRoot, stepsPath)}`);
+  if (fs.existsSync(stepsPath)) {
+    const existing = fs.readFileSync(stepsPath, 'utf-8');
+    if (existing.includes('// CUSTOMIZADO')) {
+      console.log('⚠️ api-generated.steps.ts tiene contenido customizado — omitiendo regeneración');
+    } else {
+      // Risk 9: pasar specs para embeber SOAP bodies reales
+      fs.writeFileSync(stepsPath, buildApiGeneratedSteps(collectedSpecs), 'utf-8');
+      console.log(`📄 Steps API regenerados: ${path.relative(projectRoot, stepsPath)}`);
+    }
+  } else {
+    fs.writeFileSync(stepsPath, buildApiGeneratedSteps(collectedSpecs), 'utf-8');
+    console.log(`📄 Steps API generados: ${path.relative(projectRoot, stepsPath)}`);
+  }
 
   console.log('\n🎉 BoxAPIsExecute procesado correctamente');
 }

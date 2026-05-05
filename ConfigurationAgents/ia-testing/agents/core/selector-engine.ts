@@ -1,55 +1,95 @@
-/**
- * selector-engine.ts
- *
- * Construcción inteligente de locators a partir de etiquetas de texto.
- * Detecta el rol semántico del elemento y genera variantes de búsqueda.
- * Transversal: aplica para cualquier webapp en español/inglés.
- */
 import { Page, Locator } from '@playwright/test';
 import { generateTextVariants } from './healer-agents';
 
-type RoleType = 'textbox' | 'button' | 'spinbutton' | 'checkbox' | 'link' | 'combobox' | 'option';
+// Risk 1: 'option' eliminado — los <option> de <select> se manejan via selectOption, no getByRole
+type RoleType = 'textbox' | 'button' | 'spinbutton' | 'checkbox' | 'link' | 'combobox';
 
-// Palabras clave para detección semántica de roles
+// Palabras clave para detección semántica de roles — ES / EN / PT / FR / DE
 const ROLE_KEYWORDS: Record<RoleType, string[]> = {
+  // Risk 2: checkbox se evalúa ANTES de button para que "accept/acepto" no colisione
+  checkbox: [
+    'recordarme', 'remember', 'recuérdame',
+    'acepto', 'accept',                          // "I accept the terms" → checkbox
+    'términos', 'terms', 'termos',               // PT
+    'condiciones', 'conditions', 'condições',    // PT
+    'activo', 'active', 'ativo',                 // PT
+    'habilitado', 'enabled',
+    'zustimmen', 'akzeptieren',                  // DE
+    "j'accepte", 'accepter',                     // FR
+  ],
   textbox: [
-    'usuario', 'user', 'email', 'correo', 'contraseña', 'password', 'pass',
-    'nombre', 'name', 'apellido', 'last name', 'dirección', 'address',
-    'teléfono', 'phone', 'móvil', 'celular', 'buscar', 'search', 'comentario',
-    'descripción', 'texto', 'mensaje', 'message',
+    'usuario', 'user', 'utilizador', 'benutzer', 'utilisateur',
+    'email', 'correo', 'e-mail',
+    'contraseña', 'password', 'pass', 'pwd', 'senha', 'passwort', 'mot de passe',
+    'nombre', 'name', 'nome', 'prénom', 'vorname',
+    'apellido', 'last name', 'sobrenome', 'nachname', 'nom',
+    'dirección', 'address', 'endereço', 'adresse', 'adresa',
+    'teléfono', 'phone', 'telefone', 'telefon', 'téléphone',
+    'móvil', 'celular', 'mobile', 'handy',
+    'buscar', 'search', 'pesquisar', 'suchen', 'rechercher',
+    'comentario', 'comment', 'comentário', 'kommentar', 'commentaire',
+    'descripción', 'description', 'descrição', 'beschreibung',
+    'texto', 'text', 'tekst',
+    'mensaje', 'message', 'mensagem', 'nachricht',
   ],
   button: [
-    'ingresar', 'login', 'sign in', 'confirmar', 'confirm', 'aceptar', 'accept',
-    'guardar', 'save', 'enviar', 'send', 'submit', 'continuar', 'continue',
-    'siguiente', 'next', 'anterior', 'back', 'salir', 'logout', 'cerrar sesión',
-    'registrar', 'register', 'crear', 'create', 'agregar', 'add', 'transferir',
-    'pagar', 'pay', 'comprar', 'buy', 'ok', 'aplicar', 'apply',
+    'ingresar', 'login', 'sign in', 'entrar',
+    'confirmar', 'confirm', 'confirmar',
+    // Risk 2: 'accept' eliminado de button; queda en checkbox
+    'aceptar', 'ok',
+    'guardar', 'save', 'salvar', 'speichern', 'enregistrer',
+    'enviar', 'send', 'submit', 'enviar', 'senden', 'envoyer',
+    'continuar', 'continue', 'continuar', 'weiter', 'continuer',
+    'siguiente', 'next', 'próximo', 'weiter', 'suivant',
+    'anterior', 'back', 'anterior', 'zurück', 'retour',
+    'salir', 'logout', 'cerrar sesión', 'sair', 'déconnexion', 'abmelden',
+    'registrar', 'register', 'registrar', 'registrieren', "s'inscrire",
+    'crear', 'create', 'criar', 'erstellen', 'créer',
+    'agregar', 'add', 'adicionar', 'hinzufügen', 'ajouter',
+    'transferir', 'transfer', 'transferir', 'übertragen', 'transférer',
+    'pagar', 'pay', 'pagar', 'bezahlen', 'payer',
+    'comprar', 'buy', 'comprar', 'kaufen', 'acheter',
+    'aplicar', 'apply', 'aplicar', 'anwenden', 'appliquer',
   ],
   spinbutton: [
-    'monto', 'valor', 'amount', 'precio', 'price', 'cantidad', 'quantity',
-    'total', 'número', 'number', 'edad', 'age',
-  ],
-  checkbox: [
-    'recordarme', 'remember', 'acepto', 'accept', 'términos', 'terms',
-    'condiciones', 'conditions', 'activo', 'active', 'habilitado', 'enabled',
+    'monto', 'valor', 'amount', 'montante', 'betrag', 'montant',
+    'precio', 'price', 'preço', 'preis', 'prix',
+    'cantidad', 'quantity', 'quantidade', 'menge', 'quantité',
+    'total',
+    'número', 'number', 'número', 'nummer', 'numéro',
+    'edad', 'age', 'idade', 'alter', 'âge',
   ],
   link: [
-    'inicio de sesión', 'iniciar sesión', 'log in', 'bienvenido',
-    'olvidé', 'forgot', 'recuperar', 'recover', 'ver más', 'see more',
-    'leer más', 'read more', 'aquí', 'here', 'haga clic', 'click here',
+    'inicio de sesión', 'iniciar sesión', 'log in', 'entrar',
+    'bienvenido', 'welcome', 'bem-vindo', 'willkommen', 'bienvenu',
+    'olvidé', 'forgot', 'esqueci', 'vergessen', 'oublié',
+    'recuperar', 'recover', 'recuperar', 'wiederherstellen', 'récupérer',
+    'ver más', 'see more', 'ver mais', 'mehr sehen', 'voir plus',
+    'leer más', 'read more', 'ler mais', 'mehr lesen', 'lire plus',
+    'aquí', 'here', 'aqui', 'hier', 'ici',
+    'haga clic', 'click here',
   ],
   combobox: [
-    'selecciona', 'select', 'elige', 'choose', 'tipo', 'type', 'categoría',
-    'category', 'estado', 'status', 'país', 'country', 'ciudad', 'city',
+    'selecciona', 'select', 'selecione', 'auswählen', 'sélectionner',
+    'elige', 'choose', 'escolha', 'wählen', 'choisir',
+    'tipo', 'type', 'tipo', 'typ', 'type',
+    'categoría', 'category', 'categoria', 'kategorie', 'catégorie',
+    'estado', 'status', 'estado', 'status', 'état',
+    'país', 'country', 'país', 'land', 'pays',
+    'ciudad', 'city', 'cidade', 'stadt', 'ville',
   ],
-  option: [],
 };
+
+// Risk 2: checkbox ahora es la primera entrada en ROLE_KEYWORDS — pero el orden
+// de evaluación en detectRole sigue la inserción del objeto. Para garantizarlo,
+// iteramos en un orden explícito que coloca checkbox ANTES de button.
+const DETECTION_ORDER: RoleType[] = ['checkbox', 'textbox', 'button', 'spinbutton', 'combobox', 'link'];
 
 function detectRole(label: string): RoleType | null {
   const lower = label.toLowerCase();
-  for (const [role, keywords] of Object.entries(ROLE_KEYWORDS)) {
-    if (keywords.some(k => lower.includes(k))) {
-      return role as RoleType;
+  for (const role of DETECTION_ORDER) {
+    if (ROLE_KEYWORDS[role].some(k => lower.includes(k))) {
+      return role;
     }
   }
   return null;
@@ -61,15 +101,11 @@ function escapeRegex(text: string): string {
 
 export class SelectorEngine {
 
-  /**
-   * Construye un locator compuesto con múltiples estrategias y variantes de texto.
-   * Usado por smart-actions como último fallback cuando los selectores primarios fallan.
-   */
   static build(page: Page, label: string): Locator {
-    const role = detectRole(label);
+    const role     = detectRole(label);
     const variants = generateTextVariants(label);
 
-    // ── Estrategia base: por rol detectado ──
+    // ── Estrategia base: por rol detectado ──────────────────────────────────
     if (role) {
       let loc = page.getByRole(role as any, { name: label })
         .or(page.getByRole(role as any, { name: new RegExp(escapeRegex(label), 'i') }))
@@ -77,8 +113,8 @@ export class SelectorEngine {
         .or(page.getByPlaceholder(label))
         .or(page.getByText(label, { exact: false }));
 
-      // Añadir variantes
-      for (const variant of variants.slice(0, 6)) {
+      // Risk 3: limitado a 4 variantes → máx ~13 estrategias en el OR chain
+      for (const variant of variants.slice(0, 4)) {
         loc = loc
           .or(page.getByRole(role as any, { name: new RegExp(escapeRegex(variant), 'i') }))
           .or(page.getByText(variant, { exact: false }));
@@ -86,18 +122,19 @@ export class SelectorEngine {
       return loc.first();
     }
 
-    // ── Estrategia genérica: todos los roles clickeables ──
+    // ── Estrategia genérica: todos los roles clickeables ────────────────────
+    // Risk 4: reemplazado `nav >> text=` (sintaxis legacy) por locator chaining
     let loc = page.getByRole('button', { name: label })
       .or(page.getByRole('link', { name: label }))
-      .or(page.locator(`nav >> text=${label}`))
+      .or(page.locator('nav').getByText(label))
       .or(page.getByLabel(label))
       .or(page.getByPlaceholder(label))
       .or(page.getByText(label, { exact: false }));
 
-    // Añadir variantes de texto al OR chain
-    for (const variant of variants.slice(0, 8)) {
+    // Risk 3: limitado a 5 variantes → máx ~21 estrategias en el OR chain
+    for (const variant of variants.slice(0, 5)) {
       loc = loc
-        .or(page.getByRole('link', { name: new RegExp(escapeRegex(variant), 'i') }))
+        .or(page.getByRole('link',   { name: new RegExp(escapeRegex(variant), 'i') }))
         .or(page.getByRole('button', { name: new RegExp(escapeRegex(variant), 'i') }))
         .or(page.getByText(variant, { exact: false }));
     }

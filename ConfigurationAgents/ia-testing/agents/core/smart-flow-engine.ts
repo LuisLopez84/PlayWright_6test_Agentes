@@ -1,72 +1,116 @@
-export function enhanceFlow(steps: any[]) {
+import { Action } from '../../types/action.types';
 
-  const enhancedSteps: any[] = [];
+// ─── Types (Risk 8) ───────────────────────────────────────────────────────────
+
+export interface EnhancedStep {
+  action: string;
+  target?: string;
+  value?: string;
+  url?: string;
+  [key: string]: unknown;
+}
+
+// ─── Keywords / Sets ──────────────────────────────────────────────────────────
+
+// Risk 3: keywords multilingüe ES / EN / PT / FR / DE
+const CONFIRMATION_KEYWORDS = [
+  'confirmar', 'confirm',
+  'aceptar', 'accept',
+  'ok',
+  'submit', 'enviar', 'send',
+  'yes', 'sí', 'si',
+  'confirmer', 'bestätigen',   // FR / DE
+  'confirmar', 'sim',          // PT
+];
+
+// Risk 4: etiquetas que son botones de acción, no ítems de menú
+const BUTTON_LABELS = new Set([
+  'ingresar', 'login', 'sign in',
+  'confirmar', 'confirm', 'aceptar', 'accept', 'ok',
+  'guardar', 'save', 'enviar', 'send', 'submit',
+  'continuar', 'continue', 'siguiente', 'next',
+  'anterior', 'back', 'salir', 'logout', 'cerrar sesión',
+  'registrar', 'register', 'crear', 'create',
+  'agregar', 'add', 'pagar', 'pay', 'comprar', 'buy',
+  'aplicar', 'apply',
+]);
+
+// Risk 6: conjunto completo de acciones de formulario según Playwright recorder
+const FORM_ACTIONS = new Set([
+  'input', 'select', 'fill', 'type', 'check', 'upload', 'setInputFiles',
+]);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function isNavigationStep(step: Action, prev: Action | undefined): boolean {
+  const a = step.action ?? step.type ?? '';
+  return a === 'page_load' || a === 'goto' ||
+    (!prev && a === 'click');
+}
+
+function isConfirmation(step: Action): boolean {
+  const target = (step.target ?? '').toLowerCase();
+  return CONFIRMATION_KEYWORDS.some(k => target.includes(k));
+}
+
+// Risk 4: reemplaza heurística length < 30 por conteo de palabras + exclusión de botones
+function isMenuClick(step: Action): boolean {
+  const a = step.action ?? step.type ?? '';
+  if (a !== 'click') return false;
+  if (!step.target) return false;
+  const lower = step.target.toLowerCase().trim();
+  if (BUTTON_LABELS.has(lower)) return false;
+  if (isConfirmation(step)) return false;
+  // Ítems de menú: etiqueta corta (1-4 palabras), sin estructura de oración
+  const wordCount = lower.split(/\s+/).length;
+  return wordCount >= 1 && wordCount <= 4;
+}
+
+function isFormStep(step: Action): boolean {
+  const a = step.action ?? step.type ?? '';
+  return FORM_ACTIONS.has(a);
+}
+
+// ─── Export ───────────────────────────────────────────────────────────────────
+
+/**
+ * Enriquece los pasos parseados con semántica de flujo:
+ * context_change | confirm | navigate_section | form fields | fallback.
+ *
+ * Risk 1 & 5: cadena if/else if/else garantiza exactamente UNA entrada por step.
+ */
+export function enhanceFlow(steps: Action[]): EnhancedStep[] {
+  const result: EnhancedStep[] = [];
 
   for (let i = 0; i < steps.length; i++) {
-
     const step = steps[i];
     const prev = steps[i - 1];
 
-    // 🔥 DETECTAR CAMBIO DE CONTEXTO (pantalla)
     if (isNavigationStep(step, prev)) {
-      enhancedSteps.push({
-        action: "context_change",
-        target: step.target || step.url
+      result.push({
+        action: 'context_change',
+        target: step.target ?? step.url,
       });
-    }
-
-    // 🔥 DETECTAR MENÚ (como Transferencias)
-    if (isMenuClick(step)) {
-      enhancedSteps.push({
-        action: "navigate_section",
-        target: step.target
-      });
-    }
-
-    // 🔥 DETECTAR FORMULARIO
-    if (isFormStep(step)) {
-      enhancedSteps.push({
-        action: step.action,
+    } else if (isConfirmation(step)) {
+      result.push({
+        action: 'confirm',
         target: step.target,
-        value: step.value
       });
-    }
-
-    // 🔥 DETECTAR CONFIRMACIONES
-    if (isConfirmation(step)) {
-      enhancedSteps.push({
-        action: "confirm",
-        target: step.target
+    } else if (isMenuClick(step)) {
+      result.push({
+        action: 'navigate_section',
+        target: step.target,
       });
-    }
-
-    // fallback
-    else {
-      enhancedSteps.push(step);
+    } else if (isFormStep(step)) {
+      result.push({
+        action: step.action ?? step.type ?? '',
+        target: step.target,
+        value:  step.value,
+      });
+    } else {
+      result.push({ ...step } as EnhancedStep);
     }
   }
 
-  return enhancedSteps;
-}
-
-
-// ---------------- HELPERS ----------------
-
-function isNavigationStep(step: any, prev: any) {
-  return step.action === "page_load" || (!prev && step.action === "click");
-}
-
-function isMenuClick(step: any) {
-  return step.action === "click" &&
-    step.target &&
-    step.target.length < 30 &&
-    !["Ingresar", "Confirmar"].includes(step.target);
-}
-
-function isFormStep(step: any) {
-  return step.action === "input" || step.action === "select";
-}
-
-function isConfirmation(step: any) {
-  return step.target?.toLowerCase().includes("confirmar");
+  return result;
 }

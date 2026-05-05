@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { restRequest, soapRequest } from '../../../../ConfigurationTest/tests/utils/api-helper';
 
 test.describe('SOAP API Tests', () => {
-  const url = 'http://www.dneonline.com/calculator.asmx';
+  const soapUrl = 'http://www.dneonline.com/calculator.asmx';
   const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
 <soapenv:Header/>
 <soapenv:Body>
@@ -14,15 +14,14 @@ test.describe('SOAP API Tests', () => {
 </soapenv:Envelope>`;
   const soapAction = 'http://tempuri.org/Add';
 
-  test('Éxito (2xx) - llamada normal al endpoint real', async ({ request }) => {
-    const response = await soapRequest(request, url, xmlBody, soapAction);
-    expect(response.status()).toBeGreaterThanOrEqual(200);
-    expect(response.status()).toBeLessThan(300);
+  test('Éxito - llamada normal al endpoint real', async ({ request }) => {
+    const response = await soapRequest(request, soapUrl, xmlBody, soapAction);
+    expect(response.status()).toBe(200);
     const responseBody = await response.text();
     expect(responseBody).toContain('<AddResult>7</AddResult>');
   });
 
-  test('Error técnico (fallo de red / 5xx)', async ({ request }) => {
+  test('Error técnico - fallo de red', async ({ request }) => {
     try {
       await soapRequest(request, 'https://error-tecnico.nonexistent.invalid/', xmlBody, soapAction);
     } catch (error) {
@@ -31,8 +30,8 @@ test.describe('SOAP API Tests', () => {
     }
   });
 
-  test('Error de datos (4xx)', async ({ request }) => {
-    const response = await soapRequest(request, url, `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+  test('Error de datos - datos inválidos', async ({ request }) => {
+    const response = await soapRequest(request, soapUrl, `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
 <soapenv:Header/>
 <soapenv:Body>
 <tem:Add>

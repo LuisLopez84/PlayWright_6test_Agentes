@@ -10,26 +10,70 @@ import { Page } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
 import { openai } from '../../utils/openai-client';
+import { learningStore } from './learning-store';
 
 // ─────────────────────────────────────────────
 // PERSISTENCIA
 // ─────────────────────────────────────────────
-const HEALER_DB = path.join(process.cwd(), 'healer-db.json');
+const HEALER_DB    = path.join(process.cwd(), 'healer-db.json');
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 días — invalida entradas obsoletas
+const MAX_ENTRIES  = 500;                        // evita crecimiento indefinido del archivo
 
-function loadDB(): Record<string, string> {
+interface HealerEntry { selector: string; savedAt: number; }
+type RawDB = Record<string, HealerEntry | string>; // string = formato legacy
+
+function loadDB(): Record<string, HealerEntry> {
   if (!fs.existsSync(HEALER_DB)) return {};
-  try { return JSON.parse(fs.readFileSync(HEALER_DB, 'utf-8')); } catch { return {}; }
+  try {
+    const raw: RawDB = JSON.parse(fs.readFileSync(HEALER_DB, 'utf-8'));
+    const now = Date.now();
+    const result: Record<string, HealerEntry> = {};
+    for (const [key, val] of Object.entries(raw)) {
+      // Migrar entradas legacy (string) al nuevo formato con timestamp
+      const entry: HealerEntry = typeof val === 'string'
+        ? { selector: val, savedAt: now }
+        : val;
+      // Descartar entradas expiradas (TTL de 7 días)
+      if (now - entry.savedAt < CACHE_TTL_MS) {
+        result[key] = entry;
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
 }
 
-function saveHealing(original: string, healed: string): void {
+function saveHealing(original: string, healed: string, page?: Page, action?: string): void {
   const db = loadDB();
-  db[original] = healed;
-  fs.writeFileSync(HEALER_DB, JSON.stringify(db, null, 2));
+  db[original] = { selector: healed, savedAt: Date.now() };
+
+  // Limitar tamaño: conservar solo las MAX_ENTRIES más recientes
+  const entries = Object.entries(db);
+  const finalDB = entries.length > MAX_ENTRIES
+    ? Object.fromEntries(
+        entries
+          .sort((a, b) => a[1].savedAt - b[1].savedAt)
+          .slice(entries.length - MAX_ENTRIES)
+      )
+    : db;
+
+  fs.writeFileSync(HEALER_DB, JSON.stringify(finalDB, null, 2));
+
+  // Sincronizar con learning-db.json para que smart-actions también aprenda
+  if (page && !page.isClosed() && action) {
+    try {
+      learningStore.recordSuccess(
+        { url: page.url(), action, targetText: original },
+        healed
+      );
+    } catch { /* no crítico — continuar sin sync */ }
+  }
 }
 
 function getCachedHealing(original: string): string | null {
   const db = loadDB();
-  return db[original] || null;
+  return db[original]?.selector ?? null;
 }
 
 // ─────────────────────────────────────────────
@@ -132,10 +176,15 @@ function escapeRegex(text: string): string {
 async function isLocatorValid(page: Page, selector: string): Promise<boolean> {
   if (!selector || page.isClosed()) return false;
   try {
-    const loc = page.locator(selector);
+    const loc   = page.locator(selector);
     const count = await loc.count();
     if (count === 0) return false;
-    return await loc.first().isVisible().catch(() => false);
+    const first = loc.first();
+    if (!await first.isVisible().catch(() => false)) return false;
+    // Verificar que el elemento sea interaccionable (no disabled)
+    // Fallback true: algunos elementos (links, divs) no tienen concepto de "enabled"
+    if (!await first.isEnabled().catch(() => true)) return false;
+    return true;
   } catch {
     return false;
   }
@@ -364,7 +413,7 @@ async function tryScrollAndReveal(page: Page, selector: string): Promise<string 
         return byText ? getComputedStyle(byText).display !== 'none' : false;
       },
       selector,
-      { timeout: 6000 },
+      { timeout: 3000 },
     );
 
     // Revisar de nuevo después del lazy rendering
@@ -408,31 +457,37 @@ async function tryScrollAndReveal(page: Page, selector: string): Promise<string 
 // ─────────────────────────────────────────────
 async function extractRelevantHTML(page: Page, hint: string): Promise<string> {
   try {
-    const fullHTML = await page.content();
-
-    // Intentar extraer solo la sección relevante (menú nav, header, form, etc.)
     const hintLower = hint.toLowerCase();
-    const isNav = hintLower.includes('menú') || hintLower.includes('menu') ||
-      hintLower.includes('inicio') || hintLower.includes('sesión') ||
-      hintLower.includes('login') || hintLower.includes('bienvenido');
-    const isForm = hintLower.includes('usuario') || hintLower.includes('contraseña') ||
-      hintLower.includes('email') || hintLower.includes('password') ||
-      hintLower.includes('ingresar') || hintLower.includes('registrar');
+    const isNav  = hintLower.includes('menú')  || hintLower.includes('menu')     ||
+                   hintLower.includes('inicio') || hintLower.includes('sesión')   ||
+                   hintLower.includes('login')  || hintLower.includes('bienvenido');
+    const isForm = hintLower.includes('usuario')    || hintLower.includes('contraseña') ||
+                   hintLower.includes('email')       || hintLower.includes('password')   ||
+                   hintLower.includes('ingresar')    || hintLower.includes('registrar');
 
     if (isNav) {
-      // Extraer nav/header donde suelen estar los links de login
-      const navMatch = fullHTML.match(/<(?:nav|header)[^>]*>[\s\S]{0,3000}?<\/(?:nav|header)>/i);
-      if (navMatch) return navMatch[0].substring(0, 3000);
-    }
-    if (isForm) {
-      const formMatch = fullHTML.match(/<form[^>]*>[\s\S]{0,3000}?<\/form>/i);
-      if (formMatch) return formMatch[0].substring(0, 3000);
+      // DOM query — maneja correctamente nav/header anidados sin regex
+      const navHTML = await page.evaluate(() => {
+        const el = document.querySelector('nav, header');
+        return el ? el.outerHTML.substring(0, 3000) : null;
+      }).catch(() => null);
+      if (navHTML) return navHTML;
     }
 
-    // Fallback: primeros 4000 caracteres del body
-    const bodyMatch = fullHTML.match(/<body[^>]*>([\s\S]{0,4000})/i);
-    if (bodyMatch) return bodyMatch[1];
-    return fullHTML.substring(0, 4000);
+    if (isForm) {
+      // DOM query — maneja formularios anidados correctamente
+      const formHTML = await page.evaluate(() => {
+        const el = document.querySelector('form');
+        return el ? el.outerHTML.substring(0, 3000) : null;
+      }).catch(() => null);
+      if (formHTML) return formHTML;
+    }
+
+    // Fallback: primeros 4000 caracteres del body vía DOM
+    const bodyHTML = await page.evaluate(
+      () => document.body ? document.body.innerHTML.substring(0, 4000) : ''
+    ).catch(() => '');
+    return bodyHTML || '<error extracting HTML>';
   } catch {
     return '<error extracting HTML>';
   }
@@ -525,7 +580,7 @@ export async function healSelector(
   const textVariant = await tryTextVariants(page, originalSelector);
   if (textVariant) {
     console.log(`✏️ Healing por variante de texto: ${textVariant}`);
-    saveHealing(originalSelector, textVariant);
+    saveHealing(originalSelector, textVariant, page, action);
     return textVariant;
   }
 
@@ -533,7 +588,7 @@ export async function healSelector(
   const structural = await tryStructuralStrategies(page, originalSelector);
   if (structural) {
     console.log(`🏗️ Healing estructural: ${structural}`);
-    saveHealing(originalSelector, structural);
+    saveHealing(originalSelector, structural, page, action);
     return structural;
   }
 
@@ -541,7 +596,7 @@ export async function healSelector(
   const scrolled = await tryScrollAndReveal(page, originalSelector);
   if (scrolled) {
     console.log(`📜 Healing por scroll: ${scrolled}`);
-    saveHealing(originalSelector, scrolled);
+    saveHealing(originalSelector, scrolled, page, action);
     return scrolled;
   }
 
@@ -549,7 +604,7 @@ export async function healSelector(
   const aiSelector = await healSelectorWithAI(page, originalSelector, action, value);
   if (aiSelector && await isLocatorValid(page, aiSelector)) {
     console.log(`🧠 Healing por IA: ${aiSelector}`);
-    saveHealing(originalSelector, aiSelector);
+    saveHealing(originalSelector, aiSelector, page, action);
     return aiSelector;
   }
 
@@ -578,35 +633,41 @@ export async function healSelector(
     try {
       if (await isLocatorValid(page, fb)) {
         console.log(`🔄 Fallback genérico exitoso: ${fb}`);
-        saveHealing(originalSelector, fb);
+        saveHealing(originalSelector, fb, page, action);
         return fb;
       }
     } catch {}
   }
 
-  // 7️⃣ Último recurso: texto visible más cercano en cualquier elemento interactivo
+  // 7️⃣ Último recurso: texto visible — una sola llamada DOM (15 elementos visibles)
   try {
-    const interactives = page.locator('button, a, [role="button"], [role="link"], input, textarea, select, [tabindex]');
-    const count = await interactives.count();
-    for (let i = 0; i < Math.min(count, 30); i++) {
-      const el = interactives.nth(i);
-      const text = await el.textContent().catch(() => null) || '';
-      const label = await el.getAttribute('aria-label').catch(() => null) || '';
-      const placeholder = await el.getAttribute('placeholder').catch(() => null) || '';
-      const combined = `${text} ${label} ${placeholder}`.toLowerCase();
-      const originalLower = originalSelector.toLowerCase();
-      const words = originalLower.split(/\s+/).filter(w => w.length > 2);
+    type ElemData = { text: string; label: string; placeholder: string; id: string };
+    const elements: ElemData[] = await page.evaluate(() => {
+      const sel = 'button:not([disabled]), a, [role="button"], [role="link"], ' +
+                  'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]';
+      return Array.from(document.querySelectorAll(sel))
+        .filter(el => (el as HTMLElement).offsetParent !== null)
+        .slice(0, 15)
+        .map(el => ({
+          text:        ((el as HTMLElement).innerText || el.textContent || '').trim().substring(0, 100),
+          label:       el.getAttribute('aria-label')   || '',
+          placeholder: el.getAttribute('placeholder')  || '',
+          id:          el.getAttribute('id')            || '',
+        }));
+    }).catch(() => [] as ElemData[]);
+
+    const originalLower = originalSelector.toLowerCase();
+    const words = originalLower.split(/\s+/).filter(w => w.length > 2);
+
+    for (const data of elements) {
+      const combined = `${data.text} ${data.label} ${data.placeholder}`.toLowerCase();
       const matchCount = words.filter(w => combined.includes(w)).length;
       if (matchCount > 0 && matchCount >= Math.ceil(words.length * 0.6)) {
-        const isVis = await el.isVisible().catch(() => false);
-        if (isVis) {
-          const id = await el.getAttribute('id').catch(() => null);
-          const elSel = id ? `#${id}` : `text=${text.trim().substring(0, 30)}`;
-          if (elSel && await isLocatorValid(page, elSel)) {
-            console.log(`🎯 Fallback por texto visible: ${elSel}`);
-            saveHealing(originalSelector, elSel);
-            return elSel;
-          }
+        const elSel = data.id ? `#${data.id}` : `text=${data.text.substring(0, 30)}`;
+        if (elSel && await isLocatorValid(page, elSel)) {
+          console.log(`🎯 Fallback por texto visible: ${elSel}`);
+          saveHealing(originalSelector, elSel, page, action);
+          return elSel;
         }
       }
     }

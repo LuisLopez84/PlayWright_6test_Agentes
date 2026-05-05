@@ -1,8 +1,9 @@
-import { extractBaseURL } from '../utils/url-extractor';
+import { extractBaseURL, GOTO_RE } from '../utils/url-extractor';
 import fs from 'fs';
 import path from 'path';
 import 'dotenv/config';
-import OpenAI from 'openai';
+import { openai as sharedOpenai, hasOpenAI } from '../utils/openai-client';
+import { Action } from '../types/action.types'; // Risk 1: usar tipo canónico
 
 import { parseRecording } from '../agents/recorder/recorder-parser-agent';
 import { generateUITest } from '../agents/generators/ui-agent';
@@ -16,6 +17,8 @@ import { processBoxAPIsExecute } from '../agents/network/box-api-executor.agent'
 
 import { ensureDir } from '../utils/fs-utils';
 import { buildFeature, generateStepsFromGherkin } from '../agents/core/generator-agent';
+import { validateFlow } from '../agents/core/flow-validator';
+import { enhanceFlow } from '../agents/core/smart-flow-engine';
 
 // ============================================================
 // Utilidades de matching de nombres de suite
@@ -115,13 +118,12 @@ async function findMatchingSuiteWithAI(
   fileName: string,
   suites: string[]
 ): Promise<string | null> {
-  if (!process.env.OPENAI_API_KEY) {
+  if (!hasOpenAI || !sharedOpenai) {
     console.log('⚠️  OPENAI_API_KEY no configurada — fallback IA omitido');
     return null;
   }
 
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const prompt = `Eres un asistente que mapea nombres de archivos de tests de API a sus suites de Playwright.
 
 Archivo de test: "${fileName}"
@@ -134,7 +136,7 @@ porque "Transf" es abreviación de "Transfer".
 Responde ÚNICAMENTE con el nombre exacto de la suite del array (sin comillas extra, sin explicación).
 Si ninguna suite coincide razonablemente, responde null.`;
 
-    const response = await openai.chat.completions.create({
+    const response = await sharedOpenai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0,
@@ -176,10 +178,22 @@ function fixApiHelperImport(content: string): string {
 
 /**
  * Elimina directorios en GenerateTest/tests/ que no correspondan a ninguna suite conocida.
- * Esto limpia carpetas generadas erróneamente en ejecuciones anteriores.
+ * Risk 7: operación destructiva — controlada por env vars:
+ *   SKIP_ORPHAN_CLEANUP=true  — deshabilita la limpieza completamente
+ *   CLEANUP_DRY_RUN=true      — lista qué se eliminaría sin borrar nada
  */
 function cleanupOrphanSuiteDirs(testsOutputDir: string, validSuites: string[]): void {
   if (!fs.existsSync(testsOutputDir)) return;
+
+  // Risk 7: permitir deshabilitar la limpieza para evitar pérdidas accidentales
+  if (process.env.SKIP_ORPHAN_CLEANUP === 'true') {
+    console.log('⏭️  Limpieza de directorios huérfanos omitida (SKIP_ORPHAN_CLEANUP=true)');
+    return;
+  }
+
+  const DRY_RUN = process.env.CLEANUP_DRY_RUN === 'true';
+  if (DRY_RUN) console.log('🔍 [DRY RUN] Directorios huérfanos que se eliminarían:');
+
   const existingDirs = fs.readdirSync(testsOutputDir, { withFileTypes: true })
     .filter(d => d.isDirectory())
     .map(d => d.name);
@@ -189,14 +203,20 @@ function cleanupOrphanSuiteDirs(testsOutputDir: string, validSuites: string[]): 
   for (const dir of existingDirs) {
     if (!validNormalized.has(normalizeName(dir))) {
       const dirPath = path.join(testsOutputDir, dir);
-      try {
-        fs.rmSync(dirPath, { recursive: true, force: true });
-        console.log(`🧹 Directorio huérfano eliminado: ${dirPath}`);
-      } catch (err) {
-        console.error(`⚠️ No se pudo eliminar directorio huérfano: ${dirPath}`, err);
+      if (DRY_RUN) {
+        console.log(`   → ${dirPath}`);
+      } else {
+        try {
+          fs.rmSync(dirPath, { recursive: true, force: true });
+          console.log(`🧹 Directorio huérfano eliminado: ${dirPath}`);
+        } catch (err) {
+          console.error(`⚠️ No se pudo eliminar directorio huérfano: ${dirPath}`, err);
+        }
       }
     }
   }
+
+  if (DRY_RUN) console.log('   (usa CLEANUP_DRY_RUN=false o sin la variable para aplicar)');
 }
 
 // ============================================================
@@ -249,9 +269,9 @@ async function runAgents() {
       console.log(`\n📀 Processing: ${name}`);
 
       // 1. Parse recording
-      let steps: any[] = [];
+      let steps: Action[] = [];
       try {
-        steps = parseRecording(recordingPath);
+        steps = parseRecording(recordingPath) as Action[];
       } catch (err) {
         console.error(`❌ Error parsing recording: ${file}`, err);
         continue;
@@ -261,6 +281,9 @@ async function runAgents() {
         continue;
       }
       console.log(`🧠 Steps detected: ${steps.length}`);
+
+      // 1b. Enriquecer semánticamente los pasos para el generador de UI
+      const enhancedSteps = enhanceFlow(steps);
 
       // 2. Generate BDD feature
       let gherkin = '';
@@ -278,6 +301,16 @@ async function runAgents() {
       fs.writeFileSync(featurePath, gherkin);
       console.log(`📄 Feature generado: ${featurePath}`);
 
+      // 2b. Validar cobertura del feature y corregir si hay pasos faltantes
+      try {
+        const validation = await validateFlow(steps, gherkin, featurePath);
+        if (!validation.skipped && validation.hasMissingSteps) {
+          console.log(`🔧 Feature corregido con ${validation.missingSteps.length} paso(s) añadido(s)`);
+        }
+      } catch (err) {
+        console.warn('⚠️ Error en validación del feature (no crítico)', err);
+      }
+
       // 3. Step definitions
       try {
         await generateStepsFromGherkin(name, gherkin);
@@ -285,9 +318,9 @@ async function runAgents() {
         console.error('⚠️ Error generating step definitions', err);
       }
 
-      // 4. UI Test
+      // 4. UI Test (usa enhancedSteps para contexto semántico de flujo)
       try {
-        generateUITest(name, steps);
+        generateUITest(name, enhancedSteps as any[]);
       } catch (err) {
         console.error('⚠️ Error generating UI test', err);
       }
@@ -311,28 +344,26 @@ async function runAgents() {
       }
 
       // 6. Base URL + Metadata
-      // Extraer la primera URL de navegación del recording (primera llamada goto)
+      // Risk 7: fallback usa GOTO_RE importado — sin duplicar el regex
       let baseURL = '';
       try {
         baseURL = extractBaseURL(recordingPath) || '';
-        // Si extractBaseURL no devuelve nada, buscar directamente en el contenido
         if (!baseURL) {
           const rawContent = fs.readFileSync(recordingPath, 'utf-8');
-          const gotoMatch = rawContent.match(/page\.goto\(['"`](.*?)['"`]\)/);
+          const gotoMatch = [...rawContent.matchAll(GOTO_RE)][0];
           if (gotoMatch) baseURL = gotoMatch[1];
         }
       } catch (err) {
         console.error('⚠️ Error extracting baseURL', err);
       }
       if (baseURL) {
-        // Normalizar: solo origin para los tests de security/performance/accessibility
+        // Risk 2: normalizar a origin para tests de security/performance/accessibility/visual
+        // El bloque anterior era un no-op — ahora aplica la normalización real.
         try {
-          baseURL = baseURL.trim();
-          // Remover trailing slash si no es origen puro
-          if (baseURL !== new URL(baseURL).origin) {
-            // Mantener URL completa de la primera navegación (puede ser una subpágina)
-          }
-        } catch {}
+          baseURL = new URL(baseURL.trim()).origin;
+        } catch {
+          baseURL = baseURL.trim(); // URL inválida → usar como está
+        }
       }
       const metadata = { name, baseURL };
       const metadataPath = path.join(outputDir, `${name}.metadata.json`);
@@ -358,7 +389,7 @@ async function runAgents() {
   }
 
   // ============================================
-  // 9. Procesar tests de API manuales (REST y SOAP)
+  // 8. Procesar tests de API manuales (REST y SOAP)  — Risk 1: renumerado (era 9)
   //    - Matching robusto: exacto → fuzzy → IA OpenAI
   //    - COPIA sin borrar fuente (preserva el original para re-runs)
   //    - Limpia directorios huérfanos de runs anteriores incorrectos
@@ -368,8 +399,11 @@ async function runAgents() {
     { baseDir: path.join(process.cwd(), 'GenerateTest', 'api-testing-rest-soap', 'soap'), type: 'soap' }
   ];
 
-  const FUZZY_THRESHOLD = 0.70;   // 70% prefijo en común para match local
-  const AI_THRESHOLD    = 0.50;   // por debajo de este score se delega a IA
+  // Risk 5: AI_THRESHOLD < FUZZY_THRESHOLD para que matches débiles (0.50–0.70)
+  // también pasen por la IA. findMatchingSuite se llama con AI_THRESHOLD como umbral
+  // mínimo, capturando candidatos débiles. La IA se consulta cuando score < FUZZY_THRESHOLD.
+  const FUZZY_THRESHOLD = 0.70;   // match confiable — no necesita IA
+  const AI_THRESHOLD    = 0.50;   // match débil — delegar a IA para confirmar
 
   for (const { baseDir, type } of apiManualDirs) {
     if (!fs.existsSync(baseDir)) continue;
@@ -378,17 +412,17 @@ async function runAgents() {
     for (const manualFile of manualFiles) {
       console.log(`\n🔍 Procesando test manual (${type}): ${manualFile}`);
 
-      // --- Fase 1: matching local robusto ---
-      let matchResult = findMatchingSuite(manualFile, suiteNames, FUZZY_THRESHOLD);
+      // --- Fase 1: matching local con umbral bajo (AI_THRESHOLD) para capturar candidatos débiles ---
+      let matchResult = findMatchingSuite(manualFile, suiteNames, AI_THRESHOLD); // Risk 5: umbral bajo
       let suiteName: string | null = matchResult?.suite ?? null;
       let matchScore = matchResult?.score ?? 0;
 
-      if (suiteName) {
+      if (suiteName && matchScore >= FUZZY_THRESHOLD) {
         console.log(`✅ Suite detectada localmente: "${suiteName}" (score=${matchScore.toFixed(2)}) para "${manualFile}"`);
       }
 
-      // --- Fase 2: fallback IA cuando score bajo o sin match ---
-      if (!suiteName || matchScore < AI_THRESHOLD) {
+      // --- Fase 2: fallback IA cuando score < FUZZY_THRESHOLD (incluye rango 0.50–0.70) o sin match ---
+      if (!suiteName || matchScore < FUZZY_THRESHOLD) {
         console.log(`🤖 Score bajo (${matchScore.toFixed(2)}) o sin match — consultando IA para "${manualFile}"...`);
         const aiSuite = await findMatchingSuiteWithAI(manualFile, suiteNames);
         if (aiSuite) {
@@ -421,7 +455,7 @@ async function runAgents() {
   }
 
   // ============================================
-  // 10. Procesar BoxAPIsExecute/ — genera specs Playwright desde servicios
+  // 9. Procesar BoxAPIsExecute/ — genera specs Playwright desde servicios  — Risk 1: renumerado (era 10)
   //     REST, SOAP u otros definidos en BoxAPIsExecute/<TIPO>/<MÉTODO>/*.spec.ts
   //     → GenerateTest/tests/<Suite>/api/ (o Solo_test_API si sin suite)
   // ============================================
@@ -433,7 +467,7 @@ async function runAgents() {
   );
 
   // ============================================
-  // 11. Limpiar directorios huérfanos en GenerateTest/tests/
+  // 10. Limpiar directorios huérfanos en GenerateTest/tests/  — Risk 1: renumerado (era 11)
   //     (creados por runs anteriores con matching incorrecto)
   // ============================================
   const knownSuitesWithSolo = [...suiteNames, 'Solo_test_API'];

@@ -3,44 +3,46 @@ import path from "path";
 import { ensureDir } from "../../utils/fs-utils";
 import { normalizeSelector } from "../../../../ConfigurationTest/tests/utils/selector-normalizer";
 
+// Risk 5: wrapper — expresiones encadenadas (.nth/.first/.last/.filter) pasan sin modificar
+function safeNormalize(rawSel: string): string {
+  if (!rawSel) return '';
+  if (/\.(nth|first|last|filter|and)\(/.test(rawSel)) return rawSel;
+  return normalizeSelector(rawSel) || rawSel;
+}
+
 export function generateUITest(name: string, steps: any[]) {
-  const dir = path.join('GenerateTest', 'tests', name, 'ui');
+  const dir    = path.join('GenerateTest', 'tests', name, 'ui');
   ensureDir(dir);
   const output = path.join(dir, `${name}.spec.ts`);
 
-  // ── Deduplicar pasos únicos ──
-  // Solo se deduplicAN: input/fill (se tomó ya el último en el parser),
-  // select/selectOption, verify (mismo texto), check/uncheck, upload.
-  // Los CLICKS se preservan todos aunque sean idénticos: pueden operar sobre
-  // elementos dinámicos distintos que comparten selector (e.g., árbol expandible).
+  // ── Deduplicar pasos ──────────────────────────────────────────────────────
   const uniqueSteps: any[] = [];
   const seen = new Set();
-  const NON_DEDUP_ACTIONS = new Set(['click', 'dblclick', 'press_enter', 'press_key', 'dialog_handler', 'page_load', 'hover', 'rightclick', 'drag', 'frame_click', 'frame_fill', 'scroll']);
+  const NON_DEDUP_ACTIONS = new Set([
+    'click', 'dblclick', 'press_enter', 'press_key', 'dialog_handler',
+    'page_load', 'hover', 'rightclick', 'drag', 'frame_click', 'frame_fill', 'scroll',
+  ]);
   for (const step of steps) {
     if (NON_DEDUP_ACTIONS.has(step.action)) {
-      uniqueSteps.push(step); // clics siempre se preservan
+      uniqueSteps.push(step);
     } else {
       const key = `${step.action}-${step.selector || step.target}-${step.value ?? ''}`;
-      if (!seen.has(key)) {
-        seen.add(key);
-        uniqueSteps.push(step);
-      }
+      if (!seen.has(key)) { seen.add(key); uniqueSteps.push(step); }
     }
   }
-  console.log(`📊 generateUITest: steps únicos: ${uniqueSteps.length} de ${steps.length}`);
+  console.log(`📊 generateUITest: ${uniqueSteps.length} steps únicos de ${steps.length}`);
 
-  // ── Determinar qué imports necesitamos ──
-  const usesCheck     = uniqueSteps.some(s => s.action === 'check' || s.action === 'uncheck');
-  const usesDbl       = uniqueSteps.some(s => s.action === 'dblclick');
-  const usesUpload    = uniqueSteps.some(s => s.action === 'upload');
-  const usesVerify    = uniqueSteps.some(s => s.action === 'verify') ||
-                        uniqueSteps.some(s => s.pageRef === 'popup' && s.action === 'verify');
-  const usesSelect    = uniqueSteps.some(s => s.action === 'select' || s.action === 'selectOption');
-  const usesPopup     = uniqueSteps.some(s => s.popupTrigger);
-  const usesHover     = uniqueSteps.some(s => s.action === 'hover');
-  const usesRightClick= uniqueSteps.some(s => s.action === 'rightclick');
-  const usesDrag      = uniqueSteps.some(s => s.action === 'drag');
-  const usesScroll    = uniqueSteps.some(s => s.action === 'scroll');
+  // ── Determinar imports necesarios ─────────────────────────────────────────
+  const usesCheck      = uniqueSteps.some(s => s.action === 'check' || s.action === 'uncheck');
+  const usesDbl        = uniqueSteps.some(s => s.action === 'dblclick');
+  const usesUpload     = uniqueSteps.some(s => s.action === 'upload');
+  const usesVerify     = uniqueSteps.some(s => s.action === 'verify');
+  const usesSelect     = uniqueSteps.some(s => s.action === 'select' || s.action === 'selectOption');
+  const usesPopup      = uniqueSteps.some(s => s.popupTrigger);
+  const usesHover      = uniqueSteps.some(s => s.action === 'hover');
+  const usesRightClick = uniqueSteps.some(s => s.action === 'rightclick');
+  const usesDrag       = uniqueSteps.some(s => s.action === 'drag');
+  const usesScroll     = uniqueSteps.some(s => s.action === 'scroll');
 
   const importedActions = ['smartClick', 'smartFill'];
   if (usesSelect)     importedActions.push('smartSelect');
@@ -53,51 +55,59 @@ export function generateUITest(name: string, steps: any[]) {
   if (usesDrag)       importedActions.push('smartDragAndDrop');
   if (usesScroll)     importedActions.push('smartScroll');
 
-  // ── URL base del recording (para fallback directo en popup triggers) ──
-  const pageLoadStep = uniqueSteps.find(s => s.action === 'page_load');
+  // ── URL base del recording ────────────────────────────────────────────────
+  const pageLoadStep     = uniqueSteps.find(s => s.action === 'page_load');
   const recordingBaseURL = pageLoadStep?.url || '';
 
-  // ── Recopilar todos los dialog_handler para el manejador global ──
+  // ── Dialog handler global ─────────────────────────────────────────────────
   const dialogSteps = uniqueSteps.filter(s => s.action === 'dialog_handler');
-  const hasDialogs = dialogSteps.length > 0;
+  const hasDialogs  = dialogSteps.length > 0;
 
-  // Bloque de manejador global de diálogos (cola ordenada)
   let dialogQueueBlock = '';
   if (hasDialogs) {
     const queueItems = dialogSteps.map(s => {
-      const action = (s.value === 'dismiss') ? 'dismiss' : 'accept';
-      const promptValue = (action === 'accept' && s.promptValue) ? `, '${s.promptValue}'` : '';
-      return `  { action: '${action}'${promptValue ? `, value: '${s.promptValue}'` : ''} }`;
+      const action      = (s.value === 'dismiss') ? 'dismiss' : 'accept';
+      const promptValue = (action === 'accept' && s.promptValue) ? `, value: '${s.promptValue}'` : '';
+      return `  { action: '${action}'${promptValue} }`;
     }).join(',\n');
+
     dialogQueueBlock = `
   // ── Manejador global de diálogos nativos (alert / confirm / prompt) ──
-  // Cola ordenada: cada diálogo consume una entrada; el resto se acepta por defecto.
   const _dialogQueue: Array<{ action: 'accept' | 'dismiss'; value?: string }> = [
 ${queueItems},
   ];
   let _dialogIdx = 0;
   page.on('dialog', async dialog => {
-    const cfg = _dialogQueue[_dialogIdx++] ?? { action: 'accept' };
+    const cfg = _dialogQueue[_dialogIdx++];
+    // Risk 7: diálogo inesperado (no estaba en la grabación) → advertir y aceptar
+    if (!cfg) {
+      console.warn(\`⚠️ Diálogo inesperado: "\${dialog.message()}" — aceptado por defecto\`);
+      try { await dialog.accept(); } catch {}
+      return;
+    }
     try {
       if (cfg.action === 'dismiss') {
         await dialog.dismiss();
       } else {
         await dialog.accept(cfg.value);
       }
-    } catch {
-      // Diálogo ya manejado (race condition prevenida)
-    }
+    } catch {}
   });
 `;
   }
 
-  // fixture: añadir context cuando hay popups/nuevas pestañas
   const fixture = usesPopup ? '{ page, context }' : '{ page }';
 
+  // Risk 6: timeouts como constantes configurables en el spec generado
   let code = `
 import { test, expect } from '@playwright/test';
-import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
-import { ${importedActions.join(', ')} } from '../../../../ConfigurationTest/tests/utils/smart-actions';
+import { smartGoto } from '@utils/navigation-helper';
+import { ${importedActions.join(', ')} } from '@utils/smart-actions';
+
+// Risk 6: timeouts configurables via variables de entorno
+const POPUP_TIMEOUT  = Number(process.env.POPUP_TIMEOUT  || 30000);
+const VERIFY_TIMEOUT = Number(process.env.VERIFY_TIMEOUT || 20000);
+const FILL_WAIT_MS   = Number(process.env.FILL_WAIT_MS   || 0);
 
 test('${name}', async (${fixture}) => {
   await smartGoto(page, '${name}');
@@ -105,335 +115,259 @@ ${dialogQueueBlock}`;
 
   let i = 0;
   while (i < uniqueSteps.length) {
-    const step = uniqueSteps[i];
+    const step     = uniqueSteps[i];
     const nextStep = uniqueSteps[i + 1];
 
-    // ── page_load → omitir (smartGoto ya se encarga) ──────────────────
-    if (step.action === 'page_load') {
-      i++;
-      continue;
-    }
+    // ── page_load → omitir (smartGoto ya navega) ─────────────────────────
+    if (step.action === 'page_load') { i++; continue; }
 
-    // ── dialog_handler → ya consolidado en el bloque global; omitir ───
-    if (step.action === 'dialog_handler') {
-      i++;
-      continue;
-    }
+    // ── dialog_handler → consolidado en bloque global ─────────────────────
+    if (step.action === 'dialog_handler') { i++; continue; }
 
-    // ── press_enter → teclado ─────────────────────────────────────────
+    // ── press_enter ───────────────────────────────────────────────────────
     if (step.action === 'press_enter') {
-      code += `
-  await page.keyboard.press('Enter');`;
-      i++;
-      continue;
+      code += `\n  await page.keyboard.press('Enter');`;
+      i++; continue;
     }
 
-    // ── press_key → tecla arbitraria ──────────────────────────────────
+    // ── press_key ─────────────────────────────────────────────────────────
     if (step.action === 'press_key') {
-      // Omitir teclas de posicionamiento (ArrowRight, etc.) que el parser marcó
-      // como parte de un patrón dblclick→fill incompleto (_editIntent).
       if (!step._editIntent) {
-        code += `
-  await page.keyboard.press('${step.target}');`;
+        code += `\n  await page.keyboard.press('${step.target}');`;
       }
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // ── HOVER → smartHover ────────────────────────────────────────────
+    // ── HOVER ─────────────────────────────────────────────────────────────
     if (step.action === 'hover') {
-      const rawSel = step.selector || step.target;
-      const selector = normalizeSelector(rawSel);
-      if (selector) {
-        code += `
-  await smartHover(page, \`${selector}\`);`;
-      }
-      i++;
-      continue;
+      const selector = safeNormalize(step.selector || step.target);
+      if (selector) code += `\n  await smartHover(page, \`${selector}\`);`;
+      i++; continue;
     }
 
-    // ── RIGHT CLICK → smartRightClick ─────────────────────────────────
+    // ── RIGHT CLICK ───────────────────────────────────────────────────────
     if (step.action === 'rightclick') {
-      const rawSel = step.selector || step.target;
-      const selector = normalizeSelector(rawSel);
-      if (selector) {
-        code += `
-  await smartRightClick(page, \`${selector}\`);`;
-      }
-      i++;
-      continue;
+      const selector = safeNormalize(step.selector || step.target);
+      if (selector) code += `\n  await smartRightClick(page, \`${selector}\`);`;
+      i++; continue;
     }
 
-    // ── DRAG AND DROP → smartDragAndDrop ──────────────────────────────
+    // ── DRAG AND DROP ─────────────────────────────────────────────────────
     if (step.action === 'drag') {
-      const srcSel = normalizeSelector(step.selector || step.source || '');
-      const tgtSel = normalizeSelector(step.targetSelector || step.target || '');
+      const srcSel = safeNormalize(step.selector || step.source || '');
+      const tgtSel = safeNormalize(step.targetSelector || step.target || '');
       if (srcSel && tgtSel) {
-        code += `
-  await smartDragAndDrop(page, \`${srcSel}\`, \`${tgtSel}\`);`;
+        code += `\n  await smartDragAndDrop(page, \`${srcSel}\`, \`${tgtSel}\`);`;
       }
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // ── FRAME CLICK → frameLocator directo ───────────────────────────
+    // ── FRAME CLICK ───────────────────────────────────────────────────────
     if (step.action === 'frame_click') {
-      // Usar el selector completo del frame que ya incluye frameLocator()
       const rawSel = step.selector || '';
       if (rawSel) {
-        code += `
-  // Interacción dentro de iframe: ${step.frameSelector}
-  await ${rawSel.startsWith('page.') ? rawSel : `page.${rawSel}`}.click();`;
+        const expr = rawSel.startsWith('page.') ? rawSel : `page.${rawSel}`;
+        code += `\n  // Interacción dentro de iframe: ${step.frameSelector}\n  await ${expr}.click();`;
       }
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // ── FRAME FILL → frameLocator + fill ─────────────────────────────
+    // ── FRAME FILL ────────────────────────────────────────────────────────
     if (step.action === 'frame_fill') {
       const rawSel = step.selector || '';
-      const val = step.value || '';
+      const val    = step.value || '';
       if (rawSel) {
-        code += `
-  // Fill dentro de iframe: ${step.frameSelector}
-  await ${rawSel.startsWith('page.') ? rawSel : `page.${rawSel}`}.fill('${val}');`;
+        const expr = rawSel.startsWith('page.') ? rawSel : `page.${rawSel}`;
+        code += `\n  // Fill dentro de iframe: ${step.frameSelector}\n  await ${expr}.fill('${val}');`;
       }
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // ── SCROLL → smartScroll ──────────────────────────────────────────
+    // ── SCROLL ────────────────────────────────────────────────────────────
     if (step.action === 'scroll') {
       const target = step.target || '';
-      if (target) {
-        code += `
-  await smartScroll(page, \`${target}\`);`;
-      }
-      i++;
-      continue;
+      if (target) code += `\n  await smartScroll(page, \`${target}\`);`;
+      i++; continue;
     }
 
-    // ── SELECT ────────────────────────────────────────────────────────
+    // ── SELECT ────────────────────────────────────────────────────────────
     if (step.action === 'select' || step.action === 'selectOption') {
-      const rawSel = step.selector || step.target;
-      const selector = normalizeSelector(rawSel);
-      const value = step.value || '';
-      if (selector && value) {
-        code += `
-  await smartSelect(page, \`${selector}\`, '${value}');`;
-      }
-      i++;
-      continue;
+      const selector = safeNormalize(step.selector || step.target);
+      const value    = step.value || '';
+      if (selector && value) code += `\n  await smartSelect(page, \`${selector}\`, '${value}');`;
+      i++; continue;
     }
 
-    // ── CHECK / UNCHECK ───────────────────────────────────────────────
+    // ── CHECK / UNCHECK ───────────────────────────────────────────────────
     if (step.action === 'check' || step.action === 'uncheck') {
-      const rawSel = step.selector || step.target;
-      const selector = normalizeSelector(rawSel);
+      const selector = safeNormalize(step.selector || step.target);
       if (selector) {
-        if (step.action === 'uncheck') {
-          code += `
-  await smartCheck(page, \`${selector}\`, false);`;
-        } else {
-          code += `
-  await smartCheck(page, \`${selector}\`);`;
-        }
+        code += step.action === 'uncheck'
+          ? `\n  await smartCheck(page, \`${selector}\`, false);`
+          : `\n  await smartCheck(page, \`${selector}\`);`;
       }
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // ── DBLCLICK ──────────────────────────────────────────────────────
+    // ── DBLCLICK ──────────────────────────────────────────────────────────
     if (step.action === 'dblclick') {
-      const rawSel = step.selector || step.target;
-      const selector = normalizeSelector(rawSel);
-      if (selector) {
-        code += `
-  await smartDblClick(page, \`${selector}\`);`;
-      }
-      i++;
-      continue;
+      const selector = safeNormalize(step.selector || step.target);
+      if (selector) code += `\n  await smartDblClick(page, \`${selector}\`);`;
+      i++; continue;
     }
 
-    // ── UPLOAD ────────────────────────────────────────────────────────
+    // ── UPLOAD ────────────────────────────────────────────────────────────
     if (step.action === 'upload') {
-      const rawSel = step.selector || step.target;
-      const selector = normalizeSelector(rawSel);
+      const selector = safeNormalize(step.selector || step.target);
       const filePath = step.value || '';
       code += `
-  // Upload de archivo — asegúrate de que el fichero existe en el entorno de test
   try {
     await smartUpload(page, \`${selector}\`, '${filePath}');
   } catch (e) {
     console.warn('⚠️ Upload omitido (archivo no encontrado):', '${filePath}');
   }`;
-      i++;
-      continue;
+      i++; continue;
     }
 
     const rawSelector = step.selector || step.target || '';
-    const selector = normalizeSelector(rawSelector);
-    const value = step.value || '';
+    const selector    = safeNormalize(rawSelector);
+    const value       = step.value || '';
 
-    // ── POPUP TRIGGER → click que abre nueva pestaña ──────────────────
-    // El parser marca popupTrigger:true en el click de la página principal
-    // que precede a acciones sobre la popup page (pageRef:'popup').
+    // ── POPUP TRIGGER ─────────────────────────────────────────────────────
     if (step.action === 'click' && step.popupTrigger) {
-      // Recopilar todas las acciones seguidas que pertenecen a la popup
       const popupSteps: any[] = [];
       let j = i + 1;
       while (j < uniqueSteps.length && uniqueSteps[j].pageRef === 'popup') {
         popupSteps.push(uniqueSteps[j]);
         j++;
       }
-      // Para el trigger usamos el selector Playwright original (no normalizado)
-      // para garantizar precisión: el elemento que abre el popup debe ser exacto.
-      // Si el step tiene un selector completo (getByRole/locator/etc.) lo usamos
-      // directamente; de lo contrario caemos en smartClick como fallback.
-      const rawStepSel = (step.selector || '').trim();
+
+      const rawStepSel      = (step.selector || '').trim();
       const isPlaywrightExpr = /get[A-Z]|locator\(/.test(rawStepSel);
-      const triggerExpr = isPlaywrightExpr
+      const triggerExpr      = isPlaywrightExpr
         ? `(${rawStepSel.startsWith('page.') ? rawStepSel : `page.${rawStepSel}`}).click()`
         : (selector ? `smartClick(page, \`${selector}\`)` : null);
       if (!triggerExpr) { i = j; continue; }
-      // ── Fallback de navegación directa ──────────────────────────────
-      // Derivar URL esperada a partir del texto del link de navegación previo.
-      // Si los clicks de sidebar/menú no llegaron al destino, ir directamente.
+
+      // Risk 4: fallback slug frágil → solo comentario, no código ejecutable
       const prevNavStep = uniqueSteps[i - 1];
-      const prevTarget = (prevNavStep?.target || prevNavStep?.selector || '').trim();
-      const isLinkNav = prevTarget && /get[A-Z]/.test(prevNavStep?.selector || '') &&
-                        (prevNavStep?.selector || '').includes('link');
+      const prevTarget  = (prevNavStep?.target || prevNavStep?.selector || '').trim();
+      const isLinkNav   = prevTarget && /get[A-Z]/.test(prevNavStep?.selector || '') &&
+                          (prevNavStep?.selector || '').includes('link');
       let fallbackUrlCode = '';
       if (isLinkNav && prevTarget && recordingBaseURL) {
         try {
-          const origin = new URL(recordingBaseURL).origin;
-          const derivedPath = prevTarget
-            .toLowerCase()
-            .replace(/[^a-z0-9\s]/g, '')
-            .trim()
-            .replace(/\s+/g, '-');
+          const origin      = new URL(recordingBaseURL).origin;
+          const derivedPath = prevTarget.toLowerCase()
+            .replace(/[^a-z0-9\s]/g, '').trim().replace(/\s+/g, '-');
           fallbackUrlCode = `
-  // Fallback de navegación directa: si los clicks previos no llegaron al destino
-  // (sidebar complejo, SPA, menús desplegables), navegar directamente.
-  if (!page.url().includes('${derivedPath}')) {
-    console.log('⚠️ Navegación UI no llegó a ${derivedPath} — usando goto directo');
-    await page.goto('${origin}/${derivedPath}');
-    await page.waitForLoadState('load');
-  }`;
-        } catch { /* URL derivation failed, skip fallback */ }
+  // ℹ️ Fallback disponible si la navegación UI no llega al destino:
+  //   await page.goto('${origin}/RUTA_REAL_DE_${derivedPath.toUpperCase()}');
+  //   (ajusta la ruta real antes de descomentar)`;
+        } catch {}
       }
+
       code += `${fallbackUrlCode}
-  // context.waitForEvent('page') captura cualquier nueva página del contexto
-  // sin depender del actionTimeout del config (más robusto que page.waitForEvent('popup'))
   const [_popupPage] = await Promise.all([
-    context.waitForEvent('page', { timeout: 30000 }),
+    context.waitForEvent('page', { timeout: POPUP_TIMEOUT }),
     ${triggerExpr},
   ]);
   await _popupPage.waitForLoadState('load');`;
-      // Generar acciones sobre la popup page
+
+      // Risk 2: cobertura de acciones en popup ampliada
       for (const ps of popupSteps) {
-        const pSel = normalizeSelector(ps.selector || ps.target || '');
+        const pSel = safeNormalize(ps.selector || ps.target || '');
         const pVal = ps.value || '';
-        if (ps.action === 'click' || ps.action === 'verify') {
-          if (!pSel) continue;
-          if (ps.action === 'verify') {
-            code += `
-  await smartWaitForText(_popupPage, \`${pSel}\`, 15000);`;
-          } else {
-            code += `
-  await smartClick(_popupPage, \`${pSel}\`);`;
-          }
+
+        if (ps.action === 'click') {
+          if (pSel) code += `\n  await smartClick(_popupPage, \`${pSel}\`);`;
+        } else if (ps.action === 'verify') {
+          if (pSel) code += `\n  await smartWaitForText(_popupPage, \`${pSel}\`, VERIFY_TIMEOUT);`;
         } else if (ps.action === 'input' || ps.action === 'fill') {
-          if (!pSel) continue;
-          code += `
-  await smartFill(_popupPage, \`${pSel}\`, '${pVal}');
-  await _popupPage.waitForTimeout(500);`;
+          if (pSel) {
+            code += `\n  await smartFill(_popupPage, \`${pSel}\`, '${pVal}');`;
+            code += `\n  await _popupPage.waitForTimeout(FILL_WAIT_MS);`;
+          }
+        } else if (ps.action === 'select' || ps.action === 'selectOption') {
+          if (pSel && pVal) code += `\n  await smartSelect(_popupPage, \`${pSel}\`, '${pVal}');`;
+        } else if (ps.action === 'check' || ps.action === 'uncheck') {
+          if (pSel) {
+            code += ps.action === 'uncheck'
+              ? `\n  await smartCheck(_popupPage, \`${pSel}\`, false);`
+              : `\n  await smartCheck(_popupPage, \`${pSel}\`);`;
+          }
+        } else if (ps.action === 'scroll') {
+          if (pSel) code += `\n  await smartScroll(_popupPage, \`${pSel}\`);`;
+        } else if (ps.action === 'upload') {
+          if (pSel) code += `\n  await smartUpload(_popupPage, \`${pSel}\`, '${pVal}');`;
+        } else if (ps.action === 'dblclick') {
+          if (pSel) code += `\n  await smartDblClick(_popupPage, \`${pSel}\`);`;
+        } else {
+          // Risk 2: advertir acciones de popup no soportadas en tiempo de generación
+          console.warn(`⚠️ [ui-agent] Acción de popup '${ps.action}' no soportada — omitida del spec generado.`);
         }
       }
-      i = j; // saltar los popup steps ya procesados
-      continue;
+      i = j; continue;
     }
 
-    // ── CLICK seguido de VERIFY → patrón "confirm + toast transitorio" ──
-    // smartWaitForText empieza a escuchar EN PARALELO con smartClick para
-    // capturar toasts que aparecen y desaparecen DURANTE el post-click.
+    // ── CLICK + VERIFY consecutivos → Promise.all (captura toast transitorio) ──
     if (step.action === 'click' && nextStep?.action === 'verify' && !step.pageRef) {
       if (!selector) { i++; continue; }
-      const verifyTarget = normalizeSelector(nextStep.selector || nextStep.target || '');
+      const verifyTarget = safeNormalize(nextStep.selector || nextStep.target || '');
       if (!verifyTarget) { i++; continue; }
 
       code += `
-  // Capturar toast transitorio en paralelo con el click de confirmación.
+  // Risk 8: VERIFY_TIMEOUT unificado para captura en paralelo del toast
   await Promise.all([
-    smartWaitForText(page, \`${verifyTarget}\`, 20000),
+    smartWaitForText(page, \`${verifyTarget}\`, VERIFY_TIMEOUT),
     smartClick(page, \`${selector}\`),
   ]);`;
-
-      i += 2;
-      continue;
+      i += 2; continue;
     }
 
-    // ── CLICK simple (página principal) ───────────────────────────────
+    // ── CLICK simple ──────────────────────────────────────────────────────
     if (step.action === 'click' && !step.pageRef) {
       if (!selector) { i++; continue; }
-      code += `
-  await smartClick(page, \`${selector}\`);`;
-      i++;
-      continue;
+      code += `\n  await smartClick(page, \`${selector}\`);`;
+      i++; continue;
     }
 
-    // ── FILL / INPUT (página principal) ───────────────────────────────
+    // ── FILL / INPUT ──────────────────────────────────────────────────────
     if ((step.action === 'input' || step.action === 'fill') && !step.pageRef) {
       if (!selector) { i++; continue; }
+
       if (value === '' && step._editIntent) {
-        // El recording capturó solo el borrado del campo (fill('')) pero no el valor
-        // que el usuario escribió a continuación. Esto ocurre cuando Playwright codegen
-        // no intercepta el tipeo posterior al fill('').
-        // SOLUCIÓN: edita el recording y añade la línea de fill con el valor correcto
-        // justo antes del Submit (o acción siguiente), luego vuelve a ejecutar npm run generate.
+        // Risk 1: NO generar smartFill con cadena vacía ejecutable — solo comentario
         code += `
-  // ⚠️  VALOR NO CAPTURADO EN EL RECORDING
-  //     El campo "${selector}" fue limpiado pero el nuevo valor no quedó grabado.
-  //     Para corregirlo, edita el recording y agrega ANTES del siguiente click/Submit:
-  //       await page.getByRole('textbox', { name: '${selector}' }).fill('NUEVO_VALOR');
-  //     Luego vuelve a ejecutar: npm run generate
-  await smartFill(page, \`${selector}\`, ''); // TODO: reemplaza '' con el valor deseado
-  await page.waitForTimeout(500);`;
+  // ⚠️ VALOR NO CAPTURADO EN EL RECORDING — campo "${selector}" limpiado sin nuevo valor grabado.
+  //    Para corregirlo, edita el recording y añade la línea de fill con el valor real:
+  //      await page.getByLabel('...').fill('NUEVO_VALOR');
+  //    Luego vuelve a ejecutar: npm run generate`;
       } else {
-        code += `
-  await smartFill(page, \`${selector}\`, '${value}');
-  await page.waitForTimeout(500);`;
+        // Risk 3: FILL_WAIT_MS reemplaza el waitForTimeout(500) hardcodeado
+        code += `\n  await smartFill(page, \`${selector}\`, '${value}');`;
+        code += `\n  await page.waitForTimeout(FILL_WAIT_MS);`;
       }
-      i++;
-      continue;
+      i++; continue;
     }
 
-    // ── Acciones popup sueltas (sin trigger previo detectado) ─────────
-    // Fallback: si por alguna razón quedó un paso con pageRef:'popup'
-    // sin ser consumido por el bloque popupTrigger, lo saltamos.
-    if (step.pageRef === 'popup') {
-      i++;
-      continue;
-    }
+    // ── Popup suelto sin trigger (fallback silencioso) ────────────────────
+    if (step.pageRef === 'popup') { i++; continue; }
 
-    // ── VERIFY standalone ─────────────────────────────────────────────
+    // ── VERIFY standalone ─────────────────────────────────────────────────
     if (step.action === 'verify') {
       const verifyTarget = step.selector || step.target || '';
       if (!verifyTarget) { i++; continue; }
-      const cleanTarget = normalizeSelector(verifyTarget) || verifyTarget;
-      code += `
-  // Verificar mensaje de resultado (texto asíncrono — puede ser toast transitorio)
-  await smartWaitForText(page, \`${cleanTarget}\`, 15000);`;
-      i++;
-      continue;
+      const cleanTarget = safeNormalize(verifyTarget) || verifyTarget;
+      // Risk 8: VERIFY_TIMEOUT unificado (antes 15000 aquí vs 20000 en click+verify)
+      code += `\n  await smartWaitForText(page, \`${cleanTarget}\`, VERIFY_TIMEOUT);`;
+      i++; continue;
     }
 
     i++;
   }
 
-  code += `
-});
-`;
+  code += `\n});\n`;
   fs.writeFileSync(output, code);
-  console.log("✅ UI Test generado: " + output);
+  console.log(`✅ UI Test generado: ${output}`);
 }

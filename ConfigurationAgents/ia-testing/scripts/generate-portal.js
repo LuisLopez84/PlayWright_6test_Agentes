@@ -16,7 +16,7 @@ try {
   statEngine = require(
     path.join(__dirname, '..', '..', '..', 'GenerateTest', 'non-functional', 'analysis', 'statistical-engine.js')
   );
-} catch (_) { /* opcional — el tab se mostrará sin análisis si no está disponible */ }
+} catch (e) { console.warn('⚠️ [Portal] statEngine no disponible — análisis PNF deshabilitado:', e.message); }
 
 // ─── Rutas ────────────────────────────────────────────────────────────────────
 const ROOT         = process.cwd();
@@ -100,10 +100,20 @@ function groupAttachmentsByRun(attachments) {
     }));
 }
 
+// Risk 7: decodificar entidades XML para evitar nombres rotos con <, >, & o "
+function unescapeXml(s) {
+  return s
+    .replace(/&amp;/g,  '&')
+    .replace(/&lt;/g,   '<')
+    .replace(/&gt;/g,   '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
 /** Extrae un atributo de un bloque de atributos XML */
 function attr(attrs, name) {
   const m = attrs.match(new RegExp(`${name}="([^"]*)"`));
-  return m ? m[1] : '';
+  return m ? unescapeXml(m[1]) : ''; // Risk 7: decodificar entidades
 }
 
 /** Parser XML completo: devuelve { suites, totals } */
@@ -388,6 +398,8 @@ Sé técnico, directo y profesional. Máximo 600 palabras en total.`;
   // ── Intento con OpenAI ──────────────────────────────────────────────────────
   if (process.env.OPENAI_API_KEY) {
     try {
+      // Risk 4: generate-portal.js es CommonJS — no puede importar openai-client.ts
+      // directamente. Se replica la misma lógica de inicialización para consistencia.
       let OpenAI;
       try { OpenAI = require('openai').default || require('openai'); } catch (_) {}
       if (OpenAI) {
@@ -1862,6 +1874,9 @@ function renderModuleContent(key, suiteList, features) {
   return body + renderEvidenceGrid(suiteList);
 }
 
+// Risk 5 (architectural): función monolítica que combina CSS, JS cliente, Chart.js y HTML.
+// Para mejorar la mantenibilidad se recomienda separar en archivos de plantilla externos
+// (portal.css, portal.client.js) y cargarlos con fs.readFileSync en tiempo de generación.
 function buildPortalHTML(groups, totals, generatedAt, features, allSuites, statisticalAnalysis) {
   const globalPassed = totals.tests - totals.failures - totals.errors;
   const globalRate   = totals.tests > 0 ? Math.round((globalPassed / totals.tests) * 100) : 0;
@@ -2843,7 +2858,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       pdf.setFontSize(11);
       pdf.setTextColor(100, 116, 139);
       pdf.text('TPS = L / (1 + e^(-k*(x-x0))) — Regresión Logística No Lineal', pdfW / 2, 36, { align:'center' });
-      pdf.text('Generado: ' + new Date().toLocaleString('es-CO', { timeZone:'America/Bogota' }), pdfW / 2, 43, { align:'center' });
+      pdf.text('Generado: ' + new Date().toLocaleString('es-CO', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }), pdfW / 2, 43, { align:'center' });
 
       // Imagen del análisis (puede ocupar varias páginas)
       let yPos = 52;
@@ -2888,7 +2903,9 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
 //  ENTRY POINT
 // ═══════════════════════════════════════════════════════════════════════════════
 function openInBrowser(filePath) {
-  const cmds = { win32: `start "" "${filePath}"`, darwin: `open "${filePath}"`, linux: `xdg-open "${filePath}"` };
+  // Risk 2: escapar comillas dobles en la ruta por si el path las contiene
+  const escaped = filePath.replace(/"/g, '\\"');
+  const cmds = { win32: `start "" "${escaped}"`, darwin: `open "${escaped}"`, linux: `xdg-open "${escaped}"` };
   const cmd  = cmds[process.platform] || cmds.linux;
   console.log('🌐 Abriendo portal en el navegador...');
   exec(cmd, err => {
@@ -3018,7 +3035,9 @@ async function main() {
   }
 
   const groups      = groupByModule(suites);
-  const generatedAt = new Date().toLocaleString('es-CO', { timeZone:'America/Bogota', dateStyle:'medium', timeStyle:'short' });
+  // Risk 1: timezone configurable via PORTAL_TZ; fallback a la TZ del sistema
+  const PORTAL_TZ   = process.env.PORTAL_TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  const generatedAt = new Date().toLocaleString('es-CO', { timeZone: PORTAL_TZ, dateStyle:'medium', timeStyle:'short' });
   const features    = readFeatureFiles(FEATURES_DIR);
   console.log(`🥒 Features Gherkin encontrados: ${features.length}`);
 
@@ -3038,13 +3057,22 @@ async function main() {
     console.warn('Análisis estadístico PNF no disponible:', e.message);
   }
 
-  const html        = buildPortalHTML(groups, totals, generatedAt, features, suites, statisticalAnalysis);
+  let html = buildPortalHTML(groups, totals, generatedAt, features, suites, statisticalAnalysis);
+
+  // Risk 6: banner visible en el portal cuando no hay datos de prueba
+  if (!fs.existsSync(XML_FILE)) {
+    const noDataBanner = `<div id="no-data-banner" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#ef4444;color:#fff;padding:14px 24px;text-align:center;font-family:sans-serif;font-size:14px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.3)">` +
+      `⚠️ Portal sin datos — no se encontró <code>test-results/results.xml</code>. Ejecuta las pruebas con <code>npm test</code> primero.</div>`;
+    html = html.replace(/<body[^>]*>/, m => m + noDataBanner);
+  }
 
   fs.writeFileSync(OUT_FILE, html, 'utf-8');
   console.log(`✅ Portal generado: ${OUT_FILE}`);
 
   const csv = generateCSV(suites, features, generatedAt);
-  fs.writeFileSync(CSV_FILE, '\uFEFF' + csv, 'utf-8'); // BOM for Excel compatibility
+  // Risk 8: BOM configurable \u2014 CSV_BOM=false deshabilita el BOM para herramientas Unix/pandas
+  const csvContent = process.env.CSV_BOM !== 'false' ? '\uFEFF' + csv : csv;
+  fs.writeFileSync(CSV_FILE, csvContent, 'utf-8');
   console.log(`📊 CSV generado: ${CSV_FILE}`);
 
   openInBrowser(OUT_FILE);

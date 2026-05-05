@@ -44,6 +44,11 @@ const html = `<!DOCTYPE html>
 </body>
 </html>`;
 
-fs.writeFileSync(indexFile, html);
-console.log(`✅ Índice generado: ${indexFile}`);
-console.log(`   Ábrelo con: npx playwright show-report reports/ (o navega a la carpeta reports)`);
+try {
+  fs.writeFileSync(indexFile, html);
+  console.log(`✅ Índice generado: ${indexFile}`);
+  console.log(`   Ábrelo con: npx playwright show-report reports/ (o navega a la carpeta reports)`);
+} catch (err) {
+  console.error(`❌ Error escribiendo índice en ${indexFile}:`, err.message);
+  process.exit(1);
+}

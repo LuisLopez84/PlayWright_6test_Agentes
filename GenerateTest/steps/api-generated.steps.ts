@@ -18,7 +18,12 @@ const _ctx: {
 } = { type: 'REST', method: 'GET', url: '', body: null, soapAction: null, status: 0, hasNetworkError: false };
 
 Before(async () => {
-  _ctx.status = 0;
+  _ctx.type           = 'REST';
+  _ctx.method         = 'GET';
+  _ctx.url            = '';
+  _ctx.body           = null;
+  _ctx.soapAction     = null;
+  _ctx.status         = 0;
   _ctx.hasNetworkError = false;
 });
 

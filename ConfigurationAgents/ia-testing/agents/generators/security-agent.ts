@@ -6,18 +6,17 @@ export async function generateSecurity(name: string, url: string, steps: any[] =
   let baseUrl = url;
   try {
     baseUrl = new URL(url).origin;
-  } catch {
-    // mantener la URL tal cual
-  }
+  } catch {}
 
-  // 🔥 Extraer selectores de login de los steps (texto visible en la grabación)
-  let usernameSelector = '';
-  let passwordSelector = '';
+  // ── Extraer selectores de login de los steps ──────────────────────────────
+  let usernameSelector    = '';
+  let passwordSelector    = '';
   let loginButtonSelector = '';
-  let loginPath = '/login';
+  let loginPath           = '/login';
 
   for (const step of steps) {
-    if (step.action === 'input' || step.action === 'fill') {
+    const action = step.action ?? step.type ?? '';
+    if (action === 'input' || action === 'fill') {
       const target = (step.target || '').toLowerCase();
       if (target.includes('usuario') || target.includes('user') || target.includes('email')) {
         usernameSelector = step.target;
@@ -26,148 +25,138 @@ export async function generateSecurity(name: string, url: string, steps: any[] =
         passwordSelector = step.target;
       }
     }
-    if (step.action === 'click') {
+    if (action === 'click') {
       const tgt = (step.target || '').toLowerCase();
-      if (tgt.includes('ingresar') || tgt.includes('login') || tgt.includes('sign in') || tgt.includes('acceder')) {
+      if (tgt.includes('ingresar') || tgt.includes('login') ||
+          tgt.includes('sign in') || tgt.includes('acceder')) {
         loginButtonSelector = step.target;
       }
     }
-    // Intentar inferir la ruta de login de la URL
-    if (step.action === 'page_load' && step.url) {
+    if ((action === 'page_load' || action === 'goto') && step.url) {
       try {
         const parsed = new URL(step.url);
-        if (parsed.pathname.includes('login') || parsed.pathname.includes('signin') || parsed.pathname.includes('auth')) {
+        if (parsed.pathname.includes('login') || parsed.pathname.includes('signin') ||
+            parsed.pathname.includes('auth')) {
           loginPath = parsed.pathname;
         }
       } catch {}
     }
   }
 
-  // ¿La grabación tiene formulario de login?
   const hasLoginForm = !!(usernameSelector && passwordSelector && loginButtonSelector);
   if (!hasLoginForm) {
-    usernameSelector = usernameSelector || 'input[type="text"]:first-of-type';
-    passwordSelector = passwordSelector || 'input[type="password"]';
+    usernameSelector    = usernameSelector    || 'input[type="text"]:first-of-type';
+    passwordSelector    = passwordSelector    || 'input[type="password"]';
     loginButtonSelector = loginButtonSelector || 'button[type="submit"]';
   }
 
-  // 🔥 OBTENER HEADERS REALES DEL SERVIDOR (para generar aserciones precisas)
-  let securityHeaders: string[] = [];
-  try {
-    const response = await fetch(baseUrl, { method: 'GET' });
-    const headers = response.headers;
-    const commonSecurityHeaders = [
-      'x-frame-options',
-      'x-content-type-options',
-      'x-xss-protection',
-      'strict-transport-security',
-      'content-security-policy',
-      'referrer-policy',
-      'permissions-policy',
-    ];
-    securityHeaders = commonSecurityHeaders.filter(h => headers.has(h));
-    console.log(`🔍 Headers de seguridad detectados para ${name}: ${securityHeaders.join(', ') || 'ninguno'}`);
-  } catch (err: any) {
-    console.log(`⚠️ No se pudieron obtener headers de seguridad para ${name}: ${err?.message}`);
-  }
+  // Risk 1 & 7: NO fetch en tiempo de generación — elimina bloqueo de npm run generate
+  // cuando el servidor no está disponible. Los headers se verifican en runtime dentro del spec.
 
   const testDir = path.join('GenerateTest', 'tests', name, 'security');
   ensureDir(testDir);
 
-  // ── Generar aserciones de headers dinámicamente ──
-  let headerAssertions = '';
-  if (securityHeaders.includes('x-frame-options')) {
-    headerAssertions += `    expect(response.headers()['x-frame-options']).toBeDefined();\n`;
-  }
-  if (securityHeaders.includes('x-content-type-options')) {
-    headerAssertions += `    expect(response.headers()['x-content-type-options']).toBe('nosniff');\n`;
-  }
-  if (securityHeaders.includes('x-xss-protection')) {
-    headerAssertions += `    expect(response.headers()['x-xss-protection']).toBeDefined();\n`;
-  }
-  if (securityHeaders.includes('strict-transport-security')) {
-    headerAssertions += `    expect(response.headers()['strict-transport-security']).toBeDefined();\n`;
-  }
-  if (securityHeaders.includes('content-security-policy')) {
-    headerAssertions += `    expect(response.headers()['content-security-policy']).toBeDefined();\n`;
-  }
-  if (securityHeaders.includes('referrer-policy')) {
-    headerAssertions += `    expect(response.headers()['referrer-policy']).toBeDefined();\n`;
-  }
-  if (securityHeaders.includes('permissions-policy')) {
-    headerAssertions += `    expect(response.headers()['permissions-policy']).toBeDefined();\n`;
-  }
-  if (!headerAssertions) {
-    headerAssertions = `    // No se detectaron headers de seguridad — test informativo\n    console.log('⚠️ No se detectaron headers de seguridad en ${baseUrl}');\n    expect(true).toBeTruthy();\n`;
-  }
-
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════════════════════
   // ARCHIVO 1: Security principal (headers + SQLi + XSS)
-  // ════════════════════════════════════════════════════════
-  const mainSecurityCode = `import { test, expect } from '@playwright/test';
-import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
-import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
+  // ════════════════════════════════════════════════════════════════════════════
+  const file1 = path.join(testDir, `${name}-security.spec.ts`);
+  if (!fs.existsSync(file1)) {
+    const mainSecurityCode = `import { test, expect } from '@playwright/test';
+import { smartGoto } from '@utils/navigation-helper';
+import { smartFill, smartClick } from '@utils/smart-actions';
 
-test.describe('Security tests for ${name}', () => {
+// Risk 2 (performance/accessibility pattern): URL sobreescribible sin regenerar
+const TARGET_URL  = process.env.BASE_URL || '${baseUrl}';
+const LOGIN_PATH  = '${loginPath}';
 
+test.describe('Security: ${name}', () => {
+
+  // ── Headers de seguridad ──────────────────────────────────────────────────
+  // Risk 1/8: verificación en runtime — no depende de fetch en tiempo de generación
   test('security headers', async ({ request }) => {
-    const response = await request.get('${baseUrl}');
-${headerAssertions}  });
+    const response = await request.get(TARGET_URL);
+    const h = response.headers();
 
-  test('sql injection', async ({ request }) => {
-    const response = await request.post('${baseUrl}${loginPath}', {
+    const optional = ['strict-transport-security', 'content-security-policy',
+                      'referrer-policy', 'permissions-policy'];
+    const missing = optional.filter(name => !h[name]);
+    if (missing.length > 0) {
+      console.warn(\`⚠️ Headers opcionales ausentes en ${name}: \${missing.join(', ')}\`);
+    }
+
+    // Risk 8: assertions reales sobre los headers más críticos
+    expect(h['x-content-type-options'],
+      'x-content-type-options debe ser "nosniff"').toBe('nosniff');
+    expect(h['x-frame-options'],
+      'x-frame-options debe estar presente').toBeTruthy();
+  });
+
+  // ── SQL injection ─────────────────────────────────────────────────────────
+  test('sql injection protection', async ({ request }) => {
+    const response = await request.post(TARGET_URL + LOGIN_PATH, {
       data: { username: "' OR '1'='1", password: "' OR '1'='1" }
     });
     const status = response.status();
+
     ${hasLoginForm
-      ? `// No debe responder 200/201 (éxito) ante una inyección SQL.
-    // 404 es aceptable en SPAs donde el endpoint /login no existe como API REST.
-    expect(status).not.toBe(200);
-    expect(status).not.toBe(201);`
-      : `// App sin formulario de login explícito — test informativo
-    // El endpoint /login en una SPA sirve HTML (status 200 es normal)
-    console.log(\`ℹ️ SQL injection test informativo: ${baseUrl}${loginPath} devolvió \${status}\`);
-    expect(true).toBeTruthy();`
+      ? `// Risk 8: assertions reales — no debe retornar éxito ni error interno de BD
+    expect(status, 'No debe responder 200 (éxito) ante SQLi').not.toBe(200);
+    expect(status, 'No debe responder 201 (creado) ante SQLi').not.toBe(201);
+    // Risk 6: 500 indica error SQL que llegó al cliente — también es un fallo
+    expect(status, 'No debe retornar 500 (posible error SQL interno)').not.toBe(500);`
+      : `// SPA sin endpoint REST de login — al menos no debe retornar error interno
+    // Risk 6: 500 indicaría que el payload llegó a una BD
+    expect(status, 'No debe retornar 500 (posible error SQL interno)').not.toBe(500);
+    console.log(\`ℹ️ SQL injection informativo: \${TARGET_URL + LOGIN_PATH} → \${status}\`);`
     }
   });
 
+  // ── XSS ───────────────────────────────────────────────────────────────────
   test('XSS injection protection', async ({ page }) => {
-    await smartGoto(page, '${name}');
+    await page.goto(TARGET_URL);
     const payload = "<script>alert('xss')</script>";
+
     ${hasLoginForm
       ? `await smartFill(page, '${usernameSelector}', payload);
     await smartFill(page, '${passwordSelector}', payload);
     await smartClick(page, '${loginButtonSelector}');`
-      : `// App sin login — intentar inyección en cualquier campo de texto visible
-    try {
-      const firstInput = page.locator('input[type="text"]:visible, input:not([type="hidden"]):visible').first();
+      : `try {
+      const firstInput = page.locator(
+        'input[type="text"]:visible, input:not([type="hidden"]):visible'
+      ).first();
       if (await firstInput.count() > 0) {
         await firstInput.fill(payload);
         await firstInput.press('Enter');
       }
-    } catch { /* No hay campos de texto disponibles */ }`
+    } catch { /* sin campos de texto visibles */ }`
     }
 
     const content = await page.content();
-    expect(content).not.toContain(payload);
+    expect(content, 'El payload XSS no debe aparecer sin escapar en el DOM').not.toContain(payload);
   });
 
 });
 `;
-  fs.writeFileSync(path.join(testDir, `${name}-security.spec.ts`), mainSecurityCode);
-  console.log(`✅ Security test generado: ${testDir}/${name}-security.spec.ts`);
+    fs.writeFileSync(file1, mainSecurityCode);
+    console.log(`✅ Security test generado: ${file1}`);
+  } else {
+    console.log(`⚠️ Security spec ya existe, omitiendo: ${file1}`);
+  }
 
-  // ════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════════════════════
   // ARCHIVO 2: HTTPS Enforcement
-  // ════════════════════════════════════════════════════════
-  const isHttps = baseUrl.startsWith('https');
-  const httpsCode = `import { test, expect } from '@playwright/test';
-import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
+  // ════════════════════════════════════════════════════════════════════════════
+  const file2 = path.join(testDir, `${name}-https-enforcement.spec.ts`);
+  if (!fs.existsSync(file2)) {
+    const httpsCode = `import { test, expect } from '@playwright/test';
 
-test.describe('HTTPS enforcement for ${name}', () => {
+// Risk 5: TARGET_URL evaluado en runtime — si la app migra HTTP→HTTPS no hay que regenerar
+const TARGET_URL = process.env.BASE_URL || '${baseUrl}';
 
-  test('URL base usa HTTPS', async ({ page }) => {
-    await smartGoto(page, '${name}');
+test.describe('HTTPS enforcement: ${name}', () => {
+
+  test('URL usa HTTPS', async ({ page }) => {
+    await page.goto(TARGET_URL);
     const currentUrl = page.url();
     expect(
       currentUrl.startsWith('https://'),
@@ -176,135 +165,149 @@ test.describe('HTTPS enforcement for ${name}', () => {
   });
 
   test('Redirect HTTP → HTTPS', async ({ request }) => {
-    const httpUrl = '${baseUrl}'.replace('https://', 'http://');
+    const httpUrl = TARGET_URL.replace(/^https?:\\/\\//, 'http://');
     try {
       const response = await request.get(httpUrl, { maxRedirects: 0 });
-      // Debe redirigir (301/302/307/308) o rechazar la conexión HTTP
-      const status = response.status();
-      const isRedirect = [301, 302, 307, 308].includes(status);
+      const status   = response.status();
       const location = response.headers()['location'] || '';
-      if (isRedirect) {
-        expect(location.startsWith('https://')).toBeTruthy();
+      if ([301, 302, 307, 308].includes(status)) {
+        expect(location.startsWith('https://'),
+          \`Redirect debe apuntar a https:// — got: \${location}\`).toBeTruthy();
       } else {
-        // Algunos servidores rechazan HTTP directamente (status >= 400)
-        expect(status).toBeGreaterThanOrEqual(300);
+        // Servidor que rechaza HTTP directamente (≥400) también es correcto
+        expect(status, 'HTTP debe ser rechazado o redirigido').toBeGreaterThanOrEqual(300);
       }
     } catch {
-      // Conexión rechazada en HTTP es comportamiento correcto también
+      // Conexión rechazada en HTTP es comportamiento correcto
       expect(true).toBeTruthy();
     }
   });
 
-  test('HSTS header presente', async ({ request }) => {
-    const response = await request.get('${baseUrl}');
+  test('HSTS header presente en sitios HTTPS', async ({ request }) => {
+    const response = await request.get(TARGET_URL);
     const hsts = response.headers()['strict-transport-security'];
-    if (${isHttps}) {
-      // Para sitios HTTPS se espera el header (advertencia si no está)
-      if (!hsts) {
-        console.warn('⚠️ Strict-Transport-Security no presente en ${baseUrl}');
-      }
-      // No es fatal — no todos los sitios lo implementan, pero se reporta
-      expect(true).toBeTruthy();
+
+    // Risk 5: evaluado en runtime, no bakeado como literal boolean
+    if (TARGET_URL.startsWith('https://')) {
+      // Risk 8: assertion real para sitios HTTPS
+      expect(hsts,
+        'Strict-Transport-Security debe estar presente en sitios HTTPS'
+      ).toBeTruthy();
     } else {
-      // Si no es HTTPS, el test es informativo
-      console.warn('⚠️ ${baseUrl} no usa HTTPS');
-      expect(true).toBeTruthy();
+      console.warn(\`⚠️ \${TARGET_URL} no usa HTTPS — HSTS no aplica\`);
     }
   });
 
 });
 `;
-  fs.writeFileSync(path.join(testDir, `${name}-https-enforcement.spec.ts`), httpsCode);
-  console.log(`✅ HTTPS enforcement test generado: ${testDir}/${name}-https-enforcement.spec.ts`);
+    fs.writeFileSync(file2, httpsCode);
+    console.log(`✅ HTTPS enforcement test generado: ${file2}`);
+  } else {
+    console.log(`⚠️ HTTPS spec ya existe, omitiendo: ${file2}`);
+  }
 
-  // ════════════════════════════════════════════════════════
-  // ARCHIVO 3: Authentication Brute Force Protection
-  // ════════════════════════════════════════════════════════
-  const bruteforceCode = `import { test, expect } from '@playwright/test';
-import { smartGoto } from '../../../../ConfigurationTest/tests/utils/navigation-helper';
-import { smartFill, smartClick } from '../../../../ConfigurationTest/tests/utils/smart-actions';
+  // ════════════════════════════════════════════════════════════════════════════
+  // ARCHIVO 3: Brute Force Protection
+  // ════════════════════════════════════════════════════════════════════════════
+  const file3 = path.join(testDir, `${name}-authentication-bruteforce.spec.ts`);
+  if (!fs.existsSync(file3)) {
+    const bruteforceCode = `import { test, expect } from '@playwright/test';
+import { smartGoto } from '@utils/navigation-helper';
+import { smartFill, smartClick } from '@utils/smart-actions';
 
-test.describe('Brute force protection for ${name}', () => {
+const TARGET_URL  = process.env.BASE_URL || '${baseUrl}';
+const LOGIN_PATH  = '${loginPath}';
 
-  test('Protección contra brute force via API', async ({ request }) => {
-    const loginEndpoint = '${baseUrl}${loginPath}';
+// Risk 4: iteraciones configurables vía variables de entorno
+const BRUTE_FORCE_ATTEMPTS = Number(process.env.BRUTE_FORCE_ATTEMPTS || 10);
+const UI_ATTEMPTS          = Number(process.env.UI_BRUTE_FORCE_ATTEMPTS || 3);
+
+test.describe('Brute force protection: ${name}', () => {
+
+  test('Protección via API', async ({ request }) => {
+    const loginEndpoint = TARGET_URL + LOGIN_PATH;
     let lastStatus = 0;
 
-    // Enviar 10 intentos fallidos consecutivos
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < BRUTE_FORCE_ATTEMPTS; i++) {
       const res = await request.post(loginEndpoint, {
-        data: { username: '${usernameSelector}', password: \`wrong_password_\${i}\` }
+        // Risk 3: username real de prueba, no el selector CSS
+        data: { username: 'brute_force_test_user', password: \`wrong_password_\${i}\` }
       });
       lastStatus = res.status();
     }
 
-    // Tras múltiples intentos, el servidor debe bloquear (429) o al menos no devolver 200
-    // También es válido 404 si el endpoint no existe en el backend (SPA)
-    const isProtected = lastStatus !== 200 && lastStatus !== 201;
-    if (!isProtected) {
-      console.warn('⚠️ El endpoint no aplicó rate limiting tras 10 intentos fallidos');
+    // Risk 8: assertion real — tras N intentos no debe seguir retornando 200/201
+    const isBlocked = lastStatus !== 200 && lastStatus !== 201;
+    if (!isBlocked) {
+      console.warn(\`⚠️ Sin rate limiting tras \${BRUTE_FORCE_ATTEMPTS} intentos fallidos — status: \${lastStatus}\`);
     }
-    // Test informativo — no todos los SPAs tienen este endpoint activo
-    expect(true).toBeTruthy();
+    expect(lastStatus, \`Debe bloquear tras \${BRUTE_FORCE_ATTEMPTS} intentos (got \${lastStatus})\`)
+      .not.toBe(200);
   });
 
-  test('Protección contra brute force via UI', async ({ page }) => {
+  test('Protección via UI', async ({ page }) => {
     ${hasLoginForm
-      ? `await smartGoto(page, '${name}');
+      ? `await page.goto(TARGET_URL);
 
-    // Intentar login con credenciales incorrectas 3 veces
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < UI_ATTEMPTS; i++) {
       try {
-        await smartFill(page, '${usernameSelector}', '${usernameSelector}');
+        await smartFill(page, '${usernameSelector}', 'brute_force_ui_user');
         await smartFill(page, '${passwordSelector}', \`wrong_attempt_\${i}\`);
         await smartClick(page, '${loginButtonSelector}');
-        await page.waitForTimeout(500);
+        await page.waitForLoadState('domcontentloaded');
       } catch { break; }
     }
 
-    // Verificar que no se autenticó (no debe estar en una página protegida)
-    const url = page.url();
-    const content = await page.content();
+    const currentUrl = page.url();
+    const content    = await page.content();
 
-    // El login fallido debe mostrar error o mantener el formulario visible
-    const hasLoginForm = await page.locator(
-      'input[type="password"], [type="password"], [name="password"], [aria-label*="contraseña" i], [aria-label*="password" i]'
+    // Risk 2: renombrado de hasLoginForm → formStillPresent para evitar confusión con el generador
+    const formStillPresent = await page.locator(
+      'input[type="password"], [name="password"], [aria-label*="contraseña" i], [aria-label*="password" i]'
     ).count() > 0;
 
     const hasErrorMessage = content.toLowerCase().includes('error') ||
       content.toLowerCase().includes('incorrecto') ||
-      content.toLowerCase().includes('invalid') ||
-      content.toLowerCase().includes('incorrect') ||
-      content.toLowerCase().includes('bloqueado') ||
+      content.toLowerCase().includes('invalid')    ||
+      content.toLowerCase().includes('bloqueado')  ||
       content.toLowerCase().includes('blocked');
 
-    // Al menos uno debe ser true: sigue en el login O hay mensaje de error
-    expect(hasLoginForm || hasErrorMessage || url.includes('login')).toBeTruthy();`
-      : `// App sin formulario de login — test informativo
-    console.log('ℹ️ Brute force UI test: app sin formulario de login detectado (${name})');
-    expect(true).toBeTruthy(); // Informativo — no aplica para apps sin autenticación`
+    // Risk 8: el login fallido debe mantener el formulario visible o mostrar error
+    expect(
+      formStillPresent || hasErrorMessage || currentUrl.includes('login'),
+      'Tras intentos fallidos debe permanecer en login o mostrar error'
+    ).toBeTruthy();`
+      : `// App sin formulario de login detectado en la grabación — test informativo
+    console.log('ℹ️ Brute force UI: sin formulario de login en ${name}');
+    await page.goto(TARGET_URL);
+    await page.waitForLoadState('domcontentloaded');
+    expect(page.url()).toBeTruthy();`
     }
   });
 
-  test('No revelar información sensible en respuesta de error', async ({ request }) => {
-    const loginEndpoint = '${baseUrl}${loginPath}';
+  test('No revelar enumeración de usuarios', async ({ request }) => {
+    const loginEndpoint = TARGET_URL + LOGIN_PATH;
     try {
       const response = await request.post(loginEndpoint, {
-        data: { username: 'nonexistent_user_xyz', password: 'wrong' }
+        data: { username: 'nonexistent_user_xyz_123', password: 'wrong' }
       });
       const body = await response.text();
-      // No debe revelar si el usuario existe o no (enumeración de usuarios)
-      expect(body.toLowerCase()).not.toContain('user not found');
-      expect(body.toLowerCase()).not.toContain('usuario no encontrado');
-      expect(body.toLowerCase()).not.toContain('email not registered');
+      // Risk 8: assertions reales sobre fuga de información
+      expect(body.toLowerCase(), 'No debe revelar "user not found"').not.toContain('user not found');
+      expect(body.toLowerCase(), 'No debe revelar "usuario no encontrado"').not.toContain('usuario no encontrado');
+      expect(body.toLowerCase(), 'No debe revelar "email not registered"').not.toContain('email not registered');
+      expect(body.toLowerCase(), 'No debe revelar "no existe"').not.toContain('no existe');
     } catch {
-      // Endpoint no disponible en SPA — test pasa como informativo
+      // Endpoint no disponible en SPA — pasa como informativo
       expect(true).toBeTruthy();
     }
   });
 
 });
 `;
-  fs.writeFileSync(path.join(testDir, `${name}-authentication-bruteforce.spec.ts`), bruteforceCode);
-  console.log(`✅ Brute force protection test generado: ${testDir}/${name}-authentication-bruteforce.spec.ts`);
+    fs.writeFileSync(file3, bruteforceCode);
+    console.log(`✅ Brute force test generado: ${file3}`);
+  } else {
+    console.log(`⚠️ Brute force spec ya existe, omitiendo: ${file3}`);
+  }
 }
