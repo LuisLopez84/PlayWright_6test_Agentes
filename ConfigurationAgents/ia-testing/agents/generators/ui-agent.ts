@@ -118,11 +118,42 @@ ${dialogQueueBlock}`;
     const step     = uniqueSteps[i];
     const nextStep = uniqueSteps[i + 1];
 
-    // ── page_load → omitir (smartGoto ya navega) ─────────────────────────
-    if (step.action === 'page_load') { i++; continue; }
+    // ── page_load / context_change → omitir (smartGoto ya navega) ──────────
+    if (step.action === 'page_load' || step.action === 'context_change') { i++; continue; }
 
     // ── dialog_handler → consolidado en bloque global ─────────────────────
     if (step.action === 'dialog_handler') { i++; continue; }
+
+    // ── navigate_section (menú/sidebar click) → smartClick ───────────────
+    // enhanceFlow semántica: preserva selector; se ejecuta como click normal
+    if (step.action === 'navigate_section') {
+      const navSel = safeNormalize(step.selector || step.target || '');
+      if (navSel) code += `\n  await smartClick(page, \`${navSel}\`);`;
+      i++; continue;
+    }
+
+    // ── confirm (botón de confirmación) → smartClick ─────────────────────
+    // enhanceFlow semántica: Transferir, Confirmar, Aceptar, etc.
+    if (step.action === 'confirm') {
+      const cfmSel = safeNormalize(step.selector || step.target || '');
+      if (cfmSel) {
+        // Si el siguiente paso es verify, usar Promise.all para capturar toast
+        const nextAfterConfirm = uniqueSteps[i + 1];
+        if (nextAfterConfirm?.action === 'verify') {
+          const verifyTgt = safeNormalize(nextAfterConfirm.selector || nextAfterConfirm.target || '');
+          if (verifyTgt) {
+            code += `
+  await Promise.all([
+    smartWaitForText(page, \`${verifyTgt}\`, VERIFY_TIMEOUT),
+    smartClick(page, \`${cfmSel}\`),
+  ]);`;
+            i += 2; continue;
+          }
+        }
+        code += `\n  await smartClick(page, \`${cfmSel}\`);`;
+      }
+      i++; continue;
+    }
 
     // ── press_enter ───────────────────────────────────────────────────────
     if (step.action === 'press_enter') {

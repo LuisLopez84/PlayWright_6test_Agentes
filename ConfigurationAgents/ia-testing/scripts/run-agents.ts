@@ -302,16 +302,28 @@ async function runAgents() {
       console.log(`📄 Feature generado: ${featurePath}`);
 
       // 2b. Validar cobertura del feature y corregir si hay pasos faltantes
+      // IMPORTANTE: actualizar gherkin con el feature corregido para que
+      // generateStepsFromGherkin reciba los pasos añadidos por el validador.
       try {
         const validation = await validateFlow(steps, gherkin, featurePath);
         if (!validation.skipped && validation.hasMissingSteps) {
           console.log(`🔧 Feature corregido con ${validation.missingSteps.length} paso(s) añadido(s)`);
         }
+        // Usar el feature corregido si existe; si no, releer del disco por seguridad
+        if (validation.correctedFeature) {
+          gherkin = validation.correctedFeature;
+        } else if (fs.existsSync(featurePath)) {
+          gherkin = fs.readFileSync(featurePath, 'utf-8');
+        }
       } catch (err) {
         console.warn('⚠️ Error en validación del feature (no crítico)', err);
+        // Fallback: releer del disco para capturar cualquier corrección parcial
+        if (fs.existsSync(featurePath)) {
+          gherkin = fs.readFileSync(featurePath, 'utf-8');
+        }
       }
 
-      // 3. Step definitions
+      // 3. Step definitions — usa el gherkin ya corregido por el validador
       try {
         await generateStepsFromGherkin(name, gherkin);
       } catch (err) {

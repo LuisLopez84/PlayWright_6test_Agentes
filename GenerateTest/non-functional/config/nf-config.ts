@@ -113,7 +113,7 @@ export const NFConfig: {
     // ── TARGET 1a: Misma API SOAP — Prueba INCREMENTAL ───────────────────────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_PlazosFijos/api/Homebanking_PlazosFijos_Servicio_Operacion_SOAP_POST_generated.spec.ts',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_Transferencias_QA/api/Homebanking_Transferencias_QA_Servicio_SOAP_POST.spec.ts',
       endpoint: {
         name: 'SOAP Calculator — INCREMENTAL',   // nombre único → distinguible en el reporte
         method: 'POST',
@@ -144,7 +144,7 @@ export const NFConfig: {
     // ── TARGET 1b: Misma API SOAP — Prueba de PICOS (simultánea con 1a) ──────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_PlazosFijos/api/Homebanking_PlazosFijos_Servicio_Operacion_SOAP_POST_generated.spec.ts',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_Transferencias_QA/api/Homebanking_Transferencias_QA_Servicio_SOAP_POST.spec.ts',
       endpoint: {
         name: 'SOAP Calculator — PICOS',         // nombre único → distinguible en el reporte
         method: 'POST',
@@ -178,7 +178,7 @@ export const NFConfig: {
     // ── TARGET 2a: Recording UI — INCREMENTAL (diferente suite) ──────────────
      {
        type: 'recording',
-       recording: 'Homebanking_PlazosFijos',
+       recording: 'Homebanking_Transferencias_QA',
        testType: 'incremental',
        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
      },

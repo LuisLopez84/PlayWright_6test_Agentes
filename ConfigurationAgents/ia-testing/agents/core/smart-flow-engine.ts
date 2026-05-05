@@ -88,21 +88,25 @@ export function enhanceFlow(steps: Action[]): EnhancedStep[] {
 
     if (isNavigationStep(step, prev)) {
       result.push({
+        ...step,                          // preserva selector para ui-agent
         action: 'context_change',
         target: step.target ?? step.url,
       });
     } else if (isConfirmation(step)) {
       result.push({
+        ...step,                          // preserva selector para ui-agent
         action: 'confirm',
         target: step.target,
       });
     } else if (isMenuClick(step)) {
       result.push({
+        ...step,                          // preserva selector para ui-agent
         action: 'navigate_section',
         target: step.target,
       });
     } else if (isFormStep(step)) {
       result.push({
+        ...step,                          // preserva selector para ui-agent
         action: step.action ?? '',
         target: step.target,
         value:  step.value,

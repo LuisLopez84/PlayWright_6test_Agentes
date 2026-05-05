@@ -25,7 +25,7 @@ import { SelectorEngine } from '../../../ConfigurationAgents/ia-testing/agents/c
 import { resolveSmartValue } from './test-data-resolver';
 import { waitForUIStability } from './smart-ui-detector';
 import { closeAnyModal, waitForOverlayToDisappear } from './modal-handler';
-import { openai } from '../../../ConfigurationAgents/ia-testing/utils/openai-client';
+import { openai, hasOpenAI } from '../../../ConfigurationAgents/ia-testing/utils/openai-client';
 import { learningStore } from '../../../ConfigurationAgents/ia-testing/agents/core/learning-store';
 
 // ─────────────────────────────────────────────
@@ -1202,6 +1202,223 @@ Solo el selector o NOT_FOUND, sin explicación.`;
 }
 
 // ─────────────────────────────────────────────
+// HIDDEN SELECT HEALER (transversal)
+// Cubre el patrón SPA donde el <select> nativo está oculto y una UI personalizada
+// (react-select, select2, ng-select, Material UI, Ant Design, etc.) lo reemplaza.
+// Se activa SOLO cuando el elemento existe en el DOM pero no es visible.
+// ─────────────────────────────────────────────
+
+/** Capa 1 – Force JS: asigna el valor directamente sobre el <select> oculto y
+ *  dispara los eventos change/input que escuchan los frameworks modernos. */
+async function forceJsSelect(page: Page, selector: string, value: string): Promise<boolean> {
+  return page.evaluate(
+    ({ sel, val }) => {
+      const trySet = (el: Element | null): boolean => {
+        if (!el || el.tagName !== 'SELECT') return false;
+        const opts = Array.from((el as HTMLSelectElement).options);
+        const match =
+          opts.find(o => o.value === val) ||
+          opts.find(o => o.text.trim() === val) ||
+          opts.find(o => o.value.toLowerCase() === val.toLowerCase()) ||
+          opts.find(o => o.text.trim().toLowerCase() === val.toLowerCase());
+        if (!match) return false;
+        (el as HTMLSelectElement).value = match.value;
+        ['input', 'change'].forEach(evt =>
+          el.dispatchEvent(new Event(evt, { bubbles: true }))
+        );
+        return true;
+      };
+      if (trySet(document.querySelector(sel))) return true;
+      // Fuzzy: buscar <select> cuyo id/name/data-testid coincida con el selector sin prefijos
+      const bare = sel.replace(/^[#.\[]/, '').replace(/\]$/, '');
+      for (const s of Array.from(document.querySelectorAll('select'))) {
+        if (s.id === bare || s.getAttribute('name') === bare || s.getAttribute('data-testid') === bare) {
+          if (trySet(s)) return true;
+        }
+      }
+      return false;
+    },
+    { sel: selector, val: value }
+  ).catch(() => false);
+}
+
+/** Capa 2 – Custom dropdown: detecta el trigger visual asociado al <select> oculto
+ *  (react-select, select2, ng-select, MUI, Ant Design, Bootstrap Select…),
+ *  lo abre y hace clic en la opción correspondiente. */
+async function tryCustomDropdown(page: Page, selector: string, value: string): Promise<boolean> {
+  // Detectar el patrón de dropdown custom y devolver la estrategia a usar
+  const detection = await page.evaluate(({ sel }) => {
+    const el = document.querySelector(sel);
+    if (!el) return null;
+    // Buscar en ancestors un contenedor de custom dropdown conocido
+    const PATTERNS: [string, string][] = [
+      ['.react-select__control',      'react-select'],
+      ['.select__control',            'react-select'],
+      ['.vs__dropdown-toggle',        'vue-select'],
+      ['.ng-select-container',        'ng-select'],
+      ['.select2-selection',          'select2'],
+      ['.chosen-single',              'chosen'],
+      ['.MuiSelect-select',           'material-ui'],
+      ['.ant-select-selector',        'ant-design'],
+      ['.dropdown-toggle',            'bootstrap'],
+      ['[role="combobox"]',           'generic-combobox'],
+    ];
+    let node: Element | null = el.parentElement;
+    for (let depth = 0; depth < 5 && node; depth++, node = node.parentElement) {
+      for (const [trigSel, lib] of PATTERNS) {
+        const trig = node.querySelector(trigSel) as HTMLElement | null;
+        if (trig && trig.offsetParent !== null) {
+          return { triggerSelector: trigSel, lib, containerIndex: depth };
+        }
+      }
+    }
+    return null;
+  }, { sel: selector }).catch(() => null);
+
+  if (!detection) return false;
+
+  try {
+    // Construir el locator del trigger buscando el contenedor más cercano al select
+    const containerLoc = page.locator(selector).locator('xpath=ancestor::*[1]');
+    // Intentar hasta 5 niveles de ancestor para encontrar el trigger visible
+    let triggerClicked = false;
+    for (let depth = 1; depth <= 5; depth++) {
+      const ancestorLoc = page.locator(selector).locator(`xpath=ancestor::*[${depth}]`);
+      const trigLoc = ancestorLoc.locator(detection.triggerSelector).first();
+      if (await trigLoc.count() > 0 && await trigLoc.isVisible().catch(() => false)) {
+        await trigLoc.click({ timeout: 5000 });
+        triggerClicked = true;
+        break;
+      }
+    }
+    if (!triggerClicked) {
+      // Fallback: buscar el trigger como sibling o en todo el DOM
+      const globalTrig = page.locator(detection.triggerSelector).first();
+      if (await globalTrig.count() > 0 && await globalTrig.isVisible().catch(() => false)) {
+        await globalTrig.click({ timeout: 5000 });
+        triggerClicked = true;
+      }
+    }
+    if (!triggerClicked) return false;
+
+    await page.waitForTimeout(400);
+
+    // Buscar la opción en los patrones de dropdown más comunes
+    const optionSelectors = [
+      `[role="option"]:has-text("${value}")`,
+      `.react-select__option:has-text("${value}")`,
+      `.select__option:has-text("${value}")`,
+      `.vs__dropdown-item:has-text("${value}")`,
+      `.ng-option:has-text("${value}")`,
+      `.select2-results__option:has-text("${value}")`,
+      `.dropdown-item:has-text("${value}")`,
+      `.MuiMenuItem-root:has-text("${value}")`,
+      `.ant-select-item-option:has-text("${value}")`,
+      `li:has-text("${value}")`,
+    ];
+    for (const optSel of optionSelectors) {
+      const optLoc = page.locator(optSel).first();
+      if (await optLoc.count() > 0 && await optLoc.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await optLoc.click({ timeout: 5000 });
+        console.log(`✅ [custom-dropdown:${detection.lib}] Seleccionado "${value}"`);
+        return true;
+      }
+    }
+    // Fallback: getByRole option
+    const byRole = page.getByRole('option', { name: value });
+    if (await byRole.count() > 0) {
+      await byRole.first().click({ timeout: 5000 });
+      console.log(`✅ [custom-dropdown:role-option] Seleccionado "${value}"`);
+      return true;
+    }
+  } catch (e: any) {
+    console.warn(`[custom-dropdown] Error: ${e.message}`);
+  }
+  return false;
+}
+
+/** Capa 3 – AI DOM analysis: envía el HTML del contenedor más cercano al selector
+ *  a OpenAI y pide que identifique el selector del dropdown custom visible. */
+async function tryAISelectHealing(page: Page, selector: string, value: string): Promise<boolean> {
+  if (!hasOpenAI || !openai) return false;
+  try {
+    // Capturar HTML del área cercana al elemento
+    const surroundingHtml = await page.evaluate(({ sel }) => {
+      const el = document.querySelector(sel);
+      let node: Element | null = el?.parentElement ?? null;
+      for (let i = 0; i < 4 && node?.parentElement; i++) node = node.parentElement;
+      return node ? node.outerHTML.slice(0, 4000) : document.body.outerHTML.slice(0, 4000);
+    }, { sel: selector }).catch(() => '');
+
+    if (!surroundingHtml) return false;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0,
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `En este HTML de una SPA, el elemento "${selector}" está oculto con CSS y existe un dropdown custom visible.
+Necesito seleccionar la opción con valor/texto "${value}".
+Devuelve SOLO un objeto JSON con dos campos:
+- "trigger": selector CSS del elemento clickeable para abrir el dropdown
+- "option": selector CSS de la opción a seleccionar (puede incluir :has-text)
+Si no puedes determinarlo con certeza, devuelve null.
+
+HTML:
+${surroundingHtml}`,
+      }],
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim() ?? '';
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+    const parsed = JSON.parse(jsonStr) as { trigger: string; option: string } | null;
+    if (!parsed?.trigger || !parsed?.option) return false;
+
+    const trigLoc = page.locator(parsed.trigger).first();
+    if (await trigLoc.count() > 0 && await trigLoc.isVisible().catch(() => false)) {
+      await trigLoc.click({ timeout: 5000 });
+      await page.waitForTimeout(400);
+      const optLoc = page.locator(parsed.option).first();
+      if (await optLoc.count() > 0) {
+        await optLoc.click({ timeout: 5000 });
+        console.log(`✅ [ai-select-healing] Seleccionado "${value}" via IA`);
+        return true;
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[ai-select-healing] ${e.message}`);
+  }
+  return false;
+}
+
+/**
+ * Orquesta las 3 capas de healing para selects ocultos.
+ * Orden: JS force → custom dropdown → AI DOM analysis.
+ */
+async function handleHiddenSelect(page: Page, selector: string, value: string): Promise<boolean> {
+  console.log(`🔧 [hidden-select] Activando healing para "${selector}" → "${value}"`);
+
+  // Capa 1: Force JS (más rápido, sin interacción visual)
+  const jsOk = await forceJsSelect(page, selector, value);
+  if (jsOk) {
+    console.log(`✅ [hidden-select] Capa 1 (force-js) exitosa`);
+    return true;
+  }
+
+  // Capa 2: Custom dropdown pattern
+  const customOk = await tryCustomDropdown(page, selector, value);
+  if (customOk) return true;
+
+  // Capa 3: AI DOM analysis (último recurso)
+  const aiOk = await tryAISelectHealing(page, selector, value);
+  if (aiOk) return true;
+
+  console.warn(`[hidden-select] Todas las capas fallaron para "${selector}"`);
+  return false;
+}
+
+// ─────────────────────────────────────────────
 // SMART SELECT
 // ─────────────────────────────────────────────
 export async function smartSelect(page: Page, selector: string, value: string): Promise<void> {
@@ -1240,7 +1457,16 @@ export async function smartSelect(page: Page, selector: string, value: string): 
         if (isVisible) learningStore.recordSuccess(sig, healed);
       }
 
-      if (!isVisible) throw new Error(`Elemento no visible para select: ${selector}`);
+      if (!isVisible) {
+        // Capa adicional: healing para selects ocultos por custom dropdowns (SPA pattern)
+        const hiddenHandled = await handleHiddenSelect(page, selector, value);
+        if (hiddenHandled) {
+          learningStore.recordSuccess(sig, selector);
+          await waitForPageStability(page, { waitForLoad: false, waitForNetworkIdle: false });
+          return;
+        }
+        throw new Error(`Elemento no visible para select: ${selector}`);
+      }
     }
 
     // ── [4] Ejecutar select ──
