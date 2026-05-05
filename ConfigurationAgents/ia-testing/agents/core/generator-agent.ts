@@ -30,7 +30,7 @@ export async function buildFeature(name: string, rawActions: Action[]): Promise<
   let lastSelectValue: string | null = null;
 
   for (const action of actions) {
-    const isSelect = action.type === 'select' || action.type === 'select_option';
+    const isSelect = action.action === 'select' || action.action === 'select_option';
     if (isSelect) {
       const target = action.target || '';
       const value  = action.value  || '';
@@ -54,7 +54,7 @@ export async function buildFeature(name: string, rawActions: Action[]): Promise<
     const value  = action.value  || '';
 
     // Captura selects con cualquiera de los dos tipos posibles
-    if (action.type === 'select' || action.type === 'select_option') {
+    if (action.action === 'select' || action.action === 'select_option') {
       steps.push(`And selecciona "${value}" en "${target}"`);
       continue;
     }
@@ -138,18 +138,26 @@ export async function generateStepsFromGherkin(name: string, gherkin: string): P
   // Archivo por suite — nunca comparte namespace con otras suites
   const stepsFile = path.join(STEPS_DIR, `${name}.steps.ts`);
 
-  // Recopilar steps: features ya en disco + el feature actual
+  // Patrones ya definidos en api-generated.steps.ts — excluirlos del archivo de suite UI
+  // para evitar "Multiple definitions matched scenario step" en playwright-bdd.
+  const API_STEP_PATTERNS = [
+    'servicio REST',
+    'servicio SOAP',
+    'ejecuto la petición',
+    'la respuesta debe',
+    'con acción',
+    'endpoint con error',
+    'datos inválidos',
+  ];
+  const isApiStep = (step: string) => API_STEP_PATTERNS.some(p => step.includes(p));
+
+  // Solo recopilar steps del feature de esta suite (no de API features ni otras suites).
+  // Cada suite tiene su propio steps file; leer todos los features causaría duplicados
+  // con api-generated.steps.ts.
   const allStepsSet = new Set<string>();
-
-  if (fs.existsSync(FEATURES_DIR)) {
-    for (const featureFile of fs.readdirSync(FEATURES_DIR).filter(f => f.endsWith('.feature'))) {
-      const content = fs.readFileSync(path.join(FEATURES_DIR, featureFile), 'utf-8');
-      extractStepsFromGherkin(content).forEach(s => allStepsSet.add(s));
-    }
-  }
-
-  // Feature actual (puede no estar en disco todavía si se generó en memoria)
-  extractStepsFromGherkin(gherkin).forEach(s => allStepsSet.add(s));
+  extractStepsFromGherkin(gherkin)
+    .filter(s => !isApiStep(s))
+    .forEach(s => allStepsSet.add(s));
 
   // Mapa de patrón → implementación
   const stepImplementations = new Map<string, string>();

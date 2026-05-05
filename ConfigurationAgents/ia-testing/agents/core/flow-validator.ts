@@ -43,7 +43,7 @@ export async function validateFlow(
   // Resumen legible de los pasos (evita enviar JSON crudo con campos internos ruidosos)
   const stepSummary = recordingSteps
     .map((s, i) => {
-      const tipo = s.type ?? s.action ?? 'unknown';
+      const tipo = s.action ?? 'unknown';
       const desc = s.target ?? s.value ?? s.selector ?? '';
       return `${i + 1}. [${tipo}] ${desc}`;
     })

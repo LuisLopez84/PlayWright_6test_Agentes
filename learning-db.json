@@ -341,8 +341,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 64,
-      "lastUsed": "2026-05-04T19:30:26.021Z"
+      "successCount": 73,
+      "lastUsed": "2026-05-05T11:37:47.301Z"
     },
     {
       "selector": "text=Try Again",
@@ -358,8 +358,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 87,
-      "lastUsed": "2026-05-04T19:30:33.565Z"
+      "successCount": 96,
+      "lastUsed": "2026-05-05T11:37:50.369Z"
     },
     {
       "selector": "#neterrorTryAgainButton",
@@ -370,8 +370,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "text=ingresar",
-      "successCount": 48,
-      "lastUsed": "2026-05-04T19:30:35.684Z"
+      "successCount": 58,
+      "lastUsed": "2026-05-05T11:37:53.392Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -1681,9 +1681,9 @@
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Monto a invertir": [
     {
-      "selector": "Monto a invertir",
-      "successCount": 22,
-      "lastUsed": "2026-05-04T19:30:46.401Z"
+      "selector": "text=Saldo disponible",
+      "successCount": 10,
+      "lastUsed": "2026-05-05T11:38:47.053Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|Plazo": [

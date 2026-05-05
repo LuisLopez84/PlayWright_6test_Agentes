@@ -19,7 +19,7 @@ export async function resolveDataConflicts(actions: Action[]): Promise<Action[]>
 
   const selectIndices: number[] = [];
   for (let i = 0; i < resolved.length; i++) {
-    if (resolved[i].action === 'select' || resolved[i].type === 'select') {
+    if (resolved[i].action === 'select') {
       selectIndices.push(i);
     }
   }

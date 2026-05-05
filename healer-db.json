@@ -1,32 +1,126 @@
 {
-  "Usuario": "text=Usuario",
-  "Book Store Application": "text=Store Application",
-  "Pago de Servicios": "text=Servicios",
-  "HomeeSOYc": "text=Home",
-  "Choose Saturday, April 11th,": "button:has-text(\"Choose\")",
-  "Grid": "text=grid",
-  ".auto-complete__input-container": ".text:has-text(\"Auto Complete\")",
-  "Origin": "text=origin",
-  "Use": "text=use",
-  "New Window Message": "text=Window Message",
-  "Browser Windows": "text=Windows",
-  "#alertButton": "text=Alert",
-  "#timerAlertButton": "text=Book Store Application",
-  "Alerts, Frame & Windows": "text=Windows",
-  "tr:nth-child(73) > td:nth-child(2)": "#edit-contact",
-  "Last Name:": "text=Luistester CaicedoQA",
-  "LopezTesterQA": "text=Submit",
-  "Email": "[placeholder=\"Email\"]",
-  "Edit Contact": "text=Contact",
-  "LopezTesterSeniro": "text=Last Name",
-  "Submit": "button:has-text(\"Add a New Contact\")",
-  "tr:nth-child(72) > td:nth-child(2)": "tr.contactTableBodyRow:has-text(\"John Doe\")",
-  "State or Province:": "text=Province:",
-  "Luistester LopezTester": "text=luistester lopeztester",
-  "Framework001": "#submit",
-  "Add a New Contact": "text=Contact",
-  "Framework Playwright": "button:has-text(\"Sign up\")",
-  "* First Name:": "button:has-text(\"Sign up\")",
-  "Préstamo acreditado": "text=Préstamo",
-  "Ingresar": "text=ingresar"
+  "Usuario": {
+    "selector": "text=Usuario",
+    "savedAt": 1777980894369
+  },
+  "Book Store Application": {
+    "selector": "text=Store Application",
+    "savedAt": 1777980894369
+  },
+  "Pago de Servicios": {
+    "selector": "text=Servicios",
+    "savedAt": 1777980894369
+  },
+  "HomeeSOYc": {
+    "selector": "text=Home",
+    "savedAt": 1777980894369
+  },
+  "Choose Saturday, April 11th,": {
+    "selector": "button:has-text(\"Choose\")",
+    "savedAt": 1777980894369
+  },
+  "Grid": {
+    "selector": "text=grid",
+    "savedAt": 1777980894369
+  },
+  ".auto-complete__input-container": {
+    "selector": ".text:has-text(\"Auto Complete\")",
+    "savedAt": 1777980894369
+  },
+  "Origin": {
+    "selector": "text=origin",
+    "savedAt": 1777980894369
+  },
+  "Use": {
+    "selector": "text=use",
+    "savedAt": 1777980894369
+  },
+  "New Window Message": {
+    "selector": "text=Window Message",
+    "savedAt": 1777980894369
+  },
+  "Browser Windows": {
+    "selector": "text=Windows",
+    "savedAt": 1777980894369
+  },
+  "#alertButton": {
+    "selector": "text=Alert",
+    "savedAt": 1777980894369
+  },
+  "#timerAlertButton": {
+    "selector": "text=Book Store Application",
+    "savedAt": 1777980894369
+  },
+  "Alerts, Frame & Windows": {
+    "selector": "text=Windows",
+    "savedAt": 1777980894369
+  },
+  "tr:nth-child(73) > td:nth-child(2)": {
+    "selector": "#edit-contact",
+    "savedAt": 1777980894369
+  },
+  "Last Name:": {
+    "selector": "text=Luistester CaicedoQA",
+    "savedAt": 1777980894369
+  },
+  "LopezTesterQA": {
+    "selector": "text=Submit",
+    "savedAt": 1777980894369
+  },
+  "Email": {
+    "selector": "[placeholder=\"Email\"]",
+    "savedAt": 1777980894369
+  },
+  "Edit Contact": {
+    "selector": "text=Contact",
+    "savedAt": 1777980894369
+  },
+  "LopezTesterSeniro": {
+    "selector": "text=Last Name",
+    "savedAt": 1777980894369
+  },
+  "Submit": {
+    "selector": "button:has-text(\"Add a New Contact\")",
+    "savedAt": 1777980894369
+  },
+  "tr:nth-child(72) > td:nth-child(2)": {
+    "selector": "tr.contactTableBodyRow:has-text(\"John Doe\")",
+    "savedAt": 1777980894369
+  },
+  "State or Province:": {
+    "selector": "text=Province:",
+    "savedAt": 1777980894369
+  },
+  "Luistester LopezTester": {
+    "selector": "text=luistester lopeztester",
+    "savedAt": 1777980894369
+  },
+  "Framework001": {
+    "selector": "#submit",
+    "savedAt": 1777980894369
+  },
+  "Add a New Contact": {
+    "selector": "text=Contact",
+    "savedAt": 1777980894369
+  },
+  "Framework Playwright": {
+    "selector": "button:has-text(\"Sign up\")",
+    "savedAt": 1777980894369
+  },
+  "* First Name:": {
+    "selector": "button:has-text(\"Sign up\")",
+    "savedAt": 1777980894369
+  },
+  "Préstamo acreditado": {
+    "selector": "text=Préstamo",
+    "savedAt": 1777980894369
+  },
+  "Ingresar": {
+    "selector": "text=ingresar",
+    "savedAt": 1777980894369
+  },
+  "Monto a invertir": {
+    "selector": "text=Saldo disponible",
+    "savedAt": 1777980894369
+  }
 }

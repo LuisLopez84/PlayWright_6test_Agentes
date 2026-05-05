@@ -43,7 +43,7 @@ const FORM_ACTIONS = new Set([
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function isNavigationStep(step: Action, prev: Action | undefined): boolean {
-  const a = step.action ?? step.type ?? '';
+  const a = step.action ?? '';
   return a === 'page_load' || a === 'goto' ||
     (!prev && a === 'click');
 }
@@ -55,7 +55,7 @@ function isConfirmation(step: Action): boolean {
 
 // Risk 4: reemplaza heurística length < 30 por conteo de palabras + exclusión de botones
 function isMenuClick(step: Action): boolean {
-  const a = step.action ?? step.type ?? '';
+  const a = step.action ?? '';
   if (a !== 'click') return false;
   if (!step.target) return false;
   const lower = step.target.toLowerCase().trim();
@@ -67,7 +67,7 @@ function isMenuClick(step: Action): boolean {
 }
 
 function isFormStep(step: Action): boolean {
-  const a = step.action ?? step.type ?? '';
+  const a = step.action ?? '';
   return FORM_ACTIONS.has(a);
 }
 
@@ -103,7 +103,7 @@ export function enhanceFlow(steps: Action[]): EnhancedStep[] {
       });
     } else if (isFormStep(step)) {
       result.push({
-        action: step.action ?? step.type ?? '',
+        action: step.action ?? '',
         target: step.target,
         value:  step.value,
       });

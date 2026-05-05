@@ -2,7 +2,7 @@ import { Action } from '../../types/action.types';
 
 export function detectIntent(action: Action | any): string {
   const label = (action.target || '').toLowerCase();
-  const type  = (action.type   || action.action || '').toLowerCase(); // normalizado
+  const type  = (action.action || '').toLowerCase();
 
   // ── 1. SELECT ─────────────────────────────────────────────────────────────────
   if (type === 'select' || type === 'select_option' ||
