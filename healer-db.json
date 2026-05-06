@@ -122,5 +122,9 @@
   "Monto a invertir": {
     "selector": "text=Saldo disponible",
     "savedAt": 1777980894369
+  },
+  "Password": {
+    "selector": "[placeholder=\"Password\"]",
+    "savedAt": 1778013845521
   }
 }

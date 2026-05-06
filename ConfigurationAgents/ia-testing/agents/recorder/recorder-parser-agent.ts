@@ -774,20 +774,28 @@ export function parseRecording(filePath: string): Action[] {
   }
 
   // ─────────────────────────────────────────────────────────────
-  // POST-PROCESADO 1: Deduplicar fills → conservar SÓLO el último
+  // POST-PROCESADO 1: Deduplicar fills preservando el ORDEN original
+  //
+  // Regla: para el mismo selector+valor (duplicado exacto), conservar
+  // la PRIMERA ocurrencia y descartar las repeticiones posteriores.
+  // Si el valor cambia entre dos fills del mismo selector (corrección
+  // intencional) → conservar ambos.
+  // Esto evita el reordenamiento que producía "keep last":
+  //   fill(A,'x') click(B) fill(A,'x') → antes: click(B) fill(A,'x')
+  //                                       ahora: fill(A,'x') click(B)
   // ─────────────────────────────────────────────────────────────
-  const fillLastIdx = new Map<string, number>();
-  rawSteps.forEach((s, i) => {
-    if (s.action === "input" || s.action === "fill") fillLastIdx.set(s.selector || s.target, i);
-  });
+  const seenFillValues = new Map<string, string>(); // key→último valor visto
 
-  const steps: Action[] = [];
-  rawSteps.forEach((s, i) => {
-    if (s.action === "input" || s.action === "fill") {
-      if (fillLastIdx.get(s.selector || s.target) === i) steps.push(s);
-    } else {
-      steps.push(s);
+  const steps: Action[] = rawSteps.filter(s => {
+    if (s.action !== "input" && s.action !== "fill") return true;
+    const key = s.selector || s.target || '';
+    const val = s.value ?? '';
+    if (seenFillValues.has(key) && seenFillValues.get(key) === val) {
+      // Duplicado exacto (mismo selector + mismo valor) → descartar
+      return false;
     }
+    seenFillValues.set(key, val);
+    return true;
   });
 
   // ─────────────────────────────────────────────────────────────

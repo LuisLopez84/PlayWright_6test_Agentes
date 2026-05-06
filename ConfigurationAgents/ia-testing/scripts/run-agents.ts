@@ -226,6 +226,18 @@ function cleanupOrphanSuiteDirs(testsOutputDir: string, validSuites: string[]): 
 async function runAgents() {
   console.log('🤖 AI Testing generation started');
 
+  // ── Filtro de suite (--suite=<nombre> ó variable de entorno SUITE) ──────────
+  // Uso: npm run generate -- --suite=herokuapp_CrearUsuario
+  //   ó: $env:SUITE='herokuapp_CrearUsuario'; npm run generate   (PowerShell)
+  const suiteArg = process.argv.find(a => a.startsWith('--suite='));
+  const suiteFilter: string | null = suiteArg
+    ? suiteArg.replace('--suite=', '').trim()
+    : (process.env.SUITE ?? '').trim() || null;
+
+  if (suiteFilter) {
+    console.log(`🎯 Modo suite única: generando solo "${suiteFilter}"`);
+  }
+
   const recordingsDir = path.join('BoxRecordings', 'recordings');
   const outputDir = path.join('GenerateTest');
   const featureDir = path.join(outputDir, 'features');
@@ -237,12 +249,27 @@ async function runAgents() {
   // ============================================
   // 0. Recolectar recordings (pueden no existir)
   // ============================================
-  const files = fs.existsSync(recordingsDir) ? fs.readdirSync(recordingsDir) : [];
+  const allFiles = fs.existsSync(recordingsDir) ? fs.readdirSync(recordingsDir) : [];
 
   if (!fs.existsSync(recordingsDir)) {
     console.log('⚠️ Carpeta de recordings no encontrada — se procesará solo BoxAPIsExecute');
-  } else if (files.length === 0) {
+  } else if (allFiles.length === 0) {
     console.log('⚠️ No hay recordings — se procesará solo BoxAPIsExecute');
+  }
+
+  // Aplicar filtro de suite si se especificó
+  const files = suiteFilter
+    ? allFiles.filter(f => {
+        const name = f.replace(/\.(ts|js)$/, '');
+        return normalizeName(name) === normalizeName(suiteFilter) ||
+               name.toLowerCase().includes(suiteFilter.toLowerCase());
+      })
+    : allFiles;
+
+  if (suiteFilter && files.length === 0) {
+    console.error(`❌ No se encontró ningún recording que coincida con "${suiteFilter}"`);
+    console.log(`   Recordings disponibles: ${allFiles.map(f => f.replace(/\.(ts|js)$/, '')).join(', ')}`);
+    process.exit(1);
   }
 
   const suiteNames: string[] = [];
@@ -481,9 +508,14 @@ async function runAgents() {
   // ============================================
   // 10. Limpiar directorios huérfanos en GenerateTest/tests/  — Risk 1: renumerado (era 11)
   //     (creados por runs anteriores con matching incorrecto)
+  //     OMITIR si se usó filtro de suite — suiteNames estaría parcial y borraría suites válidas
   // ============================================
-  const knownSuitesWithSolo = [...suiteNames, 'Solo_test_API'];
-  cleanupOrphanSuiteDirs(testsOutputDir, knownSuitesWithSolo);
+  if (!suiteFilter) {
+    const knownSuitesWithSolo = [...suiteNames, 'Solo_test_API'];
+    cleanupOrphanSuiteDirs(testsOutputDir, knownSuitesWithSolo);
+  } else {
+    console.log(`⏭️  Limpieza de huérfanos omitida (modo suite única: "${suiteFilter}")`);
+  }
 
   console.log('\n🎉 AI Testing generation completed');
 }

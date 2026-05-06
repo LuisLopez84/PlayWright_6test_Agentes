@@ -324,8 +324,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 50,
-      "lastUsed": "2026-05-05T15:23:31.572Z"
+      "successCount": 67,
+      "lastUsed": "2026-05-05T19:54:59.386Z"
     },
     {
       "selector": "text=Try Again",
@@ -341,8 +341,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 25,
-      "lastUsed": "2026-05-05T15:23:40.184Z"
+      "successCount": 66,
+      "lastUsed": "2026-05-05T23:27:50.372Z"
     },
     {
       "selector": "text=Try Again",
@@ -358,8 +358,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 121,
-      "lastUsed": "2026-05-05T15:23:51.368Z"
+      "successCount": 168,
+      "lastUsed": "2026-05-05T23:28:00.510Z"
     },
     {
       "selector": "#neterrorTryAgainButton",
@@ -370,8 +370,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "text=ingresar",
-      "successCount": 86,
-      "lastUsed": "2026-05-05T15:23:53.888Z"
+      "successCount": 118,
+      "lastUsed": "2026-05-05T23:28:01.932Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -389,50 +389,50 @@
   "https://homebanking-demo-tests.netlify.app/|click|Transferencias": [
     {
       "selector": "Transferencias",
-      "successCount": 58,
-      "lastUsed": "2026-05-05T15:23:58.877Z"
+      "successCount": 71,
+      "lastUsed": "2026-05-05T19:54:28.371Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|#source-account": [
     {
       "selector": "#source-account",
-      "successCount": 3,
-      "lastUsed": "2026-05-05T15:24:02.054Z"
+      "successCount": 6,
+      "lastUsed": "2026-05-05T19:55:58.104Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto": [
     {
       "selector": "Monto",
-      "successCount": 53,
-      "lastUsed": "2026-05-05T15:24:03.620Z"
+      "successCount": 8,
+      "lastUsed": "2026-05-05T19:56:01.235Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Monto": [
     {
       "selector": "Monto",
-      "successCount": 51,
-      "lastUsed": "2026-05-05T15:24:08.128Z"
+      "successCount": 62,
+      "lastUsed": "2026-05-05T19:56:07.213Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Descripción (opcional)": [
     {
       "selector": "Descripción (opcional)",
-      "successCount": 51,
-      "lastUsed": "2026-05-05T15:24:11.540Z"
+      "successCount": 61,
+      "lastUsed": "2026-05-05T19:56:11.014Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|Descripción (opcional)": [
     {
       "selector": "Descripción (opcional)",
-      "successCount": 6,
-      "lastUsed": "2026-05-05T15:24:15.850Z"
+      "successCount": 17,
+      "lastUsed": "2026-05-05T19:56:15.174Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Transferir": [
     {
       "selector": "Transferir",
-      "successCount": 48,
-      "lastUsed": "2026-05-05T15:24:20.005Z"
+      "successCount": 59,
+      "lastUsed": "2026-05-05T19:56:19.460Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Transferencia realizada": [
@@ -710,8 +710,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 61,
-      "lastUsed": "2026-05-05T15:23:46.303Z"
+      "successCount": 84,
+      "lastUsed": "2026-05-05T19:55:19.616Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Pago de Servicios": [
@@ -759,15 +759,15 @@
   "https://homebanking-demo-tests.netlify.app/|click|Préstamos": [
     {
       "selector": "Préstamos",
-      "successCount": 10,
-      "lastUsed": "2026-04-16T19:43:03.767Z"
+      "successCount": 11,
+      "lastUsed": "2026-05-05T19:50:48.985Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|#loan-destination-account": [
     {
       "selector": "#loan-destination-account",
-      "successCount": 15,
-      "lastUsed": "2026-04-16T19:43:07.141Z"
+      "successCount": 2,
+      "lastUsed": "2026-05-05T19:51:27.270Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto a solicitar": [
@@ -780,22 +780,22 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Monto a solicitar": [
     {
       "selector": "Monto a solicitar",
-      "successCount": 15,
-      "lastUsed": "2026-04-16T19:43:12.878Z"
+      "successCount": 16,
+      "lastUsed": "2026-05-05T19:51:15.119Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|Cuotas": [
     {
       "selector": "Cuotas",
-      "successCount": 15,
-      "lastUsed": "2026-04-16T19:43:15.784Z"
+      "successCount": 16,
+      "lastUsed": "2026-05-05T19:51:18.047Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Solicitar Préstamo": [
     {
       "selector": "Solicitar Préstamo",
-      "successCount": 15,
-      "lastUsed": "2026-04-16T19:43:19.010Z"
+      "successCount": 16,
+      "lastUsed": "2026-05-05T19:51:21.952Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Préstamo acreditado": [
@@ -803,6 +803,11 @@
       "selector": "text=Préstamo",
       "successCount": 4,
       "lastUsed": "2026-04-16T19:43:26.390Z"
+    },
+    {
+      "selector": "Préstamo acreditado",
+      "successCount": 1,
+      "lastUsed": "2026-05-05T19:51:33.935Z"
     }
   ],
   "https://demoqa.com/books|click|Web Tables": [
@@ -1778,8 +1783,8 @@
   "https://thinking-tester-contact-list.herokuapp.com/|click|Email": [
     {
       "selector": "[placeholder=\"Email\"]",
-      "successCount": 45,
-      "lastUsed": "2026-04-26T23:26:37.768Z"
+      "successCount": 51,
+      "lastUsed": "2026-05-05T20:48:17.539Z"
     },
     {
       "selector": "Email",
@@ -1790,22 +1795,22 @@
   "https://thinking-tester-contact-list.herokuapp.com/|fill|Email": [
     {
       "selector": "Email",
-      "successCount": 60,
-      "lastUsed": "2026-04-26T23:26:40.186Z"
+      "successCount": 65,
+      "lastUsed": "2026-05-05T20:49:02.088Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/|fill|Password": [
     {
-      "selector": "Password",
-      "successCount": 58,
-      "lastUsed": "2026-04-26T23:26:46.003Z"
+      "selector": "[placeholder=\"Password\"]",
+      "successCount": 4,
+      "lastUsed": "2026-05-05T20:48:30.465Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/|click|Submit": [
     {
       "selector": "Submit",
-      "successCount": 8,
-      "lastUsed": "2026-04-26T23:26:48.520Z"
+      "successCount": 11,
+      "lastUsed": "2026-05-05T20:49:06.868Z"
     },
     {
       "selector": "button:has-text(\"Add a New Contact\")",
@@ -1816,71 +1821,71 @@
   "https://thinking-tester-contact-list.herokuapp.com/contactList|click|Add a New Contact": [
     {
       "selector": "Add a New Contact",
-      "successCount": 25,
-      "lastUsed": "2026-04-26T23:26:53.173Z"
+      "successCount": 4,
+      "lastUsed": "2026-05-05T20:49:10.085Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|click|* First Name:": [
     {
       "selector": "* First Name:",
-      "successCount": 26,
-      "lastUsed": "2026-04-26T23:26:56.072Z"
+      "successCount": 29,
+      "lastUsed": "2026-05-05T20:49:12.510Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|* First Name:": [
     {
       "selector": "* First Name:",
-      "successCount": 26,
-      "lastUsed": "2026-04-26T23:26:58.901Z"
+      "successCount": 31,
+      "lastUsed": "2026-05-05T20:49:14.989Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|click|* Last Name:": [
     {
       "selector": "* Last Name:",
-      "successCount": 19,
-      "lastUsed": "2026-04-26T23:27:02.400Z"
+      "successCount": 23,
+      "lastUsed": "2026-05-05T20:49:19.041Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|* Last Name:": [
     {
       "selector": "* Last Name:",
-      "successCount": 26,
-      "lastUsed": "2026-04-26T23:27:05.238Z"
+      "successCount": 31,
+      "lastUsed": "2026-05-05T20:49:23.159Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|click|Date of Birth:": [
     {
       "selector": "Date of Birth:",
-      "successCount": 19,
-      "lastUsed": "2026-04-26T23:27:08.272Z"
+      "successCount": 24,
+      "lastUsed": "2026-05-05T20:49:25.109Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|Date of Birth:": [
     {
       "selector": "Date of Birth:",
-      "successCount": 26,
-      "lastUsed": "2026-04-26T23:27:11.219Z"
+      "successCount": 30,
+      "lastUsed": "2026-05-05T20:49:27.158Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|Email:": [
     {
       "selector": "Email:",
-      "successCount": 26,
-      "lastUsed": "2026-04-26T23:27:14.513Z"
+      "successCount": 29,
+      "lastUsed": "2026-05-05T20:48:40.000Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|Phone:": [
     {
       "selector": "Phone:",
-      "successCount": 25,
-      "lastUsed": "2026-04-26T23:27:17.794Z"
+      "successCount": 29,
+      "lastUsed": "2026-05-05T20:49:31.567Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|Street Address 1:": [
     {
       "selector": "Street Address 1:",
-      "successCount": 25,
-      "lastUsed": "2026-04-26T23:27:23.740Z"
+      "successCount": 30,
+      "lastUsed": "2026-05-05T20:49:40.018Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|Street Address 2:": [
@@ -1893,29 +1898,29 @@
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|City:": [
     {
       "selector": "City:",
-      "successCount": 23,
-      "lastUsed": "2026-04-26T23:27:26.846Z"
+      "successCount": 3,
+      "lastUsed": "2026-05-05T20:49:37.493Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|State or Province:": [
     {
       "selector": "text=Province:",
-      "successCount": 13,
-      "lastUsed": "2026-04-26T23:27:32.759Z"
+      "successCount": 14,
+      "lastUsed": "2026-05-05T20:49:58.865Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|Postal Code:": [
     {
       "selector": "Postal Code:",
-      "successCount": 22,
-      "lastUsed": "2026-04-26T23:27:34.695Z"
+      "successCount": 25,
+      "lastUsed": "2026-05-05T20:50:00.735Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|Country:": [
     {
       "selector": "Country:",
-      "successCount": 1,
-      "lastUsed": "2026-04-26T23:27:37.956Z"
+      "successCount": 9,
+      "lastUsed": "2026-05-05T20:50:08.939Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|click|Submit": [
@@ -2060,8 +2065,8 @@
   "https://thinking-tester-contact-list.herokuapp.com/|click|Password": [
     {
       "selector": "Password",
-      "successCount": 33,
-      "lastUsed": "2026-04-26T23:26:43.366Z"
+      "successCount": 38,
+      "lastUsed": "2026-05-05T20:49:04.130Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/contactList|click|Edit Contact": [
@@ -2121,15 +2126,15 @@
   "https://thinking-tester-contact-list.herokuapp.com/addContact|click|Street Address 1:": [
     {
       "selector": "Street Address 1:",
-      "successCount": 12,
-      "lastUsed": "2026-04-26T23:27:20.909Z"
+      "successCount": 18,
+      "lastUsed": "2026-05-05T20:49:35.851Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/addContact|click|State or Province:": [
     {
       "selector": "State or Province:",
-      "successCount": 11,
-      "lastUsed": "2026-04-26T23:27:29.891Z"
+      "successCount": 14,
+      "lastUsed": "2026-05-05T20:49:54.276Z"
     }
   ],
   "https://thinking-tester-contact-list.herokuapp.com/contactList|click|Framework Playwright": [
@@ -2229,6 +2234,13 @@
       "selector": "Add a New Contact",
       "successCount": 1,
       "lastUsed": "2026-04-20T13:09:06.541Z"
+    }
+  ],
+  "nullblank|click|Usuario": [
+    {
+      "selector": "Usuario",
+      "successCount": 1,
+      "lastUsed": "2026-05-05T15:55:51.478Z"
     }
   ]
 }

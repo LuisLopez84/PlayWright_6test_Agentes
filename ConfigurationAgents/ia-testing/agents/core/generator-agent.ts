@@ -104,6 +104,101 @@ Scenario: Flujo ${name}
 `;
 }
 
+// ─── Common steps (transversal) ───────────────────────────────────────────────
+
+/**
+ * Retorna true si el paso debe ir a common.steps.ts en lugar del archivo por-suite.
+ * Un paso es "común" cuando su implementación es idéntica para cualquier suite:
+ *   • pasos de inicio/cierre fijos
+ *   • pasos Then (siempre la misma aserción body+URL)
+ *   • pasos When/And con keywords conocidos que delegan en smartActions
+ */
+function isCommonStep(stepKey: string, rawStep: string): boolean {
+  const FIXED = new Set([
+    'el usuario está en la aplicación',
+    'la página está disponible sin errores',
+    'page_load',
+    'verify',
+  ]);
+  if (FIXED.has(stepKey)) return true;
+  // Then steps only son comunes si coinciden exactamente con un patrón fijo
+  // (los Then específicos de suite, como verificaciones de negocio, NO son comunes)
+  if (rawStep.startsWith('When') || rawStep.startsWith('And') || rawStep.startsWith('Given')) {
+    return (
+      rawStep.includes('selecciona') ||
+      rawStep.includes('ingresa')    ||
+      rawStep.includes('completa')   ||
+      rawStep.includes('clic')       ||
+      rawStep.includes('navega')
+    );
+  }
+  return false;
+}
+
+/** Escribe GenerateTest/steps/common.steps.ts con todos los pasos genéricos.
+ *  Respeta "// CUSTOMIZADO" en la primera línea para no sobreescribir ediciones. */
+function writeCommonStepsFile(stepsDir: string): void {
+  const filePath = path.join(stepsDir, 'common.steps.ts');
+  if (fs.existsSync(filePath)) {
+    const firstLine = fs.readFileSync(filePath, 'utf-8').split('\n')[0] ?? '';
+    if (firstLine.includes('CUSTOMIZADO')) return;
+  }
+  const content = `// AUTO-GENERADO — agrega "// CUSTOMIZADO" en esta línea para proteger el archivo de sobreescrituras.
+import { createBdd } from 'playwright-bdd';
+import { expect } from '@playwright/test';
+import { smartClick, smartFill, smartSelect } from '@utils/smart-actions';
+
+const { Given, When, Then } = createBdd();
+
+// ── Inicio de sesión / estado inicial ─────────────────────────────────────────
+Given('el usuario está en la aplicación', async ({ page }) => {
+  // La navegación inicial la realiza smartGoto en el spec generado.
+});
+
+// ── Clicks genéricos ──────────────────────────────────────────────────────────
+When('hace clic en {string}', async ({ page }, target: string) => {
+  await smartClick(page, target);
+});
+
+// ── Fill / entrada de datos ───────────────────────────────────────────────────
+When('el usuario ingresa {string} en {string}', async ({ page }, value: string, target: string) => {
+  await smartFill(page, target, value);
+});
+
+When('ingresa {string} en {string}', async ({ page }, value: string, target: string) => {
+  await smartFill(page, target, value);
+});
+
+When('completa {string} con {string}', async ({ page }, value: string, target: string) => {
+  await smartFill(page, target, value);
+});
+
+// ── Select ────────────────────────────────────────────────────────────────────
+When('selecciona {string} en {string}', async ({ page }, value: string, target: string) => {
+  await smartSelect(page, target, value);
+});
+
+// ── Navegación ────────────────────────────────────────────────────────────────
+When('navega a {string}', async ({ page }, target: string) => {
+  const isUrl = target.startsWith('http') || target.startsWith('/') ||
+                target.includes('.com')    || target.includes('localhost');
+  if (isUrl) { await page.goto(target); } else { await smartClick(page, target); }
+});
+
+// ── Pasos emitidos por el validador de flujo (sin acción en el spec) ──────────
+When('page_load', async () => {});
+When('verify',    async () => {});
+
+// ── Verificación final ────────────────────────────────────────────────────────
+Then('la página está disponible sin errores', async ({ page }) => {
+  await expect(page.locator('body')).toBeVisible();
+  await expect(page).not.toHaveURL(/error|exception|not-found|404/i);
+});
+`;
+  fs.writeFileSync(filePath, content, 'utf-8');
+  console.log(`📄 common.steps.ts actualizado: ${filePath}`);
+}
+
 // ─── Helpers internos ─────────────────────────────────────────────────────────
 
 function extractStepsFromGherkin(gherkin: string): string[] {
@@ -135,31 +230,27 @@ function normalizeStep(step: string): string {
 export async function generateStepsFromGherkin(name: string, gherkin: string): Promise<void> {
   ensureDir(STEPS_DIR);
 
-  // Archivo por suite — nunca comparte namespace con otras suites
+  // Garantizar que common.steps.ts existe con todos los pasos genéricos compartidos.
+  // Esto evita "Multiple definitions" en playwright-bdd cuando hay varias suites.
+  writeCommonStepsFile(STEPS_DIR);
+
+  // Archivo por suite — solo pasos ÚNICOS de esta suite (los comunes van a common.steps.ts)
   const stepsFile = path.join(STEPS_DIR, `${name}.steps.ts`);
 
-  // Patrones ya definidos en api-generated.steps.ts — excluirlos del archivo de suite UI
-  // para evitar "Multiple definitions matched scenario step" en playwright-bdd.
+  // Excluir pasos de API (ya en api-generated.steps.ts) y pasos comunes (ya en common.steps.ts)
   const API_STEP_PATTERNS = [
-    'servicio REST',
-    'servicio SOAP',
-    'ejecuto la petición',
-    'la respuesta debe',
-    'con acción',
-    'endpoint con error',
-    'datos inválidos',
+    'servicio REST', 'servicio SOAP', 'ejecuto la petición',
+    'la respuesta debe', 'con acción', 'endpoint con error', 'datos inválidos',
   ];
   const isApiStep = (step: string) => API_STEP_PATTERNS.some(p => step.includes(p));
 
-  // Solo recopilar steps del feature de esta suite (no de API features ni otras suites).
-  // Cada suite tiene su propio steps file; leer todos los features causaría duplicados
-  // con api-generated.steps.ts.
   const allStepsSet = new Set<string>();
   extractStepsFromGherkin(gherkin)
     .filter(s => !isApiStep(s))
+    .filter(s => !isCommonStep(normalizeStep(s), s))   // ← excluir comunes
     .forEach(s => allStepsSet.add(s));
 
-  // Mapa de patrón → implementación
+  // Mapa de patrón → implementación (solo pasos suite-específicos)
   const stepImplementations = new Map<string, string>();
 
   for (const step of allStepsSet) {
@@ -172,61 +263,30 @@ Given('${stepKey}', async ({ page }) => {
 });
 `);
     } else if (step.startsWith('Then')) {
-      // Assertion real: body visible + URL sin patrones de error
       stepImplementations.set(stepKey, `
 Then('${stepKey}', async ({ page }) => {
   await expect(page.locator('body')).toBeVisible();
   await expect(page).not.toHaveURL(/error|exception|not-found|404/i);
 });
 `);
-    } else if (step.startsWith('When') || step.startsWith('And')) {
-      if (step.includes('selecciona')) {
-        stepImplementations.set(stepKey, `
-When('${stepKey}', async ({ page }, value, target) => {
-  await smartSelect(page, target, value);
-});
-`);
-      } else if (step.includes('ingresa') || step.includes('completa')) {
-        stepImplementations.set(stepKey, `
-When('${stepKey}', async ({ page }, value, target) => {
-  await smartFill(page, target, value);
-});
-`);
-      } else if (step.includes('clic')) {
-        stepImplementations.set(stepKey, `
-When('${stepKey}', async ({ page }, target) => {
-  await smartClick(page, target);
-});
-`);
-      } else if (step.includes('navega')) {
-        stepImplementations.set(stepKey, `
-When('${stepKey}', async ({ page }, target) => {
-  const isRealUrl = target.startsWith('http') || target.startsWith('/') ||
-                    target.includes('.com') || target.includes('localhost');
-  if (isRealUrl) {
-    await page.goto(target);
-  } else {
-    await smartClick(page, target);
-  }
-});
-`);
-      } else {
-        stepImplementations.set(stepKey, `
+    } else {
+      // Stub suite-específico — texto único de esta suite, implementación pendiente
+      stepImplementations.set(stepKey, `
 When('${stepKey}', async ({ page }, ...args) => {
-  console.log('⚠️ Step no implementado específicamente:', '${step}', args);
+  // TODO: implementar paso específico de la suite "${name}"
+  console.log('⚠️ Step pendiente:', '${step}', args);
 });
 `);
-      }
     }
   }
 
-  // Usar path aliases de tsconfig (@utils/) para desacoplar de rutas relativas
+  // Si no hay pasos únicos, el archivo por-suite solo tiene el header (válido y vacío)
   let content = `import { createBdd } from 'playwright-bdd';
 import { expect } from '@playwright/test';
-import { smartClick, smartFill, smartSelect } from '@utils/smart-actions';
-import { smartGoto } from '@utils/navigation-helper';
 
 const { Given, When, Then } = createBdd();
+// Pasos genéricos en: common.steps.ts
+// Pasos de API en:    api-generated.steps.ts
 
 `;
 

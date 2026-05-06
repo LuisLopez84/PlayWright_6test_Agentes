@@ -4,9 +4,13 @@ import { ensureDir } from "../../utils/fs-utils";
 import { normalizeSelector } from "../../../../ConfigurationTest/tests/utils/selector-normalizer";
 
 // Risk 5: wrapper — expresiones encadenadas (.nth/.first/.last/.filter) pasan sin modificar
+// Risk 11: expresiones Playwright del recorder (page.getByLabel/Role/locator…) pasan sin modificar
+//          para que resolveLocator las evalúe directamente sin perder la info de tipo de locator.
 function safeNormalize(rawSel: string): string {
   if (!rawSel) return '';
   if (/\.(nth|first|last|filter|and)\(/.test(rawSel)) return rawSel;
+  // Expresión completa del recorder → preservar tal cual (más fiable que solo el texto)
+  if (/^page\.(getBy|locator|frameLocator)/.test(rawSel)) return rawSel;
   return normalizeSelector(rawSel) || rawSel;
 }
 
@@ -16,11 +20,18 @@ export function generateUITest(name: string, steps: any[]) {
   const output = path.join(dir, `${name}.spec.ts`);
 
   // ── Deduplicar pasos ──────────────────────────────────────────────────────
+  // NOTA: fills/inputs NO se deduplicar aquí; el recorder-parser ya eliminó
+  // duplicados exactos preservando el orden original. Deduplicar aquí de nuevo
+  // causaría perder fills legítimos en flujos que reutilizan un campo (ej. wizard).
   const uniqueSteps: any[] = [];
   const seen = new Set();
   const NON_DEDUP_ACTIONS = new Set([
     'click', 'dblclick', 'press_enter', 'press_key', 'dialog_handler',
     'page_load', 'hover', 'rightclick', 'drag', 'frame_click', 'frame_fill', 'scroll',
+    'input', 'fill',      // fills ya deduplicados en parser con orden preservado
+    'select', 'selectOption', // selects: múltiples selects en el mismo campo son válidos
+    'check', 'uncheck',
+    'upload',
   ]);
   for (const step of steps) {
     if (NON_DEDUP_ACTIONS.has(step.action)) {

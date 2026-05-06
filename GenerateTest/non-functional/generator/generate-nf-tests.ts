@@ -241,6 +241,28 @@ ${testBody}
 `;
 }
 
+// ─── Filtro de suite ──────────────────────────────────────────────────────────
+
+/**
+ * Lee el filtro de suite desde:
+ *   --suite=<nombre>  (argumento CLI)   → npm run generate:nf -- --suite=herokuapp_CrearUsuario
+ *   SUITE=<nombre>    (variable de env) → $env:SUITE='herokuapp_CrearUsuario'; npm run generate:nf
+ * Devuelve null si no se especificó filtro (genera todos los targets).
+ */
+function readSuiteFilter(): string | null {
+  const arg = process.argv.find(a => a.startsWith('--suite='));
+  if (arg) return arg.replace('--suite=', '').trim() || null;
+  return (process.env.SUITE ?? '').trim() || null;
+}
+
+/**
+ * Extrae el nombre de suite de un target NF para comparar con el filtro.
+ */
+function targetSuiteName(t: (typeof NFConfig.targets)[number]): string {
+  if (t.type === 'recording') return t.recording;
+  return resolveSuiteNameFromApiSpec(t.apiSpecPath) ?? '';
+}
+
 // ─── Función principal ────────────────────────────────────────────────────────
 
 function main(): void {
@@ -248,13 +270,42 @@ function main(): void {
   console.log('  🔧 GENERADOR DE PRUEBAS NO FUNCIONALES');
   console.log('═'.repeat(60));
 
+  // ── Filtro opcional de suite ────────────────────────────────────────────────
+  const suiteFilter = readSuiteFilter();
+  if (suiteFilter) {
+    console.log(`\n  🎯 Modo suite única: generando solo "${suiteFilter}"`);
+  }
+
   if (NFConfig.targets.length === 0) {
     console.log(`\n  ⚠️  No hay targets en NFConfig.targets.\n  Edita: GenerateTest/non-functional/config/nf-config.ts\n`);
     return;
   }
 
-  console.log(`\n  📋 Resolviendo ${NFConfig.targets.length} target(s)...\n`);
+  // Aplicar filtro de suite si se especificó
+  const filteredTargets = suiteFilter
+    ? NFConfig.targets.filter(t => {
+        const sn = targetSuiteName(t);
+        return sn.toLowerCase() === suiteFilter.toLowerCase() ||
+               sn.toLowerCase().includes(suiteFilter.toLowerCase());
+      })
+    : NFConfig.targets;
+
+  if (suiteFilter && filteredTargets.length === 0) {
+    const available = [...new Set(NFConfig.targets.map(targetSuiteName))].filter(Boolean);
+    console.error(`\n  ❌ No se encontró ningún target para la suite "${suiteFilter}"`);
+    console.log(`  Suites disponibles en nf-config.ts: ${available.join(', ')}`);
+    process.exit(1);
+  }
+
+  // Sobreescribir temporalmente NFConfig.targets con los targets filtrados
+  const originalTargets = NFConfig.targets;
+  (NFConfig as any).targets = filteredTargets;
+
+  console.log(`\n  📋 Resolviendo ${filteredTargets.length} target(s)...\n`);
   const allTargets = resolveAllTargets();
+
+  // Restaurar
+  (NFConfig as any).targets = originalTargets;
 
   if (allTargets.length === 0) {
     console.error('  ❌ No se resolvió ningún target. Revisa la configuración.');

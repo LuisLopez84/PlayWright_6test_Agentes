@@ -183,6 +183,20 @@ export const NFConfig: {
        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
      },
 
+    {
+        type: 'recording',
+        recording: 'Homebanking_PrestamosTesting',
+        testType: 'incremental',
+        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
+    },
+
+    {
+        type: 'recording',
+        recording: 'herokuapp_CrearUsuario',
+        testType: 'incremental',
+        incremental: { scenarios: 6, initialThreads: 1, finalThreads: 6, durationPerScenarioSeconds: 3 },
+    },
+
     // ── TARGET 2b: API REST — PICOS (simultánea con 2a) ──────────────────────
     // {
     //   type: 'api',

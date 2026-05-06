@@ -36,6 +36,118 @@ function isPageAlive(page: Page): boolean {
   return !page.isClosed();
 }
 
+// ─────────────────────────────────────────────
+// EVALUADOR DE EXPRESIONES PLAYWRIGHT
+// Convierte "page.getByLabel('Email')" en el Locator real sin usar eval().
+// Soporta todos los patrones que genera el recorder-parser-agent.ts.
+// ─────────────────────────────────────────────
+
+function evalPlaywrightExpr(page: Page, expr: string): Locator | null {
+  try {
+    // page.getByLabel('text') o page.getByLabel('text', { exact: true })
+    const lblM = expr.match(/^page\.getByLabel\(['"`](.*?)['"`](?:,\s*\{[^}]*exact:\s*(true|false)[^}]*\})?\)$/);
+    if (lblM) return page.getByLabel(lblM[1], { exact: lblM[2] === 'true' });
+
+    // page.getByRole('role', { name: 'text' })  con o sin .first()
+    const roleM = expr.match(/^page\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)(\.first\(\))?$/);
+    if (roleM) {
+      const loc = page.getByRole(roleM[1] as any, { name: roleM[2] });
+      return roleM[3] ? loc.first() : loc;
+    }
+
+    // page.getByRole('button', { name: '…' }).first()
+    const btnFirstM = expr.match(/^page\.getByRole\(['"`]button['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.first\(\)$/);
+    if (btnFirstM) return page.getByRole('button', { name: btnFirstM[1] }).first();
+
+    // page.getByPlaceholder('text')
+    const phM = expr.match(/^page\.getByPlaceholder\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)$/);
+    if (phM) return page.getByPlaceholder(phM[1]);
+
+    // page.getByTestId('id')
+    const tidM = expr.match(/^page\.getByTestId\(['"`](.*?)['"`]\)$/);
+    if (tidM) return page.getByTestId(tidM[1]);
+
+    // page.getByText('text') o page.getByText('text', { exact: … })
+    const txtM = expr.match(/^page\.getByText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)$/);
+    if (txtM) return page.getByText(txtM[1], { exact: false });
+
+    // page.getByAltText / page.getByTitle
+    const altM = expr.match(/^page\.getByAltText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)$/);
+    if (altM) return page.getByAltText(altM[1]);
+    const titM = expr.match(/^page\.getByTitle\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)$/);
+    if (titM) return page.getByTitle(titM[1]);
+
+    // page.locator('selector') con o sin .first() / .nth(n)
+    const locM = expr.match(/^page\.locator\(['"`](.*?)['"`]\)(?:\.(first)\(\)|\.nth\((\d+)\))?$/);
+    if (locM) {
+      const loc = page.locator(locM[1]);
+      if (locM[2]) return loc.first();
+      if (locM[3]) return loc.nth(parseInt(locM[3]));
+      return loc;
+    }
+
+    // page.getByRole('list').getByText('text')
+    const listTxtM = expr.match(/^page\.getByRole\(['"`]list['"`]\)\.getByText\(['"`](.*?)['"`]\)$/);
+    if (listTxtM) return page.getByRole('list').getByText(listTxtM[1]);
+
+    // page.getByRole('listitem').filter({ hasText: 'text' })
+    const listItemM = expr.match(/^page\.getByRole\(['"`]listitem['"`]\)\.filter\(\{\s*hasText:\s*['"`](.*?)['"`]\s*\}\)$/);
+    if (listItemM) return page.getByRole('listitem').filter({ hasText: listItemM[1] });
+
+    // page.getByRole('navigation').getByRole('link'|'button', { name: 'text' })
+    const navRoleM = expr.match(/^page\.getByRole\(['"`]navigation['"`]\)\.getByRole\(['"`](link|button|menuitem)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)$/);
+    if (navRoleM) return page.getByRole('navigation').getByRole(navRoleM[1] as any, { name: navRoleM[2] });
+
+    // page.locator('selector').getByRole('role', { name: 'text' })
+    const locRoleM = expr.match(/^page\.locator\(['"`](.*?)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)$/);
+    if (locRoleM) return page.locator(locRoleM[1]).getByRole(locRoleM[2] as any, { name: locRoleM[3] });
+
+    // page.getByRole('menubar').getByRole('menuitem', { name: 'text' })
+    const menuM = expr.match(/^page\.getByRole\(['"`]menubar['"`]\)\.getByRole\(['"`](menuitem|menu)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)$/);
+    if (menuM) return page.getByRole('menubar').getByRole(menuM[1] as any, { name: menuM[2] });
+
+    // page.locator('selector').getByText('text')
+    const locTxtM = expr.match(/^page\.locator\(['"`](.*?)['"`]\)\.getByText\(['"`](.*?)['"`]\)$/);
+    if (locTxtM) return page.locator(locTxtM[1]).getByText(locTxtM[2], { exact: false });
+
+    // page.getByRole('dialog').getByRole('button', { name: 'text' })
+    const dlgBtnM = expr.match(/^page\.getByRole\(['"`]dialog['"`]\)\.getByRole\(['"`](button|link)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)$/);
+    if (dlgBtnM) return page.getByRole('dialog').getByRole(dlgBtnM[1] as any, { name: dlgBtnM[2] });
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extrae el texto legible de una expresión Playwright para usarlo como
+ * texto de fallback en las estrategias de healing basadas en texto.
+ */
+function extractTextFromPlaywrightExpr(expr: string): string {
+  // name: 'text' — getByRole con name
+  const nameM = expr.match(/name:\s*['"`](.*?)['"`]/);
+  if (nameM) return nameM[1];
+  // getByLabel / getByText / getByPlaceholder / getByAltText / getByTitle
+  const getM = expr.match(/get[A-Z][a-zA-Z]+\(['"`](.*?)['"`]/);
+  if (getM) return getM[1];
+  // locator('#id') → '#id' (ya es CSS, se manejará por isCSSSelector)
+  const locM = expr.match(/locator\(['"`](.*?)['"`]/);
+  if (locM) return locM[1];
+  return '';
+}
+
+/**
+ * Selector efectivo para healing de texto cuando el original es una expresión Playwright.
+ * Retorna el texto legible extraído o el selector original si no es expresión.
+ */
+function getHealingTarget(selector: string): string {
+  if (/^page\.(getBy|locator)/.test(selector)) {
+    return extractTextFromPlaywrightExpr(selector) || selector;
+  }
+  return selector;
+}
+
 function escapeRegex(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -65,6 +177,34 @@ function buildSmartLocator(page: Page, selector: string): Locator {
 async function resolveLocator(page: Page, selector: string): Promise<Locator> {
   if (!isPageAlive(page)) {
     throw new Error(`🚨 Page cerrada antes de resolver selector: ${selector}`);
+  }
+
+  // ── Estrategia -3: Expresión Playwright del recorder ───────────────────────
+  // Maneja: page.getByLabel('Email'), page.getByRole('button', {name:'Submit'}),
+  //         page.locator('#id'), page.getByPlaceholder('...'), etc.
+  // Estas expresiones vienen directamente de Playwright codegen y son las más fiables.
+  if (/^page\.(getBy|locator|frameLocator)/.test(selector)) {
+    const exprLoc = evalPlaywrightExpr(page, selector);
+    if (exprLoc) {
+      try {
+        const count = await exprLoc.count();
+        if (count > 0) {
+          const isVis = await exprLoc.first().isVisible().catch(() => false);
+          if (isVis) return exprLoc.first();
+          if (count === 1) return exprLoc.first();
+          for (let i = 0; i < Math.min(count, 5); i++) {
+            if (await exprLoc.nth(i).isVisible().catch(() => false)) return exprLoc.nth(i);
+          }
+          return exprLoc.first(); // adjunto aunque no visible — waitForVisible decidirá
+        }
+      } catch {}
+    }
+    // Expresión no pudo resolver → extraer texto para strategies basadas en texto
+    const textFallback = extractTextFromPlaywrightExpr(selector);
+    if (textFallback && textFallback !== selector) {
+      // Llamada recursiva con texto — no entra de nuevo en esta rama (textFallback no empieza con 'page.')
+      return resolveLocator(page, textFallback);
+    }
   }
 
   // ── Estrategia -2: Shadow DOM pierce (selector con >>>) ──
@@ -187,8 +327,8 @@ async function resolveLocator(page: Page, selector: string): Promise<Locator> {
 
   // ── Delayed rendering retry: esperar animaciones CSS / renderizado diferido ──
   // Solo se llega aquí si ninguna estrategia encontró el elemento aún.
-  // 600ms cubre animaciones Bootstrap (300ms) y lazy rendering de SPAs.
-  await page.waitForTimeout(600);
+  // 200ms cubre animaciones Bootstrap básicas; el healing toma el relevo para casos lentos.
+  await page.waitForTimeout(200);
 
   // Retry estrategias dentro de diálogos después de esperar la animación
   const dialogRetry = await tryInOpenDialog();
@@ -228,7 +368,7 @@ async function waitForVisible(locator: Locator, timeout = 10000): Promise<boolea
       const page = locator.page();
       if (!page || page.isClosed()) return false;
       await page.evaluate(() => window.scrollTo(0, 0)).catch(() => {});
-      await page.waitForTimeout(600);
+      await page.waitForTimeout(300);
       await locator.first().scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
       const isVis = await locator.first().isVisible().catch(() => false);
       if (isVis) return true;
@@ -256,8 +396,8 @@ async function retryAction(
       lastError = e;
       if (!isPageAlive(page)) throw lastError;
       console.log(`🔁 Reintento ${attempt + 1}/${maxRetries} → ${selector}`);
-      try { await page.waitForLoadState('domcontentloaded', { timeout: 3000 }); } catch {}
-      await page.waitForTimeout(500);
+      try { await page.waitForLoadState('domcontentloaded', { timeout: 1500 }); } catch {}
+      await page.waitForTimeout(250);
     }
   }
   throw lastError;
@@ -457,8 +597,8 @@ async function forceRevealAndClick(page: Page, selector: string): Promise<boolea
       if (await loc.count() === 0) continue;
 
       // Intentar scroll al elemento (funciona incluso si está hidden)
-      await loc.scrollIntoViewIfNeeded({ timeout: 2000 }).catch(() => {});
-      await page.waitForTimeout(400);
+      await loc.scrollIntoViewIfNeeded({ timeout: 1500 }).catch(() => {});
+      await page.waitForTimeout(150);
 
       // ¿Ahora es visible?
       const nowVisible = await loc.isVisible().catch(() => false);
@@ -627,7 +767,10 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
       console.log(`🔧 Elemento no visible → iniciando healing: "${selector}"`);
       learningStore.recordFailure(sig, selector);
 
-      const healed = await healSelector(page, selector, 'click');
+      // Para expresiones Playwright, usar el texto extraído para las estrategias de healing
+      const healTarget = getHealingTarget(selector);
+
+      const healed = await healSelector(page, healTarget, 'click');
       if (healed) {
         locator = page.locator(healed);
         isVisible = await waitForVisible(locator, 6000);
@@ -636,24 +779,12 @@ export async function smartClick(page: Page, selector: string): Promise<void> {
           learningStore.recordSuccess(sig, healed);
         }
       }
-
-      if (!isVisible) {
-        const aiSelector = await healWithAI(page, selector, 'click');
-        if (aiSelector) {
-          const aiLoc = page.locator(aiSelector);
-          isVisible = await waitForVisible(aiLoc, 5000);
-          if (isVisible) {
-            console.log(`🧠 Healing IA exitoso: ${aiSelector}`);
-            locator = aiLoc;
-            learningStore.recordSuccess(sig, aiSelector);
-          }
-        }
-      }
+      // healSelector ya incluye IA como estrategia 5 interna — no repetir aquí.
 
       // ── [6] Force-reveal: último recurso antes de fallar ──
       if (!isVisible) {
         console.log(`🔓 [6] Force-reveal activado para: "${selector}"`);
-        const forceClicked = await forceRevealAndClick(page, selector);
+        const forceClicked = await forceRevealAndClick(page, healTarget);
         if (forceClicked) {
           learningStore.recordSuccess(sig, selector);
           await waitForPageStability(page);
@@ -766,7 +897,9 @@ export async function smartFill(page: Page, selector: string, value: string): Pr
       console.log(`🔧 Campo no visible → healing: "${selector}"`);
       learningStore.recordFailure(sig, selector);
 
-      const healed = await healSelector(page, selector, 'fill', smartValue);
+      const healTarget = getHealingTarget(selector);
+
+      const healed = await healSelector(page, healTarget, 'fill', smartValue);
       if (healed) {
         locator = page.locator(healed);
         isVisible = await waitForVisible(locator, 6000);
@@ -774,7 +907,7 @@ export async function smartFill(page: Page, selector: string, value: string): Pr
       }
 
       if (!isVisible) {
-        const aiSel = await healWithAI(page, selector, 'fill', smartValue);
+        const aiSel = await healWithAI(page, healTarget, 'fill', smartValue);
         if (aiSel) {
           locator = page.locator(aiSel);
           isVisible = await waitForVisible(locator, 5000);
@@ -937,21 +1070,15 @@ export async function smartCheck(page: Page, selector: string, checked = true): 
       console.log(`🔧 Checkbox/radio no visible → healing: "${selector}"`);
       learningStore.recordFailure(sig, selector);
 
-      const healed = await healSelector(page, selector, 'check');
+      const healTarget = getHealingTarget(selector);
+
+      const healed = await healSelector(page, healTarget, 'check');
       if (healed) {
         locator = page.locator(healed);
         isVisible = await waitForVisible(locator, 6000);
         if (isVisible) learningStore.recordSuccess(sig, healed);
       }
-
-      if (!isVisible) {
-        const aiSel = await healWithAI(page, selector, 'check');
-        if (aiSel) {
-          locator = page.locator(aiSel);
-          isVisible = await waitForVisible(locator, 5000);
-          if (isVisible) learningStore.recordSuccess(sig, aiSel);
-        }
-      }
+      // healSelector ya incluye IA como estrategia 5 interna — no repetir aquí.
 
       if (!isVisible) throw new Error(`Elemento no visible para check: ${selector}`);
     }
@@ -1393,11 +1520,129 @@ ${surroundingHtml}`,
 }
 
 /**
- * Orquesta las 3 capas de healing para selects ocultos.
- * Orden: JS force → custom dropdown → AI DOM analysis.
+ * Capa 0 – Navigation healing: cuando el elemento no existe en el DOM (count=0),
+ * significa que la grabación tiene un paso de navegación faltante.
+ * Intenta detectar qué sección de la app contiene el elemento y navegar a ella.
+ * Estrategia: heurística por palabras clave del selector → IA con HTML de nav.
+ */
+async function tryNavigateToElement(page: Page, selector: string): Promise<void> {
+  // Extraer palabras clave del selector para buscar en la nav
+  const hint = selector
+    .replace(/^[#.\[]/g, '')
+    .replace(/\]$/g, '')
+    .replace(/[-_]/g, ' ')
+    .replace(/\b(account|field|input|form|destination|source|id|select|option)\b/gi, '')
+    .trim();
+
+  const hintWords = hint.split(/\s+/).filter(w => w.length > 2);
+
+  // ── Heurística: buscar nav items con texto relacionado ──────────────────────
+  if (hintWords.length > 0) {
+    for (const word of hintWords) {
+      try {
+        const pattern = new RegExp(word, 'i');
+        const candidates = [
+          page.getByRole('link',   { name: pattern }),
+          page.getByRole('button', { name: pattern }),
+          page.locator(`nav, [role="navigation"], [class*="menu"], [class*="sidebar"]`)
+               .getByText(pattern),
+        ];
+        for (const navItem of candidates) {
+          const navCount = await navItem.count().catch(() => 0);
+          if (navCount > 0 && await navItem.first().isVisible().catch(() => false)) {
+            console.log(`🧭 [nav-healing] Heurística: navegando a "${word}" para "${selector}"`);
+            await navItem.first().click().catch(() => {});
+            await page.waitForTimeout(1000);
+            const afterCount = await page.locator(selector).count().catch(() => 0);
+            if (afterCount > 0) {
+              console.log(`✅ [nav-healing] Elemento encontrado tras navegar (heurística)`);
+              return;
+            }
+          }
+        }
+      } catch { /* ignorar errores de heurística */ }
+    }
+  }
+
+  // ── IA: analizar HTML de navegación y sugerir la sección correcta ───────────
+  if (!hasOpenAI || !openai) return;
+
+  try {
+    const navHtml = await page.evaluate(() => {
+      const navEl =
+        document.querySelector('nav') ??
+        document.querySelector('[role="navigation"]') ??
+        document.querySelector('[class*="menu"]') ??
+        document.querySelector('[class*="sidebar"]') ??
+        document.querySelector('header') ??
+        document.body;
+      return navEl.outerHTML.slice(0, 3000);
+    }).catch(() => '');
+
+    if (!navHtml) return;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      temperature: 0,
+      max_tokens: 200,
+      messages: [{
+        role: 'user',
+        content: `En esta SPA el elemento "${selector}" no existe en el DOM porque aún no se navegó a la sección correcta.
+
+HTML de la barra de navegación:
+${navHtml}
+
+¿Qué elemento de navegación debo clicar para ir a la sección que contiene "${selector}"?
+Devuelve SOLO JSON válido sin markdown:
+{"navSelector": "selector CSS", "text": "texto visible del item"}
+Si no puedes determinarlo devuelve null.`,
+      }],
+    });
+
+    const raw = response.choices[0]?.message?.content?.trim() ?? '';
+    const jsonStr = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
+    const parsed = JSON.parse(jsonStr) as { navSelector?: string; text?: string } | null;
+    if (!parsed) return;
+
+    const navLoc = parsed.navSelector
+      ? page.locator(parsed.navSelector).first()
+      : page.getByText(parsed.text ?? '', { exact: false }).first();
+
+    const visible = await navLoc.count()
+      .then(n => n > 0 && navLoc.isVisible())
+      .catch(() => false);
+
+    if (visible) {
+      console.log(`🧭 [nav-healing] IA sugiere navegar a: "${parsed.text ?? parsed.navSelector}"`);
+      await navLoc.click().catch(() => {});
+      await page.waitForTimeout(1500);
+      const afterCount = await page.locator(selector).count().catch(() => 0);
+      if (afterCount > 0) {
+        console.log(`✅ [nav-healing] IA navegación exitosa — elemento ahora en DOM`);
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[nav-healing] IA falló: ${e.message}`);
+  }
+}
+
+/**
+ * Orquesta las capas de healing para selects ocultos o con navegación faltante.
+ * Capa 0: navigation healing (elemento ausente del DOM)
+ * Capa 1: Force JS assign
+ * Capa 2: Custom dropdown (react-select, MUI, etc.)
+ * Capa 3: AI DOM analysis
  */
 async function handleHiddenSelect(page: Page, selector: string, value: string): Promise<boolean> {
   console.log(`🔧 [hidden-select] Activando healing para "${selector}" → "${value}"`);
+
+  // Capa 0: Si el elemento no existe en el DOM, probablemente falta un paso de navegación
+  const initialCount = await page.locator(selector).count().catch(() => 0);
+  if (initialCount === 0) {
+    console.log(`🧭 [hidden-select] Elemento ausente del DOM — activando navigation healing`);
+    await tryNavigateToElement(page, selector);
+    await page.waitForTimeout(500);
+  }
 
   // Capa 1: Force JS (más rápido, sin interacción visual)
   const jsOk = await forceJsSelect(page, selector, value);
@@ -1450,7 +1695,9 @@ export async function smartSelect(page: Page, selector: string, value: string): 
       console.log(`🔧 Select no visible → healing: "${selector}"`);
       learningStore.recordFailure(sig, selector);
 
-      const healed = await healSelector(page, selector, 'select', value);
+      const healTarget = getHealingTarget(selector);
+
+      const healed = await healSelector(page, healTarget, 'select', value);
       if (healed) {
         locator = page.locator(healed);
         isVisible = await waitForVisible(locator, 6000);

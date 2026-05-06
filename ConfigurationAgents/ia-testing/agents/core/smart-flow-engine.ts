@@ -44,8 +44,10 @@ const FORM_ACTIONS = new Set([
 
 function isNavigationStep(step: Action, prev: Action | undefined): boolean {
   const a = step.action ?? '';
-  return a === 'page_load' || a === 'goto' ||
-    (!prev && a === 'click');
+  // Solo page_load y goto son pasos de navegación.
+  // Eliminar (!prev && a==='click'): el primer click de un recording sin goto
+  // es una interacción real, no debe convertirse en context_change y omitirse.
+  return a === 'page_load' || a === 'goto';
 }
 
 function isConfirmation(step: Action): boolean {

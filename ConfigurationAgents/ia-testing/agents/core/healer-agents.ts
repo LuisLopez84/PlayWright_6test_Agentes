@@ -22,11 +22,21 @@ const MAX_ENTRIES  = 500;                        // evita crecimiento indefinido
 interface HealerEntry { selector: string; savedAt: number; }
 type RawDB = Record<string, HealerEntry | string>; // string = formato legacy
 
+// ── Caché en memoria para healer-db.json ──
+// Evita lecturas de disco en cada validación de locator (hasta 100+ checks por test).
+let _dbCache: Record<string, HealerEntry> | null = null;
+let _dbCacheTime = 0;
+const DB_MEM_TTL = 5000; // 5 s — se renueva después de cada ciclo de healing
+
 function loadDB(): Record<string, HealerEntry> {
-  if (!fs.existsSync(HEALER_DB)) return {};
+  const now = Date.now();
+  if (_dbCache !== null && now - _dbCacheTime < DB_MEM_TTL) return _dbCache;
+
+  if (!fs.existsSync(HEALER_DB)) {
+    _dbCache = {}; _dbCacheTime = now; return _dbCache;
+  }
   try {
     const raw: RawDB = JSON.parse(fs.readFileSync(HEALER_DB, 'utf-8'));
-    const now = Date.now();
     const result: Record<string, HealerEntry> = {};
     for (const [key, val] of Object.entries(raw)) {
       // Migrar entradas legacy (string) al nuevo formato con timestamp
@@ -38,13 +48,16 @@ function loadDB(): Record<string, HealerEntry> {
         result[key] = entry;
       }
     }
-    return result;
+    _dbCache = result; _dbCacheTime = now;
+    return _dbCache;
   } catch {
-    return {};
+    _dbCache = {}; _dbCacheTime = now;
+    return _dbCache;
   }
 }
 
 function saveHealing(original: string, healed: string, page?: Page, action?: string): void {
+  _dbCache = null; // invalidar caché en memoria antes de escribir
   const db = loadDB();
   db[original] = { selector: healed, savedAt: Date.now() };
 
@@ -59,6 +72,8 @@ function saveHealing(original: string, healed: string, page?: Page, action?: str
     : db;
 
   fs.writeFileSync(HEALER_DB, JSON.stringify(finalDB, null, 2));
+  _dbCache = finalDB as Record<string, HealerEntry>; // actualizar caché con el resultado final
+  _dbCacheTime = Date.now();
 
   // Sincronizar con learning-db.json para que smart-actions también aprenda
   if (page && !page.isClosed() && action) {
@@ -74,6 +89,86 @@ function saveHealing(original: string, healed: string, page?: Page, action?: str
 function getCachedHealing(original: string): string | null {
   const db = loadDB();
   return db[original]?.selector ?? null;
+}
+
+// ─────────────────────────────────────────────
+// ÍNDICE DE RECORDINGS
+// Construye un mapa (texto→expresión Playwright) a partir de todos los
+// archivos .ts de BoxRecordings/recordings/. Se construye una sola vez
+// (lazy) y se reutiliza durante toda la ejecución.
+// Esto permite al healer recuperar la expresión Playwright original del
+// codegen, que es la fuente más fiable antes de recurrir a heurísticas.
+// ─────────────────────────────────────────────
+let _recordingIndex: Map<string, string> | null = null;
+
+function buildRecordingIndex(): Map<string, string> {
+  if (_recordingIndex) return _recordingIndex;
+  _recordingIndex = new Map();
+  const dir = path.join(process.cwd(), 'BoxRecordings', 'recordings');
+  if (!fs.existsSync(dir)) return _recordingIndex;
+
+  try {
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.ts')) continue;
+      const content = fs.readFileSync(path.join(dir, file), 'utf-8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('await page.')) continue;
+        // Capturar la expresión Playwright antes del método de acción
+        const m = trimmed.match(
+          /^await\s+(page\.(?:getBy\w+|locator)\([^;]{1,250}?)\.(click|fill|check|select|hover|press|dblclick|waitFor)\s*\(/
+        );
+        if (!m) continue;
+        const expr = m[1];
+        // Extraer el texto clave: primero 'name:' (getByRole), luego primer string del método
+        const nameM  = expr.match(/name:\s*['"`]([^'"`]{2,80})['"`]/);
+        const firstM = expr.match(/page\.getBy\w+\(['"`]([^'"`]{2,80})['"`]/);
+        const text   = nameM?.[1] ?? firstM?.[1];
+        if (!text) continue;
+        const keyOrig = text.toLowerCase();
+        const keyNoAc = keyOrig.normalize('NFD').replace(/[̀-ͯ]/g, '');
+        _recordingIndex!.set(keyOrig, expr);
+        if (keyNoAc !== keyOrig) _recordingIndex!.set(keyNoAc, expr);
+      }
+    }
+  } catch {}
+  return _recordingIndex;
+}
+
+async function tryRecordingIndex(page: Page, original: string): Promise<string | null> {
+  const index = buildRecordingIndex();
+  if (index.size === 0) return null;
+
+  const keyOrig = original.toLowerCase();
+  const keyNoAc = keyOrig.normalize('NFD').replace(/[̀-ͯ]/g, '');
+
+  // Coincidencia exacta (con y sin acentos)
+  for (const lookupKey of [keyOrig, keyNoAc]) {
+    const expr = index.get(lookupKey);
+    if (!expr) continue;
+    try {
+      const loc = page.locator(expr);
+      if (await loc.count() > 0 && await loc.first().isVisible().catch(() => false)) {
+        console.log(`📼 Healing desde recording (exacto): ${expr}`);
+        return expr;
+      }
+    } catch {}
+  }
+
+  // Coincidencia parcial — buscar si el texto del selector está contenido en una clave
+  for (const [indexKey, expr] of index) {
+    if (indexKey.length < 3) continue;
+    if (!keyNoAc.includes(indexKey) && !indexKey.includes(keyNoAc)) continue;
+    try {
+      const loc = page.locator(expr);
+      if (await loc.count() > 0 && await loc.first().isVisible().catch(() => false)) {
+        console.log(`📼 Healing desde recording (parcial "${indexKey}"): ${expr}`);
+        return expr;
+      }
+    } catch {}
+  }
+
+  return null;
 }
 
 // ─────────────────────────────────────────────
@@ -385,8 +480,8 @@ async function tryScrollAndReveal(page: Page, selector: string): Promise<string 
     try {
       const loc = page.locator(sel);
       if (await loc.count() === 0) continue;
-      await loc.first().scrollIntoViewIfNeeded({ timeout: 3000 });
-      await page.waitForTimeout(600);
+      await loc.first().scrollIntoViewIfNeeded({ timeout: 2000 });
+      await page.waitForTimeout(300);
       const isNowVisible = await loc.first().isVisible().catch(() => false);
       if (isNowVisible) {
         console.log(`📜 Elemento revelado tras scroll: ${sel}`);
@@ -413,7 +508,7 @@ async function tryScrollAndReveal(page: Page, selector: string): Promise<string 
         return byText ? getComputedStyle(byText).display !== 'none' : false;
       },
       selector,
-      { timeout: 3000 },
+      { timeout: 2000 },
     );
 
     // Revisar de nuevo después del lazy rendering
@@ -435,7 +530,7 @@ async function tryScrollAndReveal(page: Page, selector: string): Promise<string 
   // ── 4c: Scroll a top y volver a revisar (formularios de login ocultos) ──────
   try {
     await page.evaluate(() => window.scrollTo(0, 0));
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(250);
     // Buscar por role textbox/button con el nombre
     const textbox = page.getByRole('textbox', { name: selector });
     if (await textbox.count() > 0 && await textbox.first().isVisible().catch(() => false)) {
@@ -572,9 +667,19 @@ export async function healSelector(
 
   console.log(`🔧 Iniciando healing para: "${originalSelector}" [${action}]`);
 
-  // 1️⃣ CACHÉ
+  // 1️⃣ CACHÉ (selectores confirmados en ejecuciones anteriores)
   const cached = await tryCache(page, originalSelector);
   if (cached) return cached;
+
+  // 1.5️⃣ ÍNDICE DE RECORDINGS (expresiones Playwright del codegen — las más fiables)
+  // Busca en BoxRecordings/recordings/ la expresión getByRole/getByLabel que generó
+  // el codegen para este texto. Es la fuente más cercana al DOM real original.
+  const recordingSel = await tryRecordingIndex(page, originalSelector);
+  if (recordingSel) {
+    console.log(`📼 Healing por recording: ${recordingSel}`);
+    saveHealing(originalSelector, recordingSel, page, action);
+    return recordingSel;
+  }
 
   // 2️⃣ VARIANTES DE TEXTO (el más importante para errores de texto compuesto)
   const textVariant = await tryTextVariants(page, originalSelector);

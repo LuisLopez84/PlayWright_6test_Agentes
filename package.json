@@ -4,8 +4,10 @@
   "scripts": {
     "record": "ts-node ConfigurationAgents/ia-testing/scripts/start-recorder.ts",
     "generate": "ts-node -r tsconfig-paths/register ConfigurationAgents/ia-testing/scripts/run-agents.ts",
+    "generate:suite": "ts-node -r tsconfig-paths/register ConfigurationAgents/ia-testing/scripts/run-agents.ts",
     "bdd": "npx playwright-bdd test",
-    "test": "npm run generate && npm run bdd && node ConfigurationAgents/ia-testing/scripts/split-reports.js && npm run generate:api && npm run portal",
+    "test": "npm run generate && npm run bdd && node ConfigurationAgents/ia-testing/scripts/split-reports.js && npm run generate:api && npm run portal && npm run heal:specs",
+    "heal:specs": "ts-node ConfigurationAgents/ia-testing/scripts/heal-specs.ts",
     "portal": "node ConfigurationAgents/ia-testing/scripts/generate-portal.js",
     "generate:api": "ts-node ConfigurationAgents/ia-testing/scripts/generate-api-after-run.ts",
     "generate-api-test": "ts-node ConfigurationAgents/ia-testing/scripts/generate-api-test.ts",
@@ -15,6 +17,8 @@
     "pw:record": "npx playwright codegen",
     "reports-index": "node ConfigurationAgents/ia-testing/scripts/generate-reports-index.js",
     "generate:nf": "ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts",
+    "generate:nf:suite": "ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts",
+    "test:suite": "ts-node -r tsconfig-paths/register ConfigurationAgents/ia-testing/scripts/test-suite.ts",
     "test:api": "npm run generate && npx playwright test --project=api && node ConfigurationAgents/ia-testing/scripts/split-reports.js && npm run portal",
     "mcp:server": "ts-node ConfigurationAgents/ia-testing/mcp/server.ts"
   },
