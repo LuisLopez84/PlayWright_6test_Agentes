@@ -130,7 +130,7 @@ function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any |
   if (selOptM) {
     const rM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)/);
     const lM = line.match(/locator\(['"`](.*?)['"`]\)/);
-    const bM = line.match(/getByLabel\(['"`](.*?)['"`]\)/);
+    const bM = line.match(/getByLabel\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)/);
     const pM = line.match(/getByPlaceholder\(['"`](.*?)['"`]\)/);
     let sel = '', tgt = '';
     if (rM)       { sel = `page.getByRole('${rM[1]}', { name: '${rM[2]}' })`; tgt = rM[2]; }
@@ -177,6 +177,12 @@ function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any |
   if (lblFill) return { action: "input", target: lblFill[1], value: extractFillValue(line) ?? '', raw: line, selector: `page.getByLabel('${lblFill[1]}')` };
   const roleFill = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.fill\(/);
   if (roleFill) return { action: "input", target: roleFill[2], value: extractFillValue(line) ?? '', raw: line, selector: `page.getByRole('${roleFill[1]}', { name: '${roleFill[2]}' })` };
+  const locNthFillP = line.match(/locator\(['"`](.*?)['"`]\)\.nth\((\d+)\)\.fill\(/);
+  if (locNthFillP) return { action: "input", target: locNthFillP[1], value: extractFillValue(line) ?? '', raw: line, selector: `page.locator('${locNthFillP[1]}').nth(${locNthFillP[2]})` };
+  const roleNthFillP = line.match(/getByRole\(['"`](\w+)['"`]\)\.nth\((\d+)\)\.fill\(/);
+  if (roleNthFillP) return { action: "input", target: `${roleNthFillP[1]}[${roleNthFillP[2]}]`, value: extractFillValue(line) ?? '', raw: line, selector: `page.getByRole('${roleNthFillP[1]}').nth(${roleNthFillP[2]})` };
+  const locRoleFillP = line.match(/locator\(['"`](.*?)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.fill\(/);
+  if (locRoleFillP) return { action: "input", target: locRoleFillP[3], value: extractFillValue(line) ?? '', raw: line, selector: `page.locator('${locRoleFillP[1]}').getByRole('${locRoleFillP[2]}', { name: '${locRoleFillP[3]}' })` };
   const locFill = line.match(/locator\(['"`](.*?)['"`]\)\.fill\(/);
   if (locFill) return { action: "input", target: locFill[1], value: extractFillValue(line) ?? '', raw: line, selector: `page.locator('${locFill[1]}')` };
   const tidFill = line.match(/getByTestId\(['"`](.*?)['"`]\)\.fill\(/);
@@ -260,6 +266,12 @@ function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any |
   const paraTxtM = line.match(/getByRole\(['"`]paragraph['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
   if (paraTxtM) return { action: "verify", target: paraTxtM[1], raw: line, selector: paraTxtM[1], verifyType: "text-visible" };
 
+  // Chained: parentRole.childRole(name).click() — preserva selector completo
+  const chainedRoleClkP = line.match(/getByRole\(['"`](\w+)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click/);
+  if (chainedRoleClkP) return { action: "click", target: chainedRoleClkP[3], raw: line, selector: `page.getByRole('${chainedRoleClkP[1]}').getByRole('${chainedRoleClkP[2]}', { name: '${chainedRoleClkP[3]}' })` };
+  // Indexed no-name: role.nth(n).click()
+  const roleNthClkP = line.match(/getByRole\(['"`](\w+)['"`]\)\.nth\((\d+)\)\.click/);
+  if (roleNthClkP) return { action: "click", target: `${roleNthClkP[1]}[${roleNthClkP[2]}]`, raw: line, selector: `page.getByRole('${roleNthClkP[1]}').nth(${roleNthClkP[2]})` };
   // role click (heading/paragraph → verify; soporta .first() y .nth(n))
   const roleClkM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)(?:\.first\(\)|\.nth\(\d+\))?\.click/);
   if (roleClkM) {
@@ -282,9 +294,11 @@ function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any |
   const txtClkM = line.match(/(?<![.]getByRole[^.]*\.)getByText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.click/);
   if (txtClkM) {
     const text = txtClkM[1];
+    const exactInLine = line.match(/exact:\s*(true|false)/);
+    const exactOptInLine = exactInLine?.[1] === 'true' ? ', { exact: true }' : '';
     return resultTextFn(text)
       ? { action: "verify", target: text, raw: line, selector: text, verifyType: "text-visible" }
-      : { action: "click",  target: text, raw: line, selector: `page.getByText('${text}')` };
+      : { action: "click",  target: text, raw: line, selector: `page.getByText('${safeRegexContent(text)}'${exactOptInLine})` };
   }
 
   // locator .first() / .nth(n) click
@@ -320,6 +334,21 @@ function parseOneLine(line: string, resultTextFn: (t: string) => boolean): any |
   const tidClkM = line.match(/getByTestId\(['"`](.*?)['"`]\)\.click/);
   if (tidClkM) return { action: "click", target: tidClkM[1], raw: line, selector: `page.getByTestId('${tidClkM[1]}')` };
 
+  // Chained con contexto del padre preservado: locator/role.getByText('text').click()
+  const locTxtClkP = line.match(/locator\(['"`](.*?)['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
+  if (locTxtClkP) {
+    const text = locTxtClkP[2];
+    return resultTextFn(text)
+      ? { action: "verify", target: text, raw: line, selector: text, verifyType: "text-visible" }
+      : { action: "click",  target: text, raw: line, selector: `page.locator('${locTxtClkP[1]}').getByText('${safeRegexContent(text)}')` };
+  }
+  const roleTxtClkP = line.match(/getByRole\(['"`](\w+)['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
+  if (roleTxtClkP) {
+    const text = roleTxtClkP[2];
+    return resultTextFn(text)
+      ? { action: "verify", target: text, raw: line, selector: text, verifyType: "text-visible" }
+      : { action: "click",  target: text, raw: line, selector: `page.getByRole('${roleTxtClkP[1]}').getByText('${safeRegexContent(text)}')` };
+  }
   // chained .getByText('...').click()  (ej: page.getByRole('nav').getByText('...'))
   const chainTxtM = line.match(/\.getByText\(['"`](.*?)['"`]\)\.click/);
   if (chainTxtM) {
@@ -561,7 +590,7 @@ export function parseRecording(filePath: string): Action[] {
       let selector = "", target = "";
       const locM = line.match(/locator\(['"`](.*?)['"`]\)/);
       const roleM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)/);
-      const labelM = line.match(/getByLabel\(['"`](.*?)['"`]\)/);
+      const labelM = line.match(/getByLabel\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)/);
       const phM = line.match(/getByPlaceholder\(['"`](.*?)['"`]\)/);
       if (locM)        { selector = locM[1]; target = selector; }
       else if (roleM)  { selector = `page.getByRole('${roleM[1]}', { name: '${roleM[2]}' })`; target = roleM[2]; }
@@ -618,6 +647,12 @@ export function parseRecording(filePath: string): Action[] {
     if (lblFillM) { rawSteps.push({ action: "input", target: lblFillM[1], value: extractFillValue(line) ?? '', raw: line, selector: `page.getByLabel('${lblFillM[1]}')` }); continue; }
     const roleFillM = line.match(/getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.fill\(/);
     if (roleFillM) { rawSteps.push({ action: "input", target: roleFillM[2], value: extractFillValue(line) ?? '', raw: line, selector: buildPlaywrightSelector({ type: "role", role: roleFillM[1], name: roleFillM[2] }) }); continue; }
+    const locNthFillM = line.match(/locator\(['"`](.*?)['"`]\)\.nth\((\d+)\)\.fill\(/);
+    if (locNthFillM) { rawSteps.push({ action: "input", target: locNthFillM[1], value: extractFillValue(line) ?? '', raw: line, selector: `page.locator('${locNthFillM[1]}').nth(${locNthFillM[2]})` }); continue; }
+    const roleNthFillM2 = line.match(/getByRole\(['"`](\w+)['"`]\)\.nth\((\d+)\)\.fill\(/);
+    if (roleNthFillM2) { rawSteps.push({ action: "input", target: `${roleNthFillM2[1]}[${roleNthFillM2[2]}]`, value: extractFillValue(line) ?? '', raw: line, selector: `page.getByRole('${roleNthFillM2[1]}').nth(${roleNthFillM2[2]})` }); continue; }
+    const locRoleFillM2 = line.match(/locator\(['"`](.*?)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.fill\(/);
+    if (locRoleFillM2) { rawSteps.push({ action: "input", target: locRoleFillM2[3], value: extractFillValue(line) ?? '', raw: line, selector: `page.locator('${locRoleFillM2[1]}').getByRole('${locRoleFillM2[2]}', { name: '${locRoleFillM2[3]}' })` }); continue; }
     const locFillM = line.match(/locator\(['"`](.*?)['"`]\)\.fill\(/);
     if (locFillM) { rawSteps.push({ action: "input", target: locFillM[1], value: extractFillValue(line) ?? '', raw: line, selector: buildPlaywrightSelector({ type: "css", selector: locFillM[1] }) }); continue; }
     const tidFillM = line.match(/getByTestId\(['"`](.*?)['"`]\)\.fill\(/);
@@ -652,6 +687,12 @@ export function parseRecording(filePath: string): Action[] {
     const paraTextM = line.match(/getByRole\(['"`]paragraph['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
     if (paraTextM) { rawSteps.push({ action: "verify", target: paraTextM[1], raw: line, selector: paraTextM[1], verifyType: "text-visible" }); continue; }
 
+    // Chained: page.getByRole('parentRole').getByRole('childRole', { name }).click()
+    const chainedRoleClickM = line.match(/getByRole\(['"`](\w+)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)\.click/);
+    if (chainedRoleClickM) { rawSteps.push({ action: "click", target: chainedRoleClickM[3], raw: line, selector: `page.getByRole('${chainedRoleClickM[1]}').getByRole('${chainedRoleClickM[2]}', { name: '${chainedRoleClickM[3]}' })` }); continue; }
+    // Indexed no-name: page.getByRole('role').nth(n).click()
+    const roleNthClickM = line.match(/getByRole\(['"`](\w+)['"`]\)\.nth\((\d+)\)\.click/);
+    if (roleNthClickM) { rawSteps.push({ action: "click", target: `${roleNthClickM[1]}[${roleNthClickM[2]}]`, raw: line, selector: `page.getByRole('${roleNthClickM[1]}').nth(${roleNthClickM[2]})` }); continue; }
     // ─────────────────────────────────────────
     // 🔥 ROLE CLICK  (cualquier rol, soporta exact:true, .first() y .nth(n))
     // ─────────────────────────────────────────
@@ -679,10 +720,12 @@ export function parseRecording(filePath: string): Action[] {
     const textClickM = line.match(/(?<![.]getByRole[^.]*\.)getByText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.click/);
     if (textClickM) {
       const text = textClickM[1];
+      const exactTextM = line.match(/exact:\s*(true|false)/);
+      const exactTextOpt = exactTextM?.[1] === 'true' ? ', { exact: true }' : '';
       if (isResultText(text)) {
         rawSteps.push({ action: "verify", target: text, raw: line, selector: text, verifyType: "text-visible" });
       } else {
-        rawSteps.push({ action: "click", target: text, raw: line, selector: buildPlaywrightSelector({ type: "text", text }) });
+        rawSteps.push({ action: "click", target: text, raw: line, selector: exactTextOpt ? `page.getByText('${safeRegexContent(text)}'${exactTextOpt})` : buildPlaywrightSelector({ type: "text", text }) });
       }
       continue;
     }
@@ -750,6 +793,27 @@ export function parseRecording(filePath: string): Action[] {
     const titleClickM = line.match(/getByTitle\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)\.click/);
     if (titleClickM) { rawSteps.push({ action: "click", target: titleClickM[1], raw: line, selector: `page.getByTitle('${titleClickM[1]}')` }); continue; }
 
+    // Chained con contexto del padre preservado
+    const locTxtClickM = line.match(/locator\(['"`](.*?)['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
+    if (locTxtClickM) {
+      const text = locTxtClickM[2];
+      if (isResultText(text)) {
+        rawSteps.push({ action: "verify", target: text, raw: line, selector: text, verifyType: "text-visible" });
+      } else {
+        rawSteps.push({ action: "click", target: text, raw: line, selector: `page.locator('${locTxtClickM[1]}').getByText('${safeRegexContent(text)}')` });
+      }
+      continue;
+    }
+    const roleTxtClickM = line.match(/getByRole\(['"`](\w+)['"`]\)\.getByText\(['"`](.*?)['"`]\)\.click/);
+    if (roleTxtClickM) {
+      const text = roleTxtClickM[2];
+      if (isResultText(text)) {
+        rawSteps.push({ action: "verify", target: text, raw: line, selector: text, verifyType: "text-visible" });
+      } else {
+        rawSteps.push({ action: "click", target: text, raw: line, selector: `page.getByRole('${roleTxtClickM[1]}').getByText('${safeRegexContent(text)}')` });
+      }
+      continue;
+    }
     // ─────────────────────────────────────────
     // 🔥 CHAINED .getByText(...).click()
     // ─────────────────────────────────────────

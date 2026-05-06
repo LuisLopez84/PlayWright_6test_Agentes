@@ -23,8 +23,8 @@ export function normalizeSelector(raw: string): string {
   const nameMatch = selector.match(/name:\s*['"`](.*?)['"`]/);
   if (nameMatch) return nameMatch[1];
 
-  // 🔥 CASO 3: getByLabel('xxx')
-  const labelMatch = selector.match(/getByLabel\(['"`](.*?)['"`]\)/);
+  // 🔥 CASO 3: getByLabel('xxx') con o sin opciones { exact: false }
+  const labelMatch = selector.match(/getByLabel\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)/);
   if (labelMatch) return labelMatch[1];
 
   // 🔥 CASO 4: getByPlaceholder('xxx')
@@ -71,6 +71,14 @@ export function normalizeSelector(raw: string): string {
   // 🔥 CASO 12: .filter({ hasText: 'xxx' }) genérico → extrae el texto
   const filterHasTextMatch = selector.match(/\.filter\(\{\s*hasText:\s*['"`](.*?)['"`]\s*\}\)/);
   if (filterHasTextMatch) return filterHasTextMatch[1];
+
+  // 🔥 CASO 13: getByRole('parent').getByRole('child', { name: 'xxx' }) → extrae el name del hijo
+  const chainedRoleMatch = selector.match(/getByRole\(['"`]\w+['"`]\)\.getByRole\(['"`].*?['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`]/);
+  if (chainedRoleMatch) return chainedRoleMatch[1];
+
+  // 🔥 CASO 14: getByRole('role').getByText('xxx') o locator('css').getByText('xxx') → extrae texto
+  const chainedParentTextMatch = selector.match(/(?:getByRole\(['"`]\w+['"`]\)|locator\(['"`].*?['"`]\))\.getByText\(['"`](.*?)['"`]\)/);
+  if (chainedParentTextMatch) return chainedParentTextMatch[1];
 
   // 🔥 Fallback: limpieza de basura residual
   return selector

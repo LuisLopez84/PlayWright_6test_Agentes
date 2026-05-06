@@ -6,11 +6,13 @@ import { normalizeSelector } from "../../../../ConfigurationTest/tests/utils/sel
 // Risk 5: wrapper — expresiones encadenadas (.nth/.first/.last/.filter) pasan sin modificar
 // Risk 11: expresiones Playwright del recorder (page.getByLabel/Role/locator…) pasan sin modificar
 //          para que resolveLocator las evalúe directamente sin perder la info de tipo de locator.
+// Risk 12: escapa backticks y ${ antes de incrustar en template literals generados.
 function safeNormalize(rawSel: string): string {
   if (!rawSel) return '';
-  if (/\.(nth|first|last|filter|and)\(/.test(rawSel)) return rawSel;
+  const forTemplate = (s: string) => s.replace(/`/g, '\\`').replace(/\$\{/g, '\\${');
+  if (/\.(nth|first|last|filter|and)\(/.test(rawSel)) return forTemplate(rawSel);
   // Expresión completa del recorder → preservar tal cual (más fiable que solo el texto)
-  if (/^page\.(getBy|locator|frameLocator)/.test(rawSel)) return rawSel;
+  if (/^page\.(getBy|locator|frameLocator)/.test(rawSel)) return forTemplate(rawSel);
   return normalizeSelector(rawSel) || rawSel;
 }
 

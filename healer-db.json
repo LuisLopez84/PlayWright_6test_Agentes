@@ -126,5 +126,25 @@
   "Password": {
     "selector": "[placeholder=\"Password\"]",
     "savedAt": 1778013845521
+  },
+  "tester1 tester2": {
+    "selector": "button:has-text(\"Submit\")",
+    "savedAt": 1778097567680
+  },
+  "Smartwatches y Accesorios": {
+    "selector": ":is(a):has-text(\"Accesorios\")",
+    "savedAt": 1778100067078
+  },
+  "Buscar: Musera": {
+    "selector": "button:has-text(\"Buscar:\")",
+    "savedAt": 1778101332503
+  },
+  "page.getByRole('button', { name: 'Buscar: Musera' })": {
+    "selector": "button:has-text(\"Musera\")",
+    "savedAt": 1778101816027
+  },
+  "Buscar: audifo": {
+    "selector": "[name=\"header-search\"]",
+    "savedAt": 1778102075340
   }
 }

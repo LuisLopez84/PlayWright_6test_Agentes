@@ -341,8 +341,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 66,
-      "lastUsed": "2026-05-05T23:27:50.372Z"
+      "successCount": 77,
+      "lastUsed": "2026-05-06T20:20:34.166Z"
     },
     {
       "selector": "text=Try Again",
@@ -358,8 +358,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 168,
-      "lastUsed": "2026-05-05T23:28:00.510Z"
+      "successCount": 179,
+      "lastUsed": "2026-05-06T20:20:46.022Z"
     },
     {
       "selector": "#neterrorTryAgainButton",
@@ -370,8 +370,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "text=ingresar",
-      "successCount": 118,
-      "lastUsed": "2026-05-05T23:28:01.932Z"
+      "successCount": 128,
+      "lastUsed": "2026-05-06T20:20:47.733Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -2241,6 +2241,401 @@
       "selector": "Usuario",
       "successCount": 1,
       "lastUsed": "2026-05-05T15:55:51.478Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/|click|page.getByRole('textbox', { name: 'Email' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Email' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:17:13.110Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/|fill|page.getByRole('textbox', { name: 'Email' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Email' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:15:12.269Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/|click|page.getByRole('textbox', { name: 'Password' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Password' })",
+      "successCount": 8,
+      "lastUsed": "2026-05-06T20:17:15.799Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/|fill|page.getByRole('textbox', { name: 'Password' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Password' })",
+      "successCount": 8,
+      "lastUsed": "2026-05-06T20:17:18.487Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/|click|page.getByRole('button', { name: 'Submit' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Submit' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:17:39.993Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/contactList|click|page.getByRole('button', { name: 'Add a New Contact' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Add a New Contact' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:17:22.924Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: '* First Name:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: '* First Name:' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:17:24.780Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: '* First Name:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: '* First Name:' })",
+      "successCount": 8,
+      "lastUsed": "2026-05-06T20:17:51.484Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: '* Last Name:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: '* Last Name:' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:17:28.234Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: '* Last Name:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: '* Last Name:' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:17:29.962Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'Date of Birth:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Date of Birth:' })",
+      "successCount": 4,
+      "lastUsed": "2026-05-06T20:17:31.550Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'Date of Birth:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Date of Birth:' })",
+      "successCount": 3,
+      "lastUsed": "2026-05-06T20:17:33.280Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'Email:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Email:' })",
+      "successCount": 4,
+      "lastUsed": "2026-05-06T20:17:34.850Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'Email:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Email:' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:18:12.451Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'Phone:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Phone:' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:18:14.996Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'Phone:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Phone:' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:18:17.590Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'Street Address 1:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Street Address 1:' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-06T20:18:20.070Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'Street Address 1:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Street Address 1:' })",
+      "successCount": 7,
+      "lastUsed": "2026-05-06T20:18:22.695Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'City:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'City:' })",
+      "successCount": 7,
+      "lastUsed": "2026-05-06T20:18:25.422Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'City:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'City:' })",
+      "successCount": 9,
+      "lastUsed": "2026-05-06T20:18:30.660Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'State or Province:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'State or Province:' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:18:33.466Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'State or Province:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'State or Province:' })",
+      "successCount": 11,
+      "lastUsed": "2026-05-06T20:18:38.683Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'Postal Code:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Postal Code:' })",
+      "successCount": 7,
+      "lastUsed": "2026-05-06T20:18:41.225Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'Postal Code:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Postal Code:' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:18:43.761Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('textbox', { name: 'Country:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Country:' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:18:46.303Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|fill|page.getByRole('textbox', { name: 'Country:' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Country:' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:18:48.829Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|tester1 tester2": [
+    {
+      "selector": "button:has-text(\"Submit\")",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T19:59:27.682Z"
+    }
+  ],
+  "https://thinking-tester-contact-list.herokuapp.com/addContact|click|page.getByRole('cell', { name: 'tester1 tester2' })": [
+    {
+      "selector": "button:has-text(\"Submit\")",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:18:50.918Z"
+    },
+    {
+      "selector": "page.getByRole('cell', { name: 'tester1 tester2' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T19:59:28.909Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('textbox', { name: 'Usuario' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Usuario' })",
+      "successCount": 4,
+      "lastUsed": "2026-05-06T20:19:57.335Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('textbox', { name: 'Usuario' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Usuario' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:20:08.698Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('textbox', { name: 'Contraseña' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Contraseña' })",
+      "successCount": 3,
+      "lastUsed": "2026-05-06T20:11:13.652Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('textbox', { name: 'Contraseña' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Contraseña' })",
+      "successCount": 4,
+      "lastUsed": "2026-05-06T20:20:23.645Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Ingresar' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Ingresar' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-06T20:20:32.108Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('list').getByText('Pago de Servicios')": [
+    {
+      "selector": "page.getByRole('list').getByText('Pago de Servicios')",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:20:44.163Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|page.getByLabel('Selecciona el Servicio')": [
+    {
+      "selector": "page.getByLabel('Selecciona el Servicio')",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:20:50.577Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('spinbutton', { name: 'Monto a Pagar' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto a Pagar' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:20:55.321Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('spinbutton', { name: 'Monto a Pagar' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto a Pagar' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:21:00.818Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Pagar Servicio' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Pagar Servicio' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:21:05.673Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|page.getByLabel('Cuenta a Debitar')": [
+    {
+      "selector": "page.getByLabel('Cuenta a Debitar')",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:21:02.825Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/|click|page.getByRole('combobox', { name: 'Ingresa lo que quieras' })": [
+    {
+      "selector": "page.getByRole('combobox', { name: 'Ingresa lo que quieras' })",
+      "successCount": 6,
+      "lastUsed": "2026-05-06T20:39:51.080Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/|fill|page.getByRole('combobox', { name: 'Ingresa lo que quieras' })": [
+    {
+      "selector": "page.getByRole('combobox', { name: 'Ingresa lo que quieras' })",
+      "successCount": 7,
+      "lastUsed": "2026-05-06T20:40:15.988Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/|click|page.getByRole('button', { name: 'Buscar' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Buscar' })",
+      "successCount": 7,
+      "lastUsed": "2026-05-06T20:41:16.833Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/audifonos|click|page.getByRole('link', { name: 'Smartwatches y Accesorios' })": [
+    {
+      "selector": "page.getByRole('link', { name: 'Smartwatches y Accesorios' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T20:41:31.171Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/celulares-telefonos/accesorios-celulares/audifonos_NoIndex_True|click|page.getByRole('link', { name: 'Soy nuevo' })": [
+    {
+      "selector": "page.getByRole('link', { name: 'Soy nuevo' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T20:32:27.757Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/audifonos|click|Smartwatches y Accesorios": [
+    {
+      "selector": ":is(a):has-text(\"Accesorios\")",
+      "successCount": 2,
+      "lastUsed": "2026-05-06T20:41:07.118Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/audifonos|click|page.getByRole('link', { name: 'Soy nuevo' })": [
+    {
+      "selector": "page.getByRole('link', { name: 'Soy nuevo' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T20:36:57.238Z"
+    }
+  ],
+  "https://listado.mercadolibre.com.co/celulares-telefonos/smartwatches-accesorios/audifonos_NoIndex_True|click|page.getByRole('link', { name: 'Soy nuevo' })": [
+    {
+      "selector": "page.getByRole('link', { name: 'Soy nuevo' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T20:40:36.694Z"
+    }
+  ],
+  "https://www.mercadolibre.com.co/gz/account-verification|click|page.getByRole('link', { name: 'Soy nuevo' })": [
+    {
+      "selector": "page.getByRole('link', { name: 'Soy nuevo' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T20:41:32.973Z"
+    }
+  ],
+  "https://www.shein.com.co/|click|page.getByText('Aceptar Todo', { exact: true })": [
+    {
+      "selector": "page.getByText('Aceptar Todo', { exact: true })",
+      "successCount": 7,
+      "lastUsed": "2026-05-06T21:12:30.210Z"
+    }
+  ],
+  "https://www.shein.com.co/|click|page.getByRole('button', { name: 'Buscar: Musera' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Buscar: Musera' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-06T21:12:45.793Z"
+    },
+    {
+      "selector": "button:has-text(\"Musera\")",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T21:10:16.050Z"
+    }
+  ],
+  "https://www.shein.com.co/|click|page.getByRole('button', { name: 'Buscar: Vestidos De Baño' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Buscar: Vestidos De Baño' })",
+      "successCount": 4,
+      "lastUsed": "2026-05-06T21:13:05.035Z"
+    }
+  ],
+  "https://www.shein.com.co/|click|Buscar: Musera": [
+    {
+      "selector": "button:has-text(\"Buscar:\")",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T21:02:12.774Z"
+    }
+  ],
+  "https://www.shein.com.co/|fill|page.getByRole('combobox', { name: 'Buscar:' })": [
+    {
+      "selector": "page.getByRole('combobox', { name: 'Buscar:' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-06T21:13:27.191Z"
+    }
+  ],
+  "https://www.shein.com.co/|fill|Buscar: audifo": [
+    {
+      "selector": "[name=\"header-search\"]",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T21:14:35.347Z"
+    }
+  ],
+  "https://www.shein.com.co/|fill|page.getByRole('combobox', { name: 'Buscar: audifo' })": [
+    {
+      "selector": "[name=\"header-search\"]",
+      "successCount": 1,
+      "lastUsed": "2026-05-06T21:14:35.435Z"
     }
   ]
 }

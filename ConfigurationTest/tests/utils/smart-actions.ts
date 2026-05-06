@@ -67,9 +67,9 @@ function evalPlaywrightExpr(page: Page, expr: string): Locator | null {
     const tidM = expr.match(/^page\.getByTestId\(['"`](.*?)['"`]\)$/);
     if (tidM) return page.getByTestId(tidM[1]);
 
-    // page.getByText('text') o page.getByText('text', { exact: … })
-    const txtM = expr.match(/^page\.getByText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)$/);
-    if (txtM) return page.getByText(txtM[1], { exact: false });
+    // page.getByText('text') o page.getByText('text', { exact: true|false })
+    const txtM = expr.match(/^page\.getByText\(['"`](.*?)['"`](?:,\s*\{[^}]*exact:\s*(true|false)[^}]*\})?\)$/);
+    if (txtM) return page.getByText(txtM[1], { exact: txtM[2] === 'true' });
 
     // page.getByAltText / page.getByTitle
     const altM = expr.match(/^page\.getByAltText\(['"`](.*?)['"`](?:,\s*\{[^}]*\})?\)$/);
@@ -113,6 +113,18 @@ function evalPlaywrightExpr(page: Page, expr: string): Locator | null {
     // page.getByRole('dialog').getByRole('button', { name: 'text' })
     const dlgBtnM = expr.match(/^page\.getByRole\(['"`]dialog['"`]\)\.getByRole\(['"`](button|link)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)$/);
     if (dlgBtnM) return page.getByRole('dialog').getByRole(dlgBtnM[1] as any, { name: dlgBtnM[2] });
+
+    // page.getByRole('anyParent').getByRole('anyChild', { name: 'text' }) — patrón general
+    const anyParentRoleM = expr.match(/^page\.getByRole\(['"`](\w+)['"`]\)\.getByRole\(['"`](.*?)['"`],\s*\{[^}]*name:\s*['"`](.*?)['"`][^}]*\}\)$/);
+    if (anyParentRoleM) return page.getByRole(anyParentRoleM[1] as any).getByRole(anyParentRoleM[2] as any, { name: anyParentRoleM[3] });
+
+    // page.getByRole('anyParent').getByText('text') — patrón general
+    const anyParentTxtM = expr.match(/^page\.getByRole\(['"`](\w+)['"`]\)\.getByText\(['"`](.*?)['"`]\)$/);
+    if (anyParentTxtM) return page.getByRole(anyParentTxtM[1] as any).getByText(anyParentTxtM[2], { exact: false });
+
+    // page.getByRole('role').nth(n) — sin name (ej: page.getByRole('row').nth(2))
+    const roleNthM = expr.match(/^page\.getByRole\(['"`](\w+)['"`]\)\.nth\((\d+)\)$/);
+    if (roleNthM) return page.getByRole(roleNthM[1] as any).nth(parseInt(roleNthM[2]));
 
     return null;
   } catch {
@@ -483,12 +495,12 @@ async function waitForPageStability(
  * estructural muy específico (#id, [data-testid], etc.) para evitar costo innecesario.
  */
 function shouldSkipAIHealing(selector: string): boolean {
-  // Selectores estructurales muy específicos → no necesitan IA
+  // Expresiones Playwright del recorder y selectores estructurales ya son específicos → no necesitan IA
   return (
     selector.startsWith('#') ||
     selector.includes('[data-testid=') ||
     selector.includes('[aria-label=') ||
-    /^page\.(getByTestId|getByRole)\(/.test(selector)
+    /^page\.(getBy|locator)\(/.test(selector)
   );
 }
 
@@ -1230,6 +1242,8 @@ const RESULT_TEXT_PATTERNS_RUNTIME: RegExp[] = [
 
 function isResultTextRuntime(text: string): boolean {
   if (text.trim().length < 5) return false;
+  // Expresiones Playwright del recorder NUNCA son texto de resultado — son selectores de elementos
+  if (/^page\.(getBy|locator|frameLocator)/.test(text.trim())) return false;
   // CSS selectors and XPath are never result texts
   if (isCSSSelector(text.trim())) return false;
   const isAction = /^(transferir|confirmar|aceptar|cancelar|volver|siguiente|anterior|cerrar|salir|ingresar|login|submit|ok|sí|si|no|yes|guardar|enviar|buscar|filtrar|limpiar|nuevo|agregar|editar|eliminar|ver|detalles)$/i.test(text.trim());
