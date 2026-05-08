@@ -113,24 +113,22 @@ export const NFConfig: {
     // ── TARGET 1a: Misma API SOAP — Prueba INCREMENTAL ───────────────────────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_Transferencias_QA/api/Homebanking_Transferencias_QA_Servicio_SOAP_POST.spec.ts',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_PlazosFijosTesting/api/Homebanking_PlazosFijosTesting_GET_SOAP.spec.ts',
       endpoint: {
         name: 'SOAP Calculator — INCREMENTAL',   // nombre único → distinguible en el reporte
         method: 'POST',
-        url: 'http://www.dneonline.com/calculator.asmx',
+        url: 'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName',
         headers: {
           'Content-Type': 'text/xml;charset=UTF-8',
           'SOAPAction': 'http://tempuri.org/Add',
         },
-        body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
-<soapenv:Header/>
-<soapenv:Body>
-<tem:Add>
-<tem:intA>5</tem:intA>
-<tem:intB>2</tem:intB>
-</tem:Add>
-</soapenv:Body>
-</soapenv:Envelope>`,
+        body: `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
+</ListOfContinentsByName>
+</soap:Body>
+</soap:Envelope>`,
       },
       testType: 'incremental',
       incremental: {
@@ -141,10 +139,10 @@ export const NFConfig: {
       },
     },
 
-    // ── TARGET 1b: Misma API SOAP — Prueba de PICOS (simultánea con 1a) ──────
+    // ── TARGET 1b: API SOAP — Prueba de PICOS (simultánea con 1a) ──────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_Transferencias_QA/api/Homebanking_Transferencias_QA_Servicio_SOAP_POST.spec.ts',
+      apiSpecPath: 'http://www.dneonline.com/calculator.asmx',
       endpoint: {
         name: 'SOAP Calculator — PICOS',         // nombre único → distinguible en el reporte
         method: 'POST',
@@ -178,21 +176,21 @@ export const NFConfig: {
     // ── TARGET 2a: Recording UI — INCREMENTAL (diferente suite) ──────────────
      {
        type: 'recording',
-       recording: 'Homebanking_Transferencias_QA',
+       recording: 'Homebanking_Pago_ServiciosTesting',
        testType: 'incremental',
        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
      },
 
     {
         type: 'recording',
-        recording: 'Homebanking_PrestamosTesting',
+        recording: 'Homebanking_Tarjeta_Virtual',
         testType: 'incremental',
         incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
     },
 
     {
         type: 'recording',
-        recording: 'herokuapp_CrearUsuario',
+        recording: 'Homebanking_TransferenciasTesting',
         testType: 'incremental',
         incremental: { scenarios: 6, initialThreads: 1, finalThreads: 6, durationPerScenarioSeconds: 3 },
     },

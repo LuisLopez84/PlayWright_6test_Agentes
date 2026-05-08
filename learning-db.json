@@ -341,8 +341,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Usuario": [
     {
       "selector": "Usuario",
-      "successCount": 77,
-      "lastUsed": "2026-05-06T20:20:34.166Z"
+      "successCount": 91,
+      "lastUsed": "2026-05-08T13:50:12.603Z"
     },
     {
       "selector": "text=Try Again",
@@ -358,8 +358,8 @@
   "https://homebanking-demo-tests.netlify.app/|fill|Contraseña": [
     {
       "selector": "Contraseña",
-      "successCount": 179,
-      "lastUsed": "2026-05-06T20:20:46.022Z"
+      "successCount": 187,
+      "lastUsed": "2026-05-08T13:50:08.439Z"
     },
     {
       "selector": "#neterrorTryAgainButton",
@@ -370,8 +370,8 @@
   "https://homebanking-demo-tests.netlify.app/|click|Ingresar": [
     {
       "selector": "text=ingresar",
-      "successCount": 128,
-      "lastUsed": "2026-05-06T20:20:47.733Z"
+      "successCount": 143,
+      "lastUsed": "2026-05-08T13:50:17.020Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|¡Bienvenido! Inicio de sesión": [
@@ -396,8 +396,8 @@
   "https://homebanking-demo-tests.netlify.app/|select|#source-account": [
     {
       "selector": "#source-account",
-      "successCount": 6,
-      "lastUsed": "2026-05-05T19:55:58.104Z"
+      "successCount": 8,
+      "lastUsed": "2026-05-08T13:50:21.675Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto": [
@@ -766,8 +766,8 @@
   "https://homebanking-demo-tests.netlify.app/|select|#loan-destination-account": [
     {
       "selector": "#loan-destination-account",
-      "successCount": 2,
-      "lastUsed": "2026-05-05T19:51:27.270Z"
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:44:33.372Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|Monto a solicitar": [
@@ -2447,78 +2447,78 @@
   "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('textbox', { name: 'Usuario' })": [
     {
       "selector": "page.getByRole('textbox', { name: 'Usuario' })",
-      "successCount": 4,
-      "lastUsed": "2026-05-06T20:19:57.335Z"
+      "successCount": 16,
+      "lastUsed": "2026-05-08T13:49:31.563Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('textbox', { name: 'Usuario' })": [
     {
       "selector": "page.getByRole('textbox', { name: 'Usuario' })",
-      "successCount": 6,
-      "lastUsed": "2026-05-06T20:20:08.698Z"
+      "successCount": 18,
+      "lastUsed": "2026-05-08T13:49:34.689Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('textbox', { name: 'Contraseña' })": [
     {
       "selector": "page.getByRole('textbox', { name: 'Contraseña' })",
-      "successCount": 3,
-      "lastUsed": "2026-05-06T20:11:13.652Z"
+      "successCount": 10,
+      "lastUsed": "2026-05-08T13:49:37.416Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('textbox', { name: 'Contraseña' })": [
     {
       "selector": "page.getByRole('textbox', { name: 'Contraseña' })",
-      "successCount": 4,
-      "lastUsed": "2026-05-06T20:20:23.645Z"
+      "successCount": 13,
+      "lastUsed": "2026-05-08T13:49:52.488Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Ingresar' })": [
     {
       "selector": "page.getByRole('button', { name: 'Ingresar' })",
-      "successCount": 5,
-      "lastUsed": "2026-05-06T20:20:32.108Z"
+      "successCount": 15,
+      "lastUsed": "2026-05-08T13:50:02.120Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('list').getByText('Pago de Servicios')": [
     {
       "selector": "page.getByRole('list').getByText('Pago de Servicios')",
-      "successCount": 6,
-      "lastUsed": "2026-05-06T20:20:44.163Z"
+      "successCount": 8,
+      "lastUsed": "2026-05-08T13:39:00.589Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|page.getByLabel('Selecciona el Servicio')": [
     {
       "selector": "page.getByLabel('Selecciona el Servicio')",
-      "successCount": 6,
-      "lastUsed": "2026-05-06T20:20:50.577Z"
+      "successCount": 9,
+      "lastUsed": "2026-05-08T13:39:03.418Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('spinbutton', { name: 'Monto a Pagar' })": [
     {
       "selector": "page.getByRole('spinbutton', { name: 'Monto a Pagar' })",
-      "successCount": 6,
-      "lastUsed": "2026-05-06T20:20:55.321Z"
+      "successCount": 10,
+      "lastUsed": "2026-05-08T13:39:06.389Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('spinbutton', { name: 'Monto a Pagar' })": [
     {
       "selector": "page.getByRole('spinbutton', { name: 'Monto a Pagar' })",
-      "successCount": 6,
-      "lastUsed": "2026-05-06T20:21:00.818Z"
+      "successCount": 10,
+      "lastUsed": "2026-05-08T13:39:10.402Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Pagar Servicio' })": [
     {
       "selector": "page.getByRole('button', { name: 'Pagar Servicio' })",
-      "successCount": 6,
-      "lastUsed": "2026-05-06T20:21:05.673Z"
+      "successCount": 9,
+      "lastUsed": "2026-05-08T13:39:15.418Z"
     }
   ],
   "https://homebanking-demo-tests.netlify.app/|select|page.getByLabel('Cuenta a Debitar')": [
     {
       "selector": "page.getByLabel('Cuenta a Debitar')",
-      "successCount": 6,
-      "lastUsed": "2026-05-06T20:21:02.825Z"
+      "successCount": 10,
+      "lastUsed": "2026-05-08T13:39:12.308Z"
     }
   ],
   "https://www.mercadolibre.com.co/|click|page.getByRole('combobox', { name: 'Ingresa lo que quieras' })": [
@@ -2636,6 +2636,160 @@
       "selector": "[name=\"header-search\"]",
       "successCount": 1,
       "lastUsed": "2026-05-06T21:14:35.435Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('list').getByText('Plazos Fijos')": [
+    {
+      "selector": "page.getByRole('list').getByText('Plazos Fijos')",
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:41:16.867Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|#deposit-source-account": [
+    {
+      "selector": "#deposit-source-account",
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:41:28.345Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('spinbutton', { name: 'Monto a invertir' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto a invertir' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:41:39.301Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('spinbutton', { name: 'Monto a invertir' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto a invertir' })",
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:41:46.507Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Crear Plazo Fijo' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Crear Plazo Fijo' })",
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:41:53.301Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Confirmar' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Confirmar' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-08T13:50:58.596Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|page.getByLabel('Plazo')": [
+    {
+      "selector": "page.getByLabel('Plazo')",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:41:49.763Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('list').getByText('Préstamos')": [
+    {
+      "selector": "page.getByRole('list').getByText('Préstamos')",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:44:44.171Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('spinbutton', { name: 'Monto a solicitar' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto a solicitar' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-08T13:44:34.820Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('spinbutton', { name: 'Monto a solicitar' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto a solicitar' })",
+      "successCount": 1,
+      "lastUsed": "2026-05-08T13:44:37.197Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|select|page.getByLabel('Cuotas')": [
+    {
+      "selector": "page.getByLabel('Cuotas')",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:45:14.966Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Solicitar Préstamo' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Solicitar Préstamo' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:45:20.823Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByText('Préstamo acreditado')": [
+    {
+      "selector": "page.getByText('Préstamo acreditado')",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:45:41.191Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByText('Tarjeta Virtual', { exact: true })": [
+    {
+      "selector": "page.getByText('Tarjeta Virtual', { exact: true })",
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:47:57.710Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByLabel('Sincronizar con cuenta:')": [
+    {
+      "selector": "page.getByLabel('Sincronizar con cuenta:')",
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:48:07.846Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: '+ Generar Nueva Tarjeta' })": [
+    {
+      "selector": "page.getByRole('button', { name: '+ Generar Nueva Tarjeta' })",
+      "successCount": 3,
+      "lastUsed": "2026-05-08T13:48:15.145Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('list').getByText('Transferencias')": [
+    {
+      "selector": "page.getByRole('list').getByText('Transferencias')",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:50:16.172Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('spinbutton', { name: 'Monto' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:50:23.972Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('spinbutton', { name: 'Monto' })": [
+    {
+      "selector": "page.getByRole('spinbutton', { name: 'Monto' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:50:33.542Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('textbox', { name: 'Descripción (opcional)' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Descripción (opcional)' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:50:37.820Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|fill|page.getByRole('textbox', { name: 'Descripción (opcional)' })": [
+    {
+      "selector": "page.getByRole('textbox', { name: 'Descripción (opcional)' })",
+      "successCount": 5,
+      "lastUsed": "2026-05-08T13:50:49.675Z"
+    }
+  ],
+  "https://homebanking-demo-tests.netlify.app/|click|page.getByRole('button', { name: 'Transferir' })": [
+    {
+      "selector": "page.getByRole('button', { name: 'Transferir' })",
+      "successCount": 2,
+      "lastUsed": "2026-05-08T13:50:53.674Z"
     }
   ]
 }
