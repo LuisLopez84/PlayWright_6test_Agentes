@@ -32,3 +32,8 @@ GenerateTest/testsSuites/**/test-results/
 BoxRecordings/recordings/*.mp4
 BoxRecordings/recordings/*.webm
 BoxRecordings/network/*.json
+
+# Visual snapshots (rutas largas en Windows superan MAX_PATH)
+GenerateTest/tests/**/*-snapshots/
+GenerateTest/tests/**/visual/**/*.png
+GenerateTest/tests/**/visual/**/*.jpg
