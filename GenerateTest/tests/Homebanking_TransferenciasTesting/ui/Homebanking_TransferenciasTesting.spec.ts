@@ -21,14 +21,10 @@ test('Homebanking_TransferenciasTesting', async ({ page }) => {
   await smartClick(page, `page.getByRole('list').getByText('Transferencias')`);
   await smartSelect(page, `#source-account`, 'ACC002');
   await smartClick(page, `page.getByRole('spinbutton', { name: 'Monto' })`);
-  await smartFill(page, `page.getByRole('spinbutton', { name: 'Monto' })`, '1000');
+  await smartFill(page, `page.getByRole('spinbutton', { name: 'Monto' })`, '1550');
   await page.waitForTimeout(FILL_WAIT_MS);
   await smartClick(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`);
-  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'c');
-  await page.waitForTimeout(FILL_WAIT_MS);
-  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'C');
-  await page.waitForTimeout(FILL_WAIT_MS);
-  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'Casi final');
+  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'grabacion video 002');
   await page.waitForTimeout(FILL_WAIT_MS);
   await smartClick(page, `page.getByRole('button', { name: 'Transferir' })`);
   await Promise.all([

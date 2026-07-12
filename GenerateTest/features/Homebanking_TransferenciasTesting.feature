@@ -3,7 +3,6 @@ Feature: Homebanking_TransferenciasTesting
 
 Scenario: Flujo Homebanking_TransferenciasTesting
   Given el usuario está en la aplicación
-  And page_load
   And hace clic en "elemento"
   And hace clic en "Usuario"
   When el usuario ingresa "demo" en "Usuario"
@@ -13,11 +12,9 @@ Scenario: Flujo Homebanking_TransferenciasTesting
   And hace clic en "Transferencias"
   And selecciona "ACC002" en "#source-account"
   And hace clic en "Monto"
-  And completa "Monto" con "1000"
+  And completa "Monto" con "1550"
   And hace clic en "Descripción (opcional)"
-  And completa "Descripción (opcional)" con "c"
-  And completa "Descripción (opcional)" con "C"
-  And completa "Descripción (opcional)" con "Casi final"
+  And completa "Descripción (opcional)" con "grabacion video 002"
   And hace clic en "Transferir"
   And hace clic en "Confirmar"
   Then la página está disponible sin errores
