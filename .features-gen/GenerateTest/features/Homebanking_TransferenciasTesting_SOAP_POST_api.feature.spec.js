@@ -1,23 +1,23 @@
-// Generated from: GenerateTest\features\Homebanking_PrestamosTesting_POST_SOAP_api.feature
+// Generated from: GenerateTest\features\Homebanking_TransferenciasTesting_SOAP_POST_api.feature
 import { test } from "playwright-bdd";
 
-test.describe('API SOAP POST - Homebanking PrestamosTesting POST SOAP', () => {
+test.describe('API SOAP POST - Homebanking TransferenciasTesting SOAP POST', () => {
 
   test.beforeEach('Background', async ({ Given }, testInfo) => { if (testInfo.error) return;
     await Given('el servicio SOAP "http://www.dneonline.com/calculator.asmx" con acción "http://tempuri.org/Add" está configurado para pruebas API'); 
   });
   
-  test('Homebanking PrestamosTesting POST SOAP - Petición exitosa', async ({ When, Then, request }) => { 
+  test('Homebanking TransferenciasTesting SOAP POST - Petición exitosa', async ({ When, Then, request }) => { 
     await When('ejecuto la petición API configurada', null, { request }); 
     await Then('la respuesta debe tener un estado de éxito 2xx'); 
   });
 
-  test('Homebanking PrestamosTesting POST SOAP - Error técnico del servidor', async ({ When, Then, request }) => { 
+  test('Homebanking TransferenciasTesting SOAP POST - Error técnico del servidor', async ({ When, Then, request }) => { 
     await When('ejecuto la petición API a un endpoint con error técnico', null, { request }); 
     await Then('la respuesta debe indicar un fallo técnico de red o 5xx'); 
   });
 
-  test('Homebanking PrestamosTesting POST SOAP - Error por datos inválidos', async ({ When, Then, request }) => { 
+  test('Homebanking TransferenciasTesting SOAP POST - Error por datos inválidos', async ({ When, Then, request }) => { 
     await When('ejecuto la petición API con datos inválidos', null, { request }); 
     await Then('la respuesta debe indicar error de validación de datos 4xx'); 
   });
@@ -30,7 +30,7 @@ test.beforeEach('BeforeEach Hooks', ({ $runScenarioHooks }) => $runScenarioHooks
 
 test.use({
   $test: [({}, use) => use(test), { scope: 'test', box: true }],
-  $uri: [({}, use) => use('GenerateTest\\features\\Homebanking_PrestamosTesting_POST_SOAP_api.feature'), { scope: 'test', box: true }],
+  $uri: [({}, use) => use('GenerateTest\\features\\Homebanking_TransferenciasTesting_SOAP_POST_api.feature'), { scope: 'test', box: true }],
   $bddFileData: [({}, use) => use(bddFileData), { scope: "test", box: true }],
 });
 

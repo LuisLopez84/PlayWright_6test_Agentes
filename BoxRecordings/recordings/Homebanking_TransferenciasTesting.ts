@@ -10,13 +10,9 @@ test('test', async ({ page }) => {
   await page.getByRole('list').getByText('Transferencias').click();
   await page.locator('#source-account').selectOption('ACC002');
   await page.getByRole('spinbutton', { name: 'Monto' }).click();
-  await page.getByRole('spinbutton', { name: 'Monto' }).fill('1000');
+  await page.getByRole('spinbutton', { name: 'Monto' }).fill('1550');
   await page.getByRole('textbox', { name: 'Descripción (opcional)' }).click();
-  await page.getByRole('textbox', { name: 'Descripción (opcional)' }).fill('c');
-  await page.getByRole('textbox', { name: 'Descripción (opcional)' }).press('CapsLock');
-  await page.getByRole('textbox', { name: 'Descripción (opcional)' }).fill('C');
-  await page.getByRole('textbox', { name: 'Descripción (opcional)' }).press('CapsLock');
-  await page.getByRole('textbox', { name: 'Descripción (opcional)' }).fill('Casi final');
+  await page.getByRole('textbox', { name: 'Descripción (opcional)' }).fill('grabacion video 002');
   await page.getByRole('button', { name: 'Transferir' }).click();
   await page.getByRole('button', { name: 'Confirmar' }).click();
   await page.getByText('Transferencia realizada').click();

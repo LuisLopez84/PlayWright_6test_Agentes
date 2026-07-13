@@ -113,22 +113,24 @@ export const NFConfig: {
     // ── TARGET 1a: Misma API SOAP — Prueba INCREMENTAL ───────────────────────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_PlazosFijosTesting/api/Homebanking_PlazosFijosTesting_GET_SOAP.spec.ts',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_TransferenciasTesting/api/Homebanking_TransferenciasTesting_SOAP_POST.spec.ts',
       endpoint: {
         name: 'SOAP Calculator — INCREMENTAL',   // nombre único → distinguible en el reporte
         method: 'POST',
-        url: 'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName',
+        url: 'http://www.dneonline.com/calculator.asmx',
         headers: {
           'Content-Type': 'text/xml;charset=UTF-8',
           'SOAPAction': 'http://tempuri.org/Add',
         },
-        body: `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-<soap:Body>
-<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
-</ListOfContinentsByName>
-</soap:Body>
-</soap:Envelope>`,
+        body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
+<soapenv:Header/>
+<soapenv:Body>
+<tem:Add>
+<tem:intA>5</tem:intA>
+<tem:intB>2</tem:intB>
+</tem:Add>
+</soapenv:Body>
+</soapenv:Envelope>`,
       },
       testType: 'incremental',
       incremental: {
@@ -142,7 +144,7 @@ export const NFConfig: {
     // ── TARGET 1b: API SOAP — Prueba de PICOS (simultánea con 1a) ──────
     {
       type: 'api',
-      apiSpecPath: 'http://www.dneonline.com/calculator.asmx',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_TransferenciasTesting/api/Homebanking_TransferenciasTesting_SOAP_POST.spec.ts',
       endpoint: {
         name: 'SOAP Calculator — PICOS',         // nombre único → distinguible en el reporte
         method: 'POST',
@@ -176,7 +178,7 @@ export const NFConfig: {
     // ── TARGET 2a: Recording UI — INCREMENTAL (diferente suite) ──────────────
      {
        type: 'recording',
-       recording: 'Homebanking_Pago_ServiciosTesting',
+       recording: 'Homebanking_TransferenciasTesting',
        testType: 'incremental',
        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
      },

@@ -8,13 +8,6 @@ import { restRequest, soapRequest } from '../../ConfigurationTest/tests/utils/ap
 const { Given, When, Then, Before } = createBdd();
 
 const SOAP_BODIES: Record<string, string> = {
-  'http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName': `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-<soap:Body>
-<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
-</ListOfContinentsByName>
-</soap:Body>
-</soap:Envelope>`,
   'http://www.dneonline.com/calculator.asmx': `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
 <soapenv:Header/>
 <soapenv:Body>
