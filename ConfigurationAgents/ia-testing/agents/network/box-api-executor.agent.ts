@@ -52,6 +52,7 @@ function detectMethod(folderName: string, fileName: string): HttpMethod {
   if (upper.includes('DELETE'))  return 'DELETE';
   if (upper.includes('PATCH'))   return 'PATCH';
   if (upper.includes('PUT'))     return 'PUT';
+  if (upper.includes('UPDATE'))  return 'PUT'; // alias: carpetas nombradas "update" (en vez de "put") también se detectan correctamente
   if (upper.includes('POST'))    return 'POST';
   if (upper.includes('HEAD'))    return 'HEAD';
   if (upper.includes('OPTIONS')) return 'OPTIONS';
@@ -611,12 +612,17 @@ export async function processBoxAPIsExecute(
     : '⚙️  Sin OPENAI_API_KEY — generando con lógica local');
 
   // Recopilar todos los .spec.ts en BoxAPIsExecute (recursivo)
+  // CONTRATO: este agente es SOLO LECTURA sobre BoxAPIsExecute/ — nunca escribe, mueve
+  // ni elimina (fs.unlink/fs.rm) los archivos fuente (curl / URL+body) ni las carpetas
+  // get/post/put/delete que los contienen. El curl pegado por el tester debe permanecer
+  // intacto para permitir regenerar el spec en cualquier momento (npm run generate).
   const specFiles: string[] = [];
   function walk(dir: string) {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) walk(full);
       else if (entry.isFile() && entry.name.endsWith('.spec.ts')) specFiles.push(full);
+      // Cualquier otro archivo (ej. .gitkeep) se ignora silenciosamente — nunca se toca.
     }
   }
   walk(boxRoot);

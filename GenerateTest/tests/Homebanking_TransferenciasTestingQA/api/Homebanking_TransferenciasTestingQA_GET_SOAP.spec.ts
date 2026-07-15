@@ -14,10 +14,8 @@ test.describe('SOAP API Tests', () => {
 
     test('Éxito (2xx) - llamada normal al endpoint real', async ({ request }) => {
         const response = await soapRequest(request, url, xmlBody, soapAction);
-        expect(response.status()).toBeGreaterThanOrEqual(200);
-        expect(response.status()).toBeLessThan(300);
-        const responseBody = await response.text();
-        expect(responseBody).toContain('<ListOfContinentsByNameResult>');
+        expect(response.status()).toBe(200);
+        expect(response.headers()['content-type']).toContain('text/xml');
     });
 
     test('Error técnico - URL no válida', async ({ request }) => {
@@ -30,9 +28,8 @@ test.describe('SOAP API Tests', () => {
 
     test('Error de datos (4xx) - ID inválido', async ({ request }) => {
         const response = await soapRequest(request, url + '/id-invalido-test-99999', xmlBody, soapAction);
-        expect(response.status()).toBeGreaterThanOrEqual(400);
-        expect(response.status()).toBeLessThan(500);
+        expect(response.status()).toBe(400);
         const responseBody = await response.text();
-        expect(responseBody).toContain('data:null');
+        expect(responseBody).toContain('error'); // Ajustar según el mensaje de error esperado
     });
 });

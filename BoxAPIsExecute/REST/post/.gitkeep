@@ -1,0 +1,3 @@
+Este archivo mantiene la carpeta en git aunque esté vacía.
+NO se elimina ni se procesa: box-api-executor.agent.ts solo lee archivos *.spec.ts.
+Pega aquí un archivo .spec.ts con un comando curl o con "URL + body" para generar el test de API correspondiente.
