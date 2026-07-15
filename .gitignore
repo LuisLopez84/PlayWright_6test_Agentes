@@ -37,3 +37,6 @@ BoxRecordings/network/*.json
 GenerateTest/tests/**/*-snapshots/
 GenerateTest/tests/**/visual/**/*.png
 GenerateTest/tests/**/visual/**/*.jpg
+
+# Claude.md
+CLAUDE.md
