@@ -103,6 +103,8 @@ export const NFConfig: {
   //
   // Cada target genera un spec independiente en GenerateTest/tests/<suite>/non-functional/
   // ─────────────────────────────────────────────────────────────────────────────
+
+// Configurar desde Targets
   targets: [
 
     // ════════════════════════════════════════════════════════════════════════════
@@ -113,7 +115,7 @@ export const NFConfig: {
     // ── TARGET 1a: Misma API SOAP — Prueba INCREMENTAL ───────────────────────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_TransferenciasTesting/api/Homebanking_TransferenciasTesting_SOAP_POST.spec.ts',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_TransferenciasTestingQA/api/Homebanking_TransferenciasTestingQA_GET_SOAP.spec.ts',
       endpoint: {
         name: 'SOAP Calculator — INCREMENTAL',   // nombre único → distinguible en el reporte
         method: 'POST',
@@ -122,15 +124,14 @@ export const NFConfig: {
           'Content-Type': 'text/xml;charset=UTF-8',
           'SOAPAction': 'http://tempuri.org/Add',
         },
-        body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
-<soapenv:Header/>
-<soapenv:Body>
-<tem:Add>
-<tem:intA>5</tem:intA>
-<tem:intB>2</tem:intB>
-</tem:Add>
-</soapenv:Body>
-</soapenv:Envelope>`,
+        // Incluye el body o trama request de la peticion:
+        body: `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
+</ListOfContinentsByName>
+</soap:Body>
+</soap:Envelope>`,
       },
       testType: 'incremental',
       incremental: {
@@ -144,7 +145,7 @@ export const NFConfig: {
     // ── TARGET 1b: API SOAP — Prueba de PICOS (simultánea con 1a) ──────
     {
       type: 'api',
-      apiSpecPath: 'GenerateTest/tests/Homebanking_TransferenciasTesting/api/Homebanking_TransferenciasTesting_SOAP_POST.spec.ts',
+      apiSpecPath: 'GenerateTest/tests/Homebanking_TransferenciasTestingQA/api/Homebanking_TransferenciasTestingQA_GET_SOAP.spec.ts',
       endpoint: {
         name: 'SOAP Calculator — PICOS',         // nombre único → distinguible en el reporte
         method: 'POST',
@@ -153,15 +154,14 @@ export const NFConfig: {
           'Content-Type': 'text/xml;charset=UTF-8',
           'SOAPAction': 'http://tempuri.org/Add',
         },
-        body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
-<soapenv:Header/>
-<soapenv:Body>
-<tem:Add>
-<tem:intA>5</tem:intA>
-<tem:intB>2</tem:intB>
-</tem:Add>
-</soapenv:Body>
-</soapenv:Envelope>`,
+        // Incluye el body o trama request de la peticion:
+        body: `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
+</ListOfContinentsByName>
+</soap:Body>
+</soap:Envelope>`,
       },
       testType: 'spike',
       spike: {
@@ -178,24 +178,26 @@ export const NFConfig: {
     // ── TARGET 2a: Recording UI — INCREMENTAL (diferente suite) ──────────────
      {
        type: 'recording',
-       recording: 'Homebanking_TransferenciasTesting',
+       recording: 'Homebanking_TransferenciasTestingQA',
        testType: 'incremental',
        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
      },
 
-    {
-        type: 'recording',
-        recording: 'Homebanking_Tarjeta_Virtual',
-        testType: 'incremental',
-        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
-    },
+    // Si tenemos más grabaciones podemos generar mas pruebas no funcionales a esas otras grabaciones web:
+//    {
+//        type: 'recording',
+//        recording: 'Homebanking_Tarjeta_Virtual',
+//        testType: 'incremental',
+//        incremental: { scenarios: 5, initialThreads: 1, finalThreads: 5, durationPerScenarioSeconds: 3 },
+//    },
+//
+//    {
+//        type: 'recording',
+//        recording: 'Homebanking_TransferenciasTesting',
+//        testType: 'incremental',
+//        incremental: { scenarios: 6, initialThreads: 1, finalThreads: 6, durationPerScenarioSeconds: 3 },
+//    },
 
-    {
-        type: 'recording',
-        recording: 'Homebanking_TransferenciasTesting',
-        testType: 'incremental',
-        incremental: { scenarios: 6, initialThreads: 1, finalThreads: 6, durationPerScenarioSeconds: 3 },
-    },
 
     // ── TARGET 2b: API REST — PICOS (simultánea con 2a) ──────────────────────
     // {

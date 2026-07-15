@@ -12,7 +12,7 @@ const EXCLUDE_SELECTORS = [
   'iframe',
 ];
 
-test.describe('Accessibility: Homebanking_TransferenciasTesting', () => {
+test.describe('Accessibility: Homebanking_TransferenciasTestingQA', () => {
 
   test('axe scan — sin violaciones críticas', async ({ page }) => {
     await page.setViewportSize(VIEWPORT);
@@ -39,7 +39,7 @@ test.describe('Accessibility: Homebanking_TransferenciasTesting', () => {
     const moderate = results.violations.filter(v => v.impact === 'moderate');
     const minor    = results.violations.filter(v => v.impact === 'minor');
 
-    console.log(`♿ Accessibility scan — Homebanking_TransferenciasTesting:`);
+    console.log(`♿ Accessibility scan — Homebanking_TransferenciasTestingQA:`);
     console.log(`   Critical: ${critical.length} | Serious: ${serious.length} | Moderate: ${moderate.length} | Minor: ${minor.length}`);
 
     if (results.violations.length > 0) {
@@ -53,8 +53,8 @@ test.describe('Accessibility: Homebanking_TransferenciasTesting', () => {
     }
 
     // Risk 2: assertion real — falla en CI si hay violaciones críticas o graves
-    expect(critical.length, `${critical.length} violaciones críticas en Homebanking_TransferenciasTesting`).toBe(0);
-    expect(serious.length,  `${serious.length} violaciones graves en Homebanking_TransferenciasTesting`).toBe(0);
+    expect(critical.length, `${critical.length} violaciones críticas en Homebanking_TransferenciasTestingQA`).toBe(0);
+    expect(serious.length,  `${serious.length} violaciones graves en Homebanking_TransferenciasTestingQA`).toBe(0);
   });
 
 });

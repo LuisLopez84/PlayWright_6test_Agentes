@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 // Risk 1: smartGoto eliminado — todos los tests navegan via TARGET_URL directamente
 
 /**
- * Performance tests — Homebanking_TransferenciasTesting
+ * Performance tests — Homebanking_TransferenciasTestingQA
  * Budgets configurables via variables de entorno:
  *   BASE_URL      (sobreescribe la URL; default: URL del recording)
  *   PERF_BUDGET   (ms, default 10000)
@@ -18,7 +18,7 @@ const TARGET_URL = process.env.BASE_URL || 'https://homebanking-demo-tests.netli
 // Risk 9: viewport fijo para mediciones consistentes entre ejecuciones
 const VIEWPORT = { width: 1280, height: 720 };
 
-test.describe('Performance: Homebanking_TransferenciasTesting', () => {
+test.describe('Performance: Homebanking_TransferenciasTestingQA', () => {
 
   // Risk 4: beforeEach centraliza la configuración común (viewport)
   test.beforeEach(async ({ page }) => {
