@@ -422,6 +422,27 @@ Sé técnico, directo y profesional. Máximo 600 palabras en total.`;
   return generateRuleBasedConcept(analyses);
 }
 
+/** Diagnóstico general (verde/amarillo/rojo) a partir del peor caso entre todos los targets analizados.
+ *  Reutilizado tanto por el concepto IA basado en reglas como por la tarjeta resumen del tab "Resumen". */
+function computeOverallDiagnosis(analyses) {
+  const overallErrors = analyses.reduce((mx, a) => {
+    const er = a.totalData ? (a.totalData.errorRate || 0) : 0;
+    return Math.max(mx, er);
+  }, 0);
+  const overallSat = analyses.reduce((mx, a) => Math.max(mx, a.saturationPct || 0), 0);
+  const overallR2  = analyses.reduce((mn, a) => a.r2 != null ? Math.min(mn, a.r2) : mn, 1);
+
+  let level, label, color, glow, icon;
+  if (overallErrors >= 20 || overallSat >= 95) {
+    level = 'red';    label = 'Acción urgente';    color = '#ef4444'; glow = 'rgba(239,68,68,0.35)';  icon = '🔴';
+  } else if (overallErrors >= 5 || overallSat >= 75 || overallR2 < 0.70) {
+    level = 'yellow'; label = 'Requiere atención';  color = '#f59e0b'; glow = 'rgba(245,158,11,0.35)'; icon = '🟡';
+  } else {
+    level = 'green';  label = 'Servicio estable';   color = '#10b981'; glow = 'rgba(16,185,129,0.35)'; icon = '🟢';
+  }
+  return { level, label, color, glow, icon, overallErrors, overallSat, overallR2 };
+}
+
 /** Análisis profesional basado en reglas cuando no hay API key de OpenAI */
 function generateRuleBasedConcept(analyses) {
   const sections = [];
@@ -500,16 +521,10 @@ function generateRuleBasedConcept(analyses) {
   );
 
   sections.push('\n## Diagnóstico General');
-  const overallErrors = analyses.reduce((mx, a) => {
-    const er = a.totalData ? (a.totalData.errorRate || 0) : 0;
-    return Math.max(mx, er);
-  }, 0);
-  const overallSat = analyses.reduce((mx, a) => Math.max(mx, a.saturationPct || 0), 0);
-  const overallR2  = analyses.reduce((mn, a) => a.r2 != null ? Math.min(mn, a.r2) : mn, 1);
-
-  if (overallErrors >= 20 || overallSat >= 95) {
+  const diag = computeOverallDiagnosis(analyses);
+  if (diag.level === 'red') {
     sections.push('🔴 **ROJO — Acción urgente requerida.** El servicio opera con riesgo crítico de saturación o errores que comprometen la disponibilidad.');
-  } else if (overallErrors >= 5 || overallSat >= 75 || overallR2 < 0.70) {
+  } else if (diag.level === 'yellow') {
     sections.push('🟡 **AMARILLO — Requiere atención.** Se detectan señales de saturación o calidad del modelo insuficiente. Planificar escalado y pruebas adicionales.');
   } else {
     sections.push('🟢 **VERDE — Servicio estable.** Los indicadores de rendimiento están dentro de márgenes aceptables. Continuar monitoreo y establecer baseline de capacidad.');
@@ -583,6 +598,41 @@ function renderStatisticalAnalysis(statisticalAnalysis) {
       Proyección estadística mediante <b>regresión logística no lineal</b> sobre los resultados de pruebas de carga.
       Modela la saturación del servicio: <code>TPS = L / (1 + e<sup>-k(x-x₀)</sup>)</code>
     </p>
+
+    <!-- ── Glosario de métricas ──────────────────────────────────── -->
+    <div class="pnf-glossary-card" id="pnf-glossary-card">
+      <div class="pnf-glossary-header">
+        <span class="pnf-glossary-icon">📖</span>
+        <span class="pnf-glossary-title">¿Qué significa cada métrica?</span>
+        <button class="pnf-toggle-btn" id="glossary-toggle-btn" onclick="toggleGlossary()">Ocultar ▴</button>
+      </div>
+      <div class="pnf-glossary-grid" id="pnf-glossary-body">
+        <div class="pnf-glossary-item">
+          <span class="pnf-glossary-term">Capacidad Máx. (L)</span>
+          <span class="pnf-glossary-def">Es el techo de la curva logística: el rendimiento máximo (en TPS, transacciones por segundo) que el servicio puede sostener según el modelo, sin importar cuántos usuarios concurrentes más se agreguen. <b>Impacta</b> directamente el dimensionamiento de infraestructura — define el límite real de throughput contra el que se debe planificar el escalado.</span>
+        </div>
+        <div class="pnf-glossary-item">
+          <span class="pnf-glossary-term">Breakpoint</span>
+          <span class="pnf-glossary-def">El punto de inflexión de la curva (x₀): el número de usuarios/hilos concurrentes donde el servicio deja de escalar linealmente y el rendimiento marginal por cada usuario adicional empieza a caer. <b>Impacta</b> las alertas de capacidad en producción — superarlo anticipa degradación del servicio.</span>
+        </div>
+        <div class="pnf-glossary-item">
+          <span class="pnf-glossary-term">Saturación 95% en</span>
+          <span class="pnf-glossary-def">El número de usuarios concurrentes en el que el servicio alcanza el 95% de su capacidad máxima (L). <b>Impacta</b> el dimensionamiento con margen de seguridad — es una referencia más conservadora que el breakpoint, útil para no operar al límite teórico.</span>
+        </div>
+        <div class="pnf-glossary-item">
+          <span class="pnf-glossary-term">R² (bondad de ajuste)</span>
+          <span class="pnf-glossary-def">Mide qué tan bien la curva logística explica los datos realmente observados, en una escala de 0% a 100%. <b>Impacta</b> la confianza en las proyecciones: valores altos (≥85%) indican que L, breakpoint y saturación son confiables; valores bajos señalan que faltan más escenarios de carga para confiar en el modelo.</span>
+        </div>
+        <div class="pnf-glossary-item">
+          <span class="pnf-glossary-term">RMSE</span>
+          <span class="pnf-glossary-def">La raíz del error cuadrático medio: el error promedio, en TPS, entre lo que predice el modelo y lo que se midió realmente en cada escenario. <b>Impacta</b> el margen de error a considerar — cuanto menor sea, más precisas son las proyecciones de capacidad basadas en la curva.</span>
+        </div>
+        <div class="pnf-glossary-item">
+          <span class="pnf-glossary-term">Saturación al máx.</span>
+          <span class="pnf-glossary-def">El porcentaje de la capacidad máxima (L) alcanzado en el escenario de <b>mayor carga realmente ejecutado</b> en la prueba (dato empírico, no proyectado). <b>Impacta</b> la lectura de riesgo inmediato — indica qué tan cerca se llegó del límite teórico durante la ejecución real.</span>
+        </div>
+      </div>
+    </div>
 
     <!-- ── Botón PDF ─────────────────────────────────────────────── -->
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap">
@@ -729,6 +779,53 @@ function renderStatisticalAnalysis(statisticalAnalysis) {
   </script>`;
 
   return html;
+}
+
+/** Tarjeta compacta del Análisis Estadístico PNF para el tab "Resumen".
+ *  Muestra el peor caso agregado entre todos los targets y enlaza al detalle completo.
+ *  Devuelve '' si no hay pruebas no funcionales ejecutadas (no agrega ruido al resumen). */
+function renderPnfSummaryCard(statisticalAnalysis) {
+  const { analyses } = statisticalAnalysis || {};
+  if (!analyses || analyses.length === 0) return '';
+
+  const diag   = computeOverallDiagnosis(analyses);
+  const satStr = diag.overallSat > 0 ? diag.overallSat.toFixed(1) + '%' : '—';
+  const errStr = diag.overallErrors.toFixed(2) + '%';
+  const r2Str  = diag.overallR2 <= 1 ? (diag.overallR2 * 100).toFixed(1) + '%' : '—';
+  const refBp  = analyses.find(a => a.breakpoint != null);
+  const n      = analyses.length;
+
+  return `
+    <br/>
+    <p class="section-title">📊 Análisis Estadístico PNF</p>
+    <div class="card" style="--accent:${diag.color};--glow:${diag.glow};max-width:100%" onclick="showSection('pnfanalysis')">
+      <div class="card-top-bar" style="background:${diag.color}"></div>
+      <div class="card-header">
+        <span class="card-icon">${diag.icon}</span>
+        <span class="card-label">Proyección de saturación — ${n} target${n > 1 ? 's' : ''} analizado${n > 1 ? 's' : ''}</span>
+        <span class="badge" style="background:${diag.color}26;color:${diag.color};border:1px solid ${diag.color}55">${esc(diag.label.toUpperCase())}</span>
+      </div>
+      <div class="pnf-kpi-row" style="margin-bottom:14px">
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">Saturación máx.</span>
+          <span class="pnf-kpi-value" style="color:${diag.overallSat>=90?'#ef4444':diag.overallSat>=70?'#f59e0b':'#10b981'}">${satStr}</span>
+        </div>
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">Error máx.</span>
+          <span class="pnf-kpi-value" style="color:${diag.overallErrors>=20?'#ef4444':diag.overallErrors>=5?'#f59e0b':'#10b981'}">${errStr}</span>
+        </div>
+        <div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">R² mínimo</span>
+          <span class="pnf-kpi-value" style="color:${diag.overallR2>=0.85?'#10b981':'#f59e0b'}">${r2Str}</span>
+        </div>
+        ${refBp ? `<div class="pnf-kpi-card">
+          <span class="pnf-kpi-label">Breakpoint ref.</span>
+          <span class="pnf-kpi-value">${refBp.breakpoint.toFixed(1)}</span>
+          <span class="pnf-kpi-sub">usuarios — ${esc(refBp.name)}</span>
+        </div>` : ''}
+      </div>
+      <button class="btn-detail" onclick="event.stopPropagation(); showSection('pnfanalysis')">Ver análisis completo →</button>
+    </div>`;
 }
 
 /** API: extrae pares request/response del system-out.
@@ -2427,11 +2524,11 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     }
     .ai-concept-icon { font-size:20px; }
     .ai-concept-title { font-size:14px; font-weight:700; color:#c4b5fd; flex:1; }
-    .ai-toggle-btn {
+    .ai-toggle-btn, .pnf-toggle-btn {
       background:none; border:1px solid rgba(99,102,241,.4); color:#a78bfa;
       border-radius:6px; padding:4px 10px; font-size:12px; cursor:pointer;
     }
-    .ai-toggle-btn:hover { background:rgba(99,102,241,.15); }
+    .ai-toggle-btn:hover, .pnf-toggle-btn:hover { background:rgba(99,102,241,.15); }
     .ai-concept-body {
       padding:20px 24px; font-size:13px; line-height:1.8; color:var(--text);
     }
@@ -2441,6 +2538,25 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     }
     .ai-concept-body ul { margin:6px 0 6px 20px; }
     .ai-concept-body li { margin-bottom:4px; }
+
+    .pnf-glossary-card {
+      background:var(--surface); border:1px solid var(--border); border-radius:14px;
+      margin-bottom:28px; overflow:hidden;
+    }
+    .pnf-glossary-header {
+      display:flex; align-items:center; gap:10px; padding:14px 20px;
+      background:var(--surface2); border-bottom:1px solid var(--border);
+    }
+    .pnf-glossary-icon  { font-size:18px; }
+    .pnf-glossary-title { font-size:14px; font-weight:700; color:#fff; flex:1; }
+    .pnf-glossary-grid {
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+      gap:18px; padding:20px 24px;
+    }
+    .pnf-glossary-item { display:flex; flex-direction:column; gap:5px; }
+    .pnf-glossary-term  { font-size:13px; font-weight:700; color:#a78bfa; }
+    .pnf-glossary-def   { font-size:12.5px; line-height:1.65; color:var(--text); }
+    .pnf-glossary-def b { color:#c4b5fd; font-weight:600; }
 
     .pnf-target-block {
       background:var(--surface); border:1px solid var(--border); border-radius:14px;
@@ -2531,6 +2647,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     <br/>
     <p class="section-title">Módulos de Prueba</p>
     <div class="cards-grid">${summaryCards}</div>
+    ${renderPnfSummaryCard(statisticalAnalysis)}
   </section>
 
   ${sections}
@@ -2655,6 +2772,16 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   function toggleAiConcept() {
     const body = document.getElementById('ai-concept-body');
     const btn  = document.querySelector('.ai-toggle-btn');
+    if (!body) return;
+    const visible = body.style.display !== 'none';
+    body.style.display = visible ? 'none' : '';
+    if (btn) btn.textContent = visible ? 'Mostrar ▾' : 'Ocultar ▴';
+  }
+
+  /* Toggle del glosario de métricas PNF */
+  function toggleGlossary() {
+    const body = document.getElementById('pnf-glossary-body');
+    const btn  = document.getElementById('glossary-toggle-btn');
     if (!body) return;
     const visible = body.style.display !== 'none';
     body.style.display = visible ? 'none' : '';

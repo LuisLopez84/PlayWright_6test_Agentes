@@ -9,7 +9,7 @@ const LOGIN_PATH  = '/login';
 const BRUTE_FORCE_ATTEMPTS = Number(process.env.BRUTE_FORCE_ATTEMPTS || 10);
 const UI_ATTEMPTS          = Number(process.env.UI_BRUTE_FORCE_ATTEMPTS || 3);
 
-test.describe('Brute force protection: Homebanking_TransferenciasTesting', () => {
+test.describe('Brute force protection: Homebanking_TransferenciasTestingQA', () => {
 
   test('Protección via API', async ({ request }) => {
     const loginEndpoint = TARGET_URL + LOGIN_PATH;

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 // Risk 5: TARGET_URL evaluado en runtime — si la app migra HTTP→HTTPS no hay que regenerar
 const TARGET_URL = process.env.BASE_URL || 'https://homebanking-demo-tests.netlify.app';
 
-test.describe('HTTPS enforcement: Homebanking_TransferenciasTesting', () => {
+test.describe('HTTPS enforcement: Homebanking_TransferenciasTestingQA', () => {
 
   test('URL usa HTTPS', async ({ page }) => {
     await page.goto(TARGET_URL);

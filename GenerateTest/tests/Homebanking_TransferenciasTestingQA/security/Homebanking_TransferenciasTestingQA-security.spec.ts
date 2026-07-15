@@ -6,7 +6,7 @@ import { smartFill, smartClick } from '@utils/smart-actions';
 const TARGET_URL  = process.env.BASE_URL || 'https://homebanking-demo-tests.netlify.app';
 const LOGIN_PATH  = '/login';
 
-test.describe('Security: Homebanking_TransferenciasTesting', () => {
+test.describe('Security: Homebanking_TransferenciasTestingQA', () => {
 
   // ── Headers de seguridad ──────────────────────────────────────────────────
   // Risk 1/8: verificación en runtime — no depende de fetch en tiempo de generación
@@ -18,7 +18,7 @@ test.describe('Security: Homebanking_TransferenciasTesting', () => {
                       'referrer-policy', 'permissions-policy'];
     const missing = optional.filter(name => !h[name]);
     if (missing.length > 0) {
-      console.warn(`⚠️ Headers opcionales ausentes en Homebanking_TransferenciasTesting: ${missing.join(', ')}`);
+      console.warn(`⚠️ Headers opcionales ausentes en Homebanking_TransferenciasTestingQA: ${missing.join(', ')}`);
     }
 
     // Risk 8: assertions reales sobre los headers más críticos

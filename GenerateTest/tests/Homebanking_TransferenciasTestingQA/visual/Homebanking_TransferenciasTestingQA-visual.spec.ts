@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Visual regression — Homebanking_TransferenciasTesting
+ * Visual regression — Homebanking_TransferenciasTestingQA
  * Primera ejecución: npx playwright test --update-snapshots --project=visual
  *
  * Configuración via variables de entorno:
@@ -67,7 +67,7 @@ async function waitForVisualStability(page: any): Promise<void> {
   if (VISUAL_WAIT_MS > 0) await page.waitForTimeout(VISUAL_WAIT_MS);
 }
 
-test.describe('Visual regression: Homebanking_TransferenciasTesting', () => {
+test.describe('Visual regression: Homebanking_TransferenciasTestingQA', () => {
 
   // ── Test 1: Desktop (1280×720) ────────────────────────────────────────────
   test('screenshot — desktop 1280×720', async ({ page }) => {
@@ -80,7 +80,7 @@ test.describe('Visual regression: Homebanking_TransferenciasTesting', () => {
       console.warn('⚠️ No se pudo inyectar CSS de estabilización (posible CSP):', err.message)
     );
 
-    await expect(page).toHaveScreenshot('Homebanking_TransferenciasTesting-desktop.png', {
+    await expect(page).toHaveScreenshot('Homebanking_TransferenciasTestingQA-desktop.png', {
       fullPage:           true,
       maxDiffPixelRatio:  VISUAL_DIFF_RATIO,
       animations:         'disabled',
@@ -97,7 +97,7 @@ test.describe('Visual regression: Homebanking_TransferenciasTesting', () => {
       console.warn('⚠️ No se pudo inyectar CSS de estabilización (móvil, posible CSP):', err.message)
     );
 
-    await expect(page).toHaveScreenshot('Homebanking_TransferenciasTesting-mobile.png', {
+    await expect(page).toHaveScreenshot('Homebanking_TransferenciasTestingQA-mobile.png', {
       fullPage:           true,
       maxDiffPixelRatio:  VISUAL_DIFF_RATIO,
       animations:         'disabled',

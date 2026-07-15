@@ -1,8 +1,8 @@
 /**
- * Homebanking_TransferenciasTesting.nf.spec.ts
+ * Homebanking_TransferenciasTestingQA.nf.spec.ts
  *
- * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebanking_TransferenciasTesting
- * Targets: 4 | SOAP Calculator — INCREMENTAL (incremental), SOAP Calculator — PICOS (spike), Homebanking_TransferenciasTesting (incremental), Homebanking_TransferenciasTesting (incremental)
+ * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebanking_TransferenciasTestingQA
+ * Targets: 3 | SOAP Calculator — INCREMENTAL (incremental), SOAP Calculator — PICOS (spike), Homebanking_TransferenciasTestingQA (incremental)
  *
  * AUTO-GENERADO por:
  *   npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
@@ -14,7 +14,7 @@
  *
  * Ejecución individual:
  *   npx playwright test --project=non-functional \
- *     GenerateTest/tests/Homebanking_TransferenciasTesting/non-functional/Homebanking_TransferenciasTesting.nf.spec.ts
+ *     GenerateTest/tests/Homebanking_TransferenciasTestingQA/non-functional/Homebanking_TransferenciasTestingQA.nf.spec.ts
  */
 
 import { test } from '@playwright/test';
@@ -32,15 +32,13 @@ const NF_TARGET_0: LoadTarget = {
     "Content-Type": "text/xml;charset=UTF-8",
     "SOAPAction": "http://tempuri.org/Add"
   },
-  body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
-<soapenv:Header/>
-<soapenv:Body>
-<tem:Add>
-<tem:intA>5</tem:intA>
-<tem:intB>2</tem:intB>
-</tem:Add>
-</soapenv:Body>
-</soapenv:Envelope>`,
+  body: `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
+</ListOfContinentsByName>
+</soap:Body>
+</soap:Envelope>`,
   type: 'api',
   testType: 'incremental',
   incremental: {
@@ -82,15 +80,13 @@ const NF_TARGET_1: LoadTarget = {
     "Content-Type": "text/xml;charset=UTF-8",
     "SOAPAction": "http://tempuri.org/Add"
   },
-  body: `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
-<soapenv:Header/>
-<soapenv:Body>
-<tem:Add>
-<tem:intA>5</tem:intA>
-<tem:intB>2</tem:intB>
-</tem:Add>
-</soapenv:Body>
-</soapenv:Envelope>`,
+  body: `<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
+</ListOfContinentsByName>
+</soap:Body>
+</soap:Envelope>`,
   type: 'api',
   testType: 'spike',
   incremental: {
@@ -133,9 +129,9 @@ const NF_PARAMS_1 = {
     ]
   }; // spike
 
-// ─── Target 3: Homebanking_TransferenciasTesting [RECORDING] — INCREMENTAL ────
+// ─── Target 3: Homebanking_TransferenciasTestingQA [RECORDING] — INCREMENTAL ────
 const NF_TARGET_2: LoadTarget = {
-  name: 'Homebanking_TransferenciasTesting',
+  name: 'Homebanking_TransferenciasTestingQA',
   url: 'https://homebanking-demo-tests.netlify.app',
   method: 'GET',
   headers: {},
@@ -172,83 +168,37 @@ const NF_PARAMS_2 = {
     "durationPerScenarioSeconds": 3
   }; // incremental
 
-// ─── Target 4: Homebanking_TransferenciasTesting [RECORDING] — INCREMENTAL ────
-const NF_TARGET_3: LoadTarget = {
-  name: 'Homebanking_TransferenciasTesting',
-  url: 'https://homebanking-demo-tests.netlify.app',
-  method: 'GET',
-  headers: {},
-  body: undefined,
-  type: 'recording',
-  testType: 'incremental',
-  incremental: {
-    "scenarios": 6,
-    "initialThreads": 1,
-    "finalThreads": 6,
-    "durationPerScenarioSeconds": 3
-  },
-  spike: {
-    "threadsPerScenario": [
-      10,
-      50,
-      5,
-      80,
-      20
-    ],
-    "durationPerScenarioSeconds": [
-      30,
-      30,
-      30,
-      30,
-      30
-    ]
-  },
-};
-const NF_PARAMS_3 = {
-    "scenarios": 6,
-    "initialThreads": 1,
-    "finalThreads": 6,
-    "durationPerScenarioSeconds": 3
-  }; // incremental
-
 // ─── Test ──────────────────────────────────────────────────────────────────
 test.describe.configure({ mode: 'serial' });
 
-test('Non-Functional — Homebanking_TransferenciasTesting', async () => {
+test('Non-Functional — Homebanking_TransferenciasTestingQA', async () => {
   test.setTimeout(0);
 
   console.log('\n' + '═'.repeat(60));
-  console.log('  🚀 Prueba No Funcional: Homebanking_TransferenciasTesting');
-  console.log('  📋 Targets: 4 | SOAP Calculator — INCREMENTAL (incremental) + SOAP Calculator — PICOS (spike) + Homebanking_TransferenciasTesting (incremental) + Homebanking_TransferenciasTesting (incremental)');
+  console.log('  🚀 Prueba No Funcional: Homebanking_TransferenciasTestingQA');
+  console.log('  📋 Targets: 3 | SOAP Calculator — INCREMENTAL (incremental) + SOAP Calculator — PICOS (spike) + Homebanking_TransferenciasTestingQA (incremental)');
   console.log('═'.repeat(60));
 
-  // ── [1/4] SOAP Calculator — INCREMENTAL — INCREMENTAL ─────────────────────
+  // ── [1/3] SOAP Calculator — INCREMENTAL — INCREMENTAL ─────────────────────
   console.log('\n' + '─'.repeat(60));
   console.log('  📡 SOAP Calculator — INCREMENTAL | http://www.dneonline.com/calculator.asmx');
   console.log('  📋 Tipo: INCREMENTAL');
   const summaries_0 = await runIncrementalTest(NF_TARGET_0, NF_PARAMS_0, NFConfig.assertions);
   printSummaryTable(NF_TARGET_0, summaries_0, 'incremental');
 
-  // ── [2/4] SOAP Calculator — PICOS — SPIKE ─────────────────────
+  // ── [2/3] SOAP Calculator — PICOS — SPIKE ─────────────────────
   console.log('\n' + '─'.repeat(60));
   console.log('  📡 SOAP Calculator — PICOS | http://www.dneonline.com/calculator.asmx');
   console.log('  📋 Tipo: SPIKE');
   const summaries_1 = await runSpikeTest(NF_TARGET_1, NF_PARAMS_1, NFConfig.assertions);
   printSummaryTable(NF_TARGET_1, summaries_1, 'spike');
 
-  // ── [3/4] Homebanking_TransferenciasTesting — INCREMENTAL ─────────────────────
+  // ── [3/3] Homebanking_TransferenciasTestingQA — INCREMENTAL ─────────────────────
   console.log('\n' + '─'.repeat(60));
-  console.log('  📡 Homebanking_TransferenciasTesting | https://homebanking-demo-tests.netlify.app');
+  console.log('  📡 Homebanking_TransferenciasTestingQA | https://homebanking-demo-tests.netlify.app');
   console.log('  📋 Tipo: INCREMENTAL');
   const summaries_2 = await runIncrementalTest(NF_TARGET_2, NF_PARAMS_2, NFConfig.assertions);
   printSummaryTable(NF_TARGET_2, summaries_2, 'incremental');
 
-  // ── [4/4] Homebanking_TransferenciasTesting — INCREMENTAL ─────────────────────
-  console.log('\n' + '─'.repeat(60));
-  console.log('  📡 Homebanking_TransferenciasTesting | https://homebanking-demo-tests.netlify.app');
-  console.log('  📋 Tipo: INCREMENTAL');
-  const summaries_3 = await runIncrementalTest(NF_TARGET_3, NF_PARAMS_3, NFConfig.assertions);
-  printSummaryTable(NF_TARGET_3, summaries_3, 'incremental');
-
-  console.log('\n  ✅ Prueba no funcional completada: Homebanking_TransferenciasTesting\n');
+  console.log('\n  ✅ Prueba no funcional completada: Homebanking_TransferenciasTestingQA\n');
 });
