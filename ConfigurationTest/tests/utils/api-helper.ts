@@ -60,7 +60,7 @@ export async function restRequest(
   const respHeaders = response.headers();
   const safeRespHeaders: Record<string, string> = {};
   for (const [k, v] of Object.entries(respHeaders)) {
-    safeRespHeaders[k] = v;
+    safeRespHeaders[k] = String(v);
   }
 
   console.log(`\n@@API_REQUEST_START@@

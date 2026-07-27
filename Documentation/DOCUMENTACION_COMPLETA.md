@@ -133,6 +133,17 @@ Estos archivos son el "cerebro" que transforma una grabación cruda en pasos nor
 
 > **Nota de diseño importante:** `learning-db.json` (clave: `url|action|targetText`, ver `learning-store.ts:51`) y `healer-db.json` (usado solo por `healer-agents.ts`) son **dos cachés independientes**. La primera aprende qué selector funcionó mejor para una URL+acción+texto; la segunda cachea la reparación puntual de un selector roto. Ambos son auto-generados — no se editan a mano.
 
+> ## ⚠️⚠️ AVISO DE SEGURIDAD Y USO RESPONSABLE — `captcha-solver.ts` ⚠️⚠️
+>
+> **`captcha-solver.ts` integra un servicio EXTERNO de resolución de captchas** (formato compatible con 2captcha: endpoints `in.php`/`res.php`, tipos `userrecaptcha`/`hcaptcha`/`turnstile`), activado mediante la variable de entorno `TWO_CAPTCHA_API_KEY`. **Si esa variable no está definida, la función se omite silenciosamente** (`console.warn`, no falla el test) — es decir, esta integración **no está activa por defecto**.
+>
+> **Antes de habilitarla, el equipo debe confirmar explícitamente:**
+> 1. **Autorización del objetivo:** esta función **solo debe apuntar a aplicativos PROPIOS o EXPLÍCITAMENTE AUTORIZADOS** para pruebas (staging/QA del propio equipo). Resolver captchas de sitios de terceros sin autorización puede violar los términos de servicio del sitio objetivo y/o del proveedor del servicio de captcha. La responsabilidad de verificar esa autorización recae en quien configura `TWO_CAPTCHA_API_KEY`, **no en el framework**.
+> 2. **Manejo de la clave:** `TWO_CAPTCHA_API_KEY` debe tratarse con el **mismo cuidado que `OPENAI_API_KEY`** — nunca hardcodeada en código, nunca commiteada al repositorio, siempre vía `.env` (gitignoreado) en local o vía *secrets* del pipeline de CI/CD.
+> 3. **Aprobación previa:** confirmar con el responsable de seguridad/QA del equipo antes de habilitar esta integración en un nuevo entorno.
+>
+> Ver también la Sección 13 (Notas de auditoría) y el Manual Técnico para Ingenieros de Automatización, Capítulo 4, sección 4.1.1.
+
 #### 4.2.2 Generadores — `agents/generators/`
 
 Estos son los archivos que **literalmente escriben el código** de cada tipo de prueba (excepto API). Son la pieza más relevante de este documento porque sus plantillas determinan qué queda "fijo" y qué queda configurable en cada spec generado. Se detallan por completo en la **Sección 9**.
@@ -312,13 +323,17 @@ playwright-enterprise-template_UI_API_Performance3/
 |---|---|
 | `npm run record <Nombre_Flujo>` | Abre Playwright Codegen para grabar un flujo nuevo |
 | `npm run generate` | Genera **todas** las suites (UI, API, Performance, Accessibility, Security, Visual, BDD) desde `BoxRecordings/recordings/` |
+| `npm run generate -- --suite=<Nombre>` | Genera **solo** esa suite (más rápido cuando ya generaste antes y solo agregaste una) — también vía `SUITE=<Nombre>` como variable de entorno |
+| `npm run generate:suite -- --suite=<Nombre>` | Alias del comando anterior (mismo script, mismo filtro) |
 | `npm run generate:nf` | Genera los specs de pruebas no funcionales dentro de cada suite, a partir de `nf-config.ts` |
+| `npm run generate:nf -- --suite=<Nombre>` | Genera las pruebas de carga de **solo** esa suite |
+| `npm run generate:nf:suite -- --suite=<Nombre>` | Alias del comando anterior |
 | `npm run generate:api` | Genera tests de API a partir del tráfico capturado en la última ejecución |
 | `npm run bdd` | Transpila los `.feature` a specs de Playwright (sin ejecutar) |
 | `npm run test` | Flujo completo: `generate` + `bdd` + ejecución por suite + `generate:api` + `portal` + `heal:specs` |
 | `npm run test:smoke` | Genera y ejecuta solo tests con tag `@smoke` |
 | `npm run test:api` | Genera y ejecuta solo el proyecto `api` |
-| `npm run test:suite` | Genera y ejecuta una sola suite |
+| `npm run test:suite -- --suite=<Nombre>` | Genera y ejecuta el pipeline completo de **una sola** suite |
 | `npm run heal:specs` | Aplica selectores curados (de `healer-db.json`/`learning-db.json`) de vuelta a los `*.spec.ts` |
 | `npm run portal` | Regenera `playwright-report/portal.html` |
 | `npm run reports-index` | Regenera el índice global de `reports/` |
@@ -541,28 +556,42 @@ Para quien no sabe escribir un test de Playwright pero sí sabe copiar un `curl`
 **Cómo se usa:**
 
 1. Pega el comando `curl` (o simplemente `URL` + línea vacía + `body`) en un archivo `.spec.ts` dentro de:
-   - `BoxAPIsExecute/REST/get/` o `BoxAPIsExecute/REST/post/` para REST
-   - `BoxAPIsExecute/SOAP/get/` o `BoxAPIsExecute/SOAP/post/` para SOAP
+   - `BoxAPIsExecute/REST/{get,post,put,delete}/` para REST
+   - `BoxAPIsExecute/SOAP/{get,post,put,delete}/` para SOAP
 2. Ejecuta `npm run generate`.
-3. El agente `box-api-executor.agent.ts` detecta el formato, extrae método/URL/headers/body, encuentra a qué suite pertenece (por nombre o, si hay `OPENAI_API_KEY`, por IA) y genera el spec real en `GenerateTest/tests/<Suite>/api/`.
+3. El agente `box-api-executor.agent.ts` detecta el formato, extrae método/URL/headers/body, encuentra a qué suite pertenece (por nombre o, si hay `OPENAI_API_KEY`, por IA) y genera el spec real en `GenerateTest/tests/<Suite>/api/`. Si existe un archivo de datos en `BoxTestData/` para esa suite (Sección 9.11), el test "Éxito" se repite una vez por fila.
 
-Ejemplo real (`BoxAPIsExecute/REST/get/Homebanking_TransferenciasTesting_REST_GET.spec.ts`):
-
-```
-curl -X 'GET' \
-'https://homebanking-demo.onrender.com/prestamos/' \
--H 'accept: application/json'
-```
-
-Ejemplo real formato URL+body (`BoxAPIsExecute/SOAP/post/Homebanking_TransferenciasTesting_SOAP_POST.spec.ts`):
+Ejemplo real (`BoxAPIsExecute/REST/post/Homebanking_TransferenciasTestingQA_POST_REST.spec.ts`):
 
 ```
-http://www.dneonline.com/calculator.asmx
-
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
-<soapenv:Body><tem:Add><tem:intA>5</tem:intA><tem:intB>2</tem:intB></tem:Add></soapenv:Body>
-</soapenv:Envelope>
+curl -X 'POST' \
+'https://homebanking-demo.onrender.com/transferencias/' \
+-H 'accept: application/json' \
+-H 'Content-Type: application/json' \
+-d '{
+  "cuenta_destino": "ACC002",
+  "cuenta_origen": "ACC001",
+  "monto": 1500,
+  "motivo": "Varios",
+  "tipo": "propia"
+}'
 ```
+
+Ejemplo real formato URL+body (`BoxAPIsExecute/SOAP/get/Homebanking_TransferenciasTestingQA_GET_SOAP.spec.ts`):
+
+```
+http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?op=ListOfContinentsByName
+
+<?xml version="1.0" encoding="utf-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Body>
+<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
+</ListOfContinentsByName>
+</soap:Body>
+</soap:Envelope>
+```
+
+> Cada una de las 8 carpetas (`REST`/`SOAP` × `get`/`post`/`put`/`delete`) incluye un `.gitkeep` para que persista en git aunque esté vacía — así nunca desaparece al hacer checkout o limpiar el repo (`detectMethod()` además reconoce `UPDATE` como alias de `PUT` por si una carpeta quedó nombrada así).
 
 > Nota técnica: `BoxAPIsExecute/` está explícitamente excluido de la compilación TypeScript (`tsconfig.json`, sección `exclude`) — sus archivos son plantillas de texto que el agente parsea como string, no código Playwright real. No importa que "no compilen".
 
@@ -1039,6 +1068,8 @@ Hallazgos verificados durante la elaboración de este documento, útiles para qu
 1. **Carpetas `rest/` y `soap/` faltantes:** `GenerateTest/api-testing-rest-soap/` solo contiene `graphql/` (vacía) en este checkout. `README.md` y `CLAUDE.md` documentan `rest/` y `soap/` como si existieran. `run-agents.ts` las espera pero no falla si no están (omite el paso en silencio). **Acción sugerida:** crear ambas carpetas antes del primer test de API manual.
 2. **Script roto en `package.json`:** el script `generate-api-test` (línea 13) apunta a `ConfigurationAgents/ia-testing/scripts/generate-api-test.ts`, archivo que no existe en el repositorio actual.
 3. **`.env` con clave real presente:** el archivo `.env` en la raíz contiene una `OPENAI_API_KEY` con valor real (no solo la plantilla de `.env-example`). Se verificó que `.env` está correctamente listado en `.gitignore` (línea 11), por lo que no se versiona — no requiere acción.
+4. **⚠️ `captcha-solver.ts` — servicio externo de resolución de captchas, uso bajo autorización explícita:** ver el aviso completo en la Sección 4.2.1 (justo después de la tabla de `agents/core/`). Resumen: requiere `TWO_CAPTCHA_API_KEY` (inactivo si no está definida), solo debe usarse contra aplicativos propios/autorizados, y esa clave debe tratarse con el mismo cuidado que `OPENAI_API_KEY` (nunca commitear, solo `.env`/secrets de CI).
+5. **17 errores de `npx tsc --noEmit` corregidos (resuelto):** el proyecto tenía 17 errores de compilación TypeScript preexistentes. Se corrigieron 16 sin cambiar comportamiento (casts de tipo, imports de tipo, reemplazo de `axios`/`express` por `fetch`/`http` nativos de Node en `captcha-solver.ts` y `monitor.ts`, tipado explícito en `customFixtures.ts` y `captcha-handler.ts`, `String(v)` en `api-helper.ts`). El 17º era el servidor MCP (`ConfigurationAgents/ia-testing/mcp/server.ts`), que importaba `createPlaywrightServer` — una función que no existe en `@playwright/mcp`. Se resolvió reescribiendo el archivo para delegar en el **CLI propio de `@playwright/mcp`** (`cli.js`, resuelto vía `require.resolve('@playwright/mcp/package.json')` ya que el `exports` del paquete no permite importar `cli.js` como subpath directo) mediante `child_process.spawn()`, en vez de envolver el SDK (`@modelcontextprotocol/sdk`) manualmente — evitando así depender de un paquete cuyas versiones publicadas tienen todas alguna vulnerabilidad conocida. El comando `npm run mcp:server` ahora arranca un Chromium real (verificado en vivo) y `npx tsc --noEmit` reporta **0 errores** en todo el proyecto. Variables nuevas: `MCP_PORT` (activa transporte SSE/HTTP en vez de stdio) y `MCP_ALLOWED_HOSTS` (lista de hosts permitidos si se expone `MCP_HOST` fuera de `localhost`).
 
 ---
 

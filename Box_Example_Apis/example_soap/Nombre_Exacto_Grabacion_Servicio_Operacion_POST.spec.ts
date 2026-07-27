@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { soapRequest } from '../../../../ConfigurationTest/tests/utils/api-helper.js';
+import { soapRequest } from '../../ConfigurationTest/tests/utils/api-helper.js';
 
 const xmlBody = `<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tem="http://tempuri.org/">
 <soapenv:Header/>

@@ -174,6 +174,16 @@ npm run generate:api
 
 # Generar índice de reportes multi-suite
 npm run reports-index
+
+# Generar / generar+ejecutar SOLO una suite (no toca las demás)
+npm run generate -- --suite=<Nombre>
+npm run generate:nf -- --suite=<Nombre>
+npm run test:suite -- --suite=<Nombre>
+
+# Arrancar el servidor MCP (delega en el CLI de @playwright/mcp)
+npm run mcp:server                    # stdio, headless
+HEADLESS=false npm run mcp:server     # navegador visible
+MCP_PORT=8931 npm run mcp:server      # transporte HTTP/SSE en vez de stdio
 ```
 
 ---
@@ -184,17 +194,20 @@ Este framework genera tests automáticamente a partir de grabaciones de Playwrig
 
 ```
 BoxRecordings/recordings/<Suite>.ts   ← grabación raw (Playwright codegen)
-        ↓  npm run generate
+BoxAPIsExecute/{REST,SOAP}/{get,post,put,delete}/<Suite>_*.spec.ts  ← curl/URL+body pegado
+BoxTestData/<Suite>.csv|.txt|.xlsx    ← datos variables opcionales (Data-Driven Testing), un archivo por suite
+        ↓  npm run generate  (o  npm run generate -- --suite=<Suite>  para una sola)
 GenerateTest/
   features/<Suite>.feature            ← Gherkin BDD generado por IA
   steps/<Suite>.steps.ts              ← step definitions generados
   tests/<Suite>/
-    ui/          ← spec UI (Chromium/Firefox/WebKit)
-    api/         ← specs REST (200, 400, 404/500)
-    performance/ ← page load, performance budget
+    ui/            ← spec UI (Chromium/Firefox/WebKit) — repite por fila si hay datos en BoxTestData/
+    api/           ← specs REST/SOAP (200, 400, 404/500) — el caso "Éxito" repite por fila si hay datos en BoxTestData/
+    performance/   ← page load, performance budget
     accessibility/ ← axe-core scan
-    security/    ← headers, XSS, SQLi, brute-force
-    visual/      ← screenshot regression
+    security/      ← headers, XSS, SQLi, brute-force
+    visual/        ← screenshot regression
+    non-functional/ ← pruebas de carga (solo si se ejecutó npm run generate:nf)
   <Suite>.metadata.json               ← { name, baseURL } extraído de la grabación
 ```
 
@@ -219,10 +232,11 @@ Helpers disponibles en `ConfigurationTest/tests/utils/api-helper.ts`:
 
 | Directorio | Propósito |
 |---|---|
-| `agents/core/` | Motor central: parser de grabación, selector engine, assertion engine, flow healer, learning store |
-| `agents/generators/` | Generadores por tipo: `ui-agent`, `performance-agent`, `accessibility-agent`, `security-agent`, `visual-agent` |
-| `agents/network/` | Detección de llamadas API en grabaciones (`api-discovery.agent`) y generación de specs API (`api-test-generator.agent`) |
+| `agents/core/` | Motor central: parser de grabación, selector engine, assertion engine, flow healer, learning store, `data-binding.agent.ts` (mapeo columna→campo/clave para DDT, con fallback a IA) |
+| `agents/generators/` | Generadores por tipo: `ui-agent` (async; envuelve el spec en loop si hay datos en `BoxTestData/`), `performance-agent`, `accessibility-agent`, `security-agent`, `visual-agent` |
+| `agents/network/` | Detección de llamadas API en grabaciones (`api-discovery.agent`), generación de specs API (`api-test-generator.agent`) y de specs desde curl pegado en `BoxAPIsExecute/` (`box-api-executor.agent.ts`) |
 | `agents/recorder/` | Parser de archivos `.ts` de Playwright codegen → steps normalizados |
+| `mcp/server.ts` | Servidor MCP — delega en el CLI de `@playwright/mcp` (`cli.js`) vía `child_process.spawn()`; invocado por `npm run mcp:server` |
 | `scripts/run-agents.ts` | Orquestador principal invocado por `npm run generate` |
 
 ### 2. Configuración de tests (`ConfigurationTest/tests/`)
@@ -234,6 +248,7 @@ Helpers disponibles en `ConfigurationTest/tests/utils/api-helper.ts`:
 | `utils/api-helper.ts` | Helpers para tests REST y SOAP |
 | `utils/test-data-resolver.ts` | Resolución de valores dinámicos (fechas, tokens, etc.) en pasos generados |
 | `utils/modal-handler.ts` | `closeAnyModal(page)` — cierra modales automáticamente |
+| `utils/data-file-parser.ts` | `parseDataFile`, `findSuiteDataFile`, `loadSuiteTestData` — lee `.csv`/`.txt`/`.xlsx` de `BoxTestData/` (Data-Driven Testing), usable también desde specs manuales |
 | `fixtures/customFixtures.ts` | Fixture `loginPage` que extiende `@playwright/test` |
 | `pages/LoginPage.ts` | Page Object del login |
 | `setup/auth.setup.ts` | Setup de autenticación que guarda sesión en `storage/auth.json` |
@@ -273,6 +288,9 @@ Definidos en `tsconfig.json`, disponibles en todos los tests:
 | `BASE_URL` | Sobreescribe la URL base de todos los tests |
 | `OPENAI_API_KEY` | Habilita healing avanzado por IA (opcional; sin ella el framework funciona igual) |
 | `USER` / `PASS` | Credenciales para el setup de autenticación (fallback: `demo` / `demo123`) |
+| `HEADLESS` | Solo para `npm run mcp:server`: `false` abre el navegador con ventana visible (default: headless) |
+| `MCP_PORT` / `MCP_HOST` | Solo para `npm run mcp:server`: si se define `MCP_PORT`, usa transporte HTTP/SSE en ese host/puerto en vez de stdio |
+| `MCP_ALLOWED_HOSTS` | Solo para `npm run mcp:server`: lista de hosts permitidos si se expone `MCP_HOST` fuera de `localhost` (el CLI no soporta token de autenticación) |
 
 Crear `.env` en la raíz del proyecto para desarrollo local.
 

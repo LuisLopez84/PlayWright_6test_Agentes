@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { restRequest } from '../../../../ConfigurationTest/tests/utils/api-helper';
+import { restRequest } from '../../ConfigurationTest/tests/utils/api-helper';
 
 // Credenciales de prueba (debes registrarte primero en la app)
 const USER_EMAIL = 'pruebas@prue.com.co';   // ← Cámbialo por un email real registrado

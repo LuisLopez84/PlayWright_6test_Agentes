@@ -520,14 +520,29 @@ playwright-enterprise-template/
 ├── BoxRecordings/
 │   └── recordings/                    ← grabaciones .ts de Playwright codegen
 │
+├── BoxTestData/                       ← datos variables para Data-Driven Testing (DDT)
+│   ├── README.md                      ← convención de nombres y formato
+│   └── <NombreSuite>.csv|.txt|.xlsx   ← un archivo por suite, mismo nombre exacto
+│
+├── BoxAPIsExecute/                     ← pega aquí un curl (o URL+body) para generar un test de API
+│   ├── REST/{get,post,put,delete}/    ← cada subcarpeta tiene un .gitkeep (persisten vacías en git)
+│   └── SOAP/{get,post,put,delete}/
+│
 ├── Box_Example_Apis/
 │   ├── example_rest/                  ← ejemplos de tests REST
 │   └── example_soap/                  ← ejemplos de tests SOAP
 │
 ├── ConfigurationAgents/
 │   └── ia-testing/
-│       ├── agents/                    ← motores de generación y healing
-│       ├── scripts/                   ← run-agents.ts (orquestador)
+│       ├── agents/
+│       │   ├── core/                  ← parser, selector engine, assertion engine, flow healer,
+│       │   │                             learning store, data-binding.agent (mapeo columna→campo IA)
+│       │   ├── generators/            ← ui-agent, performance-agent, accessibility-agent,
+│       │   │                             security-agent, visual-agent
+│       │   ├── network/               ← api-discovery.agent, box-api-executor.agent
+│       │   └── recorder/              ← parser de grabaciones .ts → steps normalizados
+│       ├── mcp/server.ts              ← servidor MCP (delega en el CLI de @playwright/mcp)
+│       ├── scripts/                   ← run-agents.ts (orquestador), generate-portal.js, monitor.ts
 │       └── utils/                     ← openai-client, helpers
 │
 ├── ConfigurationTest/
@@ -537,7 +552,8 @@ playwright-enterprise-template/
 │       │   ├── navigation-helper.ts   ← smartGoto, attachErrorMonitors
 │       │   ├── api-helper.ts          ← restRequest, soapRequest
 │       │   ├── modal-handler.ts       ← closeAnyModal, waitForToastMessage
-│       │   └── test-data-resolver.ts  ← datos dinámicos offline + IA
+│       │   ├── test-data-resolver.ts  ← datos dinámicos offline + IA
+│       │   └── data-file-parser.ts    ← parseDataFile, findSuiteDataFile, loadSuiteTestData (DDT)
 │       ├── pages/                     ← Page Objects
 │       ├── fixtures/                  ← customFixtures (loginPage)
 │       └── setup/                     ← auth.setup.ts (storageState)
@@ -579,13 +595,40 @@ playwright-enterprise-template/
 |---|---|
 | `npm run record <NombreApp_Flujo>` | Graba un flujo con Playwright codegen |
 | `npm run generate` | Genera todas las suites (UI, API, Performance, Accessibility, Security, Visual, BDD) |
+| `npm run generate -- --suite=<Nombre>` / `npm run generate:suite -- --suite=<Nombre>` | Genera **solo** esa suite (todos los tipos de prueba) |
 | `npm run generate:nf` | Genera specs de pruebas no funcionales dentro de las suites |
+| `npm run generate:nf -- --suite=<Nombre>` / `npm run generate:nf:suite -- --suite=<Nombre>` | Genera las pruebas de carga de **solo** esa suite |
 | `npm run generate:api` | Genera tests de API a partir del tráfico capturado en la última ejecución |
 | `npm run test` | Flujo completo: generate + bdd + ejecución + reportes por suite |
+| `npm run test:suite -- --suite=<Nombre>` | Genera y ejecuta el pipeline completo de **una sola** suite |
 | `npm run bdd` | Solo transpila features BDD a tests |
 | `npm run test:smoke` | Ejecuta solo tests con tag `@smoke` |
+| `npm run test:api` | Genera y ejecuta solo el proyecto `api`, luego reportes |
+| `npm run mcp:server` | Arranca el servidor MCP (delega en el CLI de `@playwright/mcp`) — `HEADLESS=false` para modo visual, `MCP_PORT` para transporte HTTP/SSE |
 | `npm run report` | Abre el último reporte HTML |
 | `npm run reports-index` | Genera el índice global de reportes multi-suite |
+
+---
+
+## Pruebas de API vía curl pegado (`BoxAPIsExecute/`)
+
+Además de grabar UI, se puede generar un test de API pegando un `curl` (o `URL` + línea en blanco + body) directamente en un `.spec.ts` dentro de:
+
+```
+BoxAPIsExecute/REST/{get,post,put,delete}/
+BoxAPIsExecute/SOAP/{get,post,put,delete}/
+```
+
+Al ejecutar `npm run generate`, el agente `box-api-executor.agent.ts` detecta el método, extrae URL/headers/body, identifica a qué suite pertenece (por nombre o, con `OPENAI_API_KEY`, por IA) y genera el spec real en `GenerateTest/tests/<Suite>/api/`. Las 8 subcarpetas incluyen un `.gitkeep` para que nunca desaparezcan del repositorio aunque estén vacías.
+
+## Pruebas con datos variables (Data-Driven Testing)
+
+Para ejecutar el mismo flujo UI o el mismo test de API con varias filas de datos (ej. distintos usuarios, montos, descripciones), coloca un archivo `.csv`, `.txt` o `.xlsx` en `BoxTestData/` con el **mismo nombre exacto que la suite** (ver ejemplo en `BoxTestData/Homebanking_TransferenciasTestingQA.csv`).
+
+- El encabezado de cada columna se compara (localmente y, si hace falta, con IA) contra las etiquetas de los campos del flujo grabado o contra las claves del body/tags del curl pegado.
+- Al ejecutar `npm run generate`, si existe un archivo de datos para la suite, el spec generado repite el test una vez por fila (UI: todo el flujo; API: solo el caso "Éxito").
+- El reporte HTML (`portal.html`) muestra, bajo cada ejecución, un panel "📋 Datos de prueba" con los valores usados en esa fila.
+- Si no existe archivo de datos para una suite, el comportamiento es exactamente el mismo de siempre (una sola ejecución, sin loop).
 
 ---
 
@@ -597,10 +640,13 @@ playwright-enterprise-template/
 | `page closed` / `page crashed` | El framework detecta la página cerrada y reintenta. Aumenta `timeout` en `playwright.config.ts` si el sistema es lento. |
 | `selector not found` | El healer intenta 5 estrategias automáticas. Si falla: revisa que el recording capture el elemento y ejecuta `npm run generate`. |
 | `Tests de API manuales no aparecen en la suite` | El nombre del spec debe comenzar igual que el recording. Ej: `Homebankink_Transferencias_*.spec.ts` para la suite `Homebankink_Transferencias`. |
+| `El curl pegado en BoxAPIsExecute/ no genera nada` | Verifica que el archivo esté en la subcarpeta correcta (`REST` o `SOAP` × `get/post/put/delete`) y vuelve a ejecutar `npm run generate`. |
+| `Los datos de BoxTestData/ no se aplican` | El nombre del archivo debe coincidir exactamente con el nombre de la suite (mismo criterio que la grabación). Revisa en consola las columnas sin match (`console.warn`). |
 | `Non-functional: Suite no encontrada` | Ejecuta `npm run generate` antes de `npm run generate:nf`. |
 | `Non-functional: 100% errores` | El endpoint puede requerir autenticación. Añade `Authorization: 'Bearer TOKEN'` en `headers` del target en `nf-config.ts`. |
 | `Tests duplicados` | Ejecuta `npm run generate` para regenerar limpio. Los archivos en `GenerateTest/tests/` se sobreescriben. |
 | `BDD: no encuentra steps` | Verifica que `playwright.config.ts` apunte a `GenerateTest/steps/**/*.ts`. Ejecuta `npm run bdd` primero. |
+| `El servidor MCP no arranca` | Ejecuta `npx playwright install chromium` si falta el navegador. Verifica `npm ci` si falta `@playwright/mcp`. |
 
 ---
 

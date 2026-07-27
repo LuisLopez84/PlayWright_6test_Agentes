@@ -6,7 +6,7 @@ test('Core Web Vitals', async ({ page }) => {
   await smartGoto(page, 'GLOBAL');
 
   const metrics = await page.evaluate(() => {
-    const navigation = performance.getEntriesByType('navigation')[0];
+    const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
     return {
       loadTime: navigation.loadEventEnd - navigation.fetchStart
     };
@@ -34,7 +34,7 @@ test('Performance Budget', async ({ page }) => {
   await smartGoto(page, 'GLOBAL');
 
   const metrics = await page.evaluate(() => {
-    const nav = performance.getEntriesByType('navigation')[0];
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
     return {
       pageLoad: nav.loadEventEnd - nav.fetchStart
     };

@@ -1,5 +1,4 @@
 import { Page } from '@playwright/test';
-import axios from 'axios';
 
 // Risk 4: tipos de captcha soportados
 export type CaptchaMethod = 'userrecaptcha' | 'hcaptcha' | 'turnstile';
@@ -9,6 +8,29 @@ const POLL_INTERVAL_MS = 2_000;
 const MAX_POLLS = Math.floor(
   parseInt(process.env.CAPTCHA_TIMEOUT_MS || '50000', 10) / POLL_INTERVAL_MS
 );
+
+/**
+ * fetch con timeout y parseo JSON — reemplaza a axios (sin dependencia nueva;
+ * fetch es global en Node 18+, versión mínima ya requerida por el proyecto).
+ */
+async function fetchJson(
+  url: string,
+  params: Record<string, string | number>,
+  method: 'GET' | 'POST',
+  timeoutMs: number
+): Promise<any> {
+  const query = new URLSearchParams(
+    Object.fromEntries(Object.entries(params).map(([k, v]) => [k, String(v)]))
+  ).toString();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${url}?${query}`, { method, signal: controller.signal });
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // Risk 6: POST /in.php con retry hasta 3 intentos
 async function submitTask(
@@ -20,12 +42,14 @@ async function submitTask(
 ): Promise<string | null> {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const res = await axios.post('https://2captcha.com/in.php', null, {
-        params: { key: apiKey, method, googlekey: siteKey, pageurl: pageUrl, json: 1 },
-        timeout: 10_000,
-      });
-      if (res.data.status === 1) return res.data.request as string;
-      console.warn(`[captcha-solver] POST /in.php status≠1 (intento ${attempt}): ${res.data.request}`);
+      const data = await fetchJson(
+        'https://2captcha.com/in.php',
+        { key: apiKey, method, googlekey: siteKey, pageurl: pageUrl, json: 1 },
+        'POST',
+        10_000
+      );
+      if (data.status === 1) return data.request as string;
+      console.warn(`[captcha-solver] POST /in.php status≠1 (intento ${attempt}): ${data.request}`);
     } catch (err: any) {
       console.warn(`[captcha-solver] POST /in.php error (intento ${attempt}): ${err.message}`);
     }
@@ -92,12 +116,14 @@ export async function solveAndInjectCaptcha(
 
     for (let i = 0; i < MAX_POLLS; i++) {
       await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
-      const res = await axios.get('https://2captcha.com/res.php', {
-        params: { key: apiKey, action: 'get', id: requestId, json: 1 },
-        timeout: 10_000,
-      });
-      if (res.data.status === 1) {
-        await injectToken(page, res.data.request as string, method);
+      const data = await fetchJson(
+        'https://2captcha.com/res.php',
+        { key: apiKey, action: 'get', id: requestId, json: 1 },
+        'GET',
+        10_000
+      );
+      if (data.status === 1) {
+        await injectToken(page, data.request as string, method);
         console.log(`[captcha-solver] Token inyectado correctamente (${method}).`);
         return true;
       }

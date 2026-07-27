@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { restRequest } from '../../../../ConfigurationTest/tests/utils/api-helper';
+import { restRequest } from '../../ConfigurationTest/tests/utils/api-helper';
 
 test('POST /transferencias/ - éxito (200 o 201)', async ({ request }) => {
   const payload = {

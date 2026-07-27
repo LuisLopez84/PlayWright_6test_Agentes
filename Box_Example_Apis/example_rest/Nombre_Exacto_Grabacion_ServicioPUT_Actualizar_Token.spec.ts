@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { restRequest } from '../../../../ConfigurationTest/tests/utils/api-helper';
+import { restRequest } from '../../ConfigurationTest/tests/utils/api-helper';
 
 // Credenciales (cámbialas por las tuyas)
 const USER_EMAIL = 'pruebas@prue.com.co';
