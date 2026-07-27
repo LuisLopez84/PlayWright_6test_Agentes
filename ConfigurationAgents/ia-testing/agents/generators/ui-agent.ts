@@ -2,6 +2,8 @@ import fs from "fs";
 import path from "path";
 import { ensureDir } from "../../utils/fs-utils";
 import { normalizeSelector } from "../../../../ConfigurationTest/tests/utils/selector-normalizer";
+import { findSuiteDataFile, parseDataFile, DataRow } from "../../../../ConfigurationTest/tests/utils/data-file-parser";
+import { bindUiColumns } from "../core/data-binding.agent";
 
 // Risk 5: wrapper — expresiones encadenadas (.nth/.first/.last/.filter) pasan sin modificar
 // Risk 11: expresiones Playwright del recorder (page.getByLabel/Role/locator…) pasan sin modificar
@@ -16,7 +18,7 @@ function safeNormalize(rawSel: string): string {
   return normalizeSelector(rawSel) || rawSel;
 }
 
-export function generateUITest(name: string, steps: any[]) {
+export async function generateUITest(name: string, steps: any[]) {
   const dir    = path.join('GenerateTest', 'tests', name, 'ui');
   ensureDir(dir);
   const output = path.join(dir, `${name}.spec.ts`);
@@ -44,6 +46,28 @@ export function generateUITest(name: string, steps: any[]) {
     }
   }
   console.log(`📊 generateUITest: ${uniqueSteps.length} steps únicos de ${steps.length}`);
+
+  // ── Datos variables (DDT) — BoxTestData/<name>.csv|.txt|.xlsx ──────────────
+  // Si existe un archivo de datos para esta suite, cada fila genera una ejecución
+  // independiente del mismo flujo. Sin archivo, comportamiento idéntico a hoy.
+  const ddtFile    = findSuiteDataFile(name);
+  const ddtRows: DataRow[] = ddtFile ? parseDataFile(ddtFile) : [];
+  const ddtBinding = ddtRows.length > 0 ? await bindUiColumns(uniqueSteps, Object.keys(ddtRows[0])) : {};
+  if (ddtRows.length > 0) {
+    console.log(`🔢 [DDT] ${ddtRows.length} fila(s) de datos detectadas para "${name}" (${ddtFile})`);
+    console.log(`🔗 [DDT] Campos emparejados: ${Object.keys(ddtBinding).length}`);
+  }
+
+  /** Emite el valor de un campo: si el step está emparejado con una columna DDT,
+   *  usa `__ddtRow['col'] ?? 'valor grabado'` (fallback si la celda queda vacía);
+   *  si no, el literal grabado tal cual (comportamiento actual, sin cambios). */
+  function valueExpr(stepIndex: number, literal: string): string {
+    const col = ddtBinding[String(stepIndex)];
+    if (!col) return `'${literal}'`;
+    const safeCol     = col.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const safeLiteral = literal.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return `(__ddtRow['${safeCol}'] ?? '${safeLiteral}')`;
+  }
 
   // ── Determinar imports necesarios ─────────────────────────────────────────
   const usesCheck      = uniqueSteps.some(s => s.action === 'check' || s.action === 'uncheck');
@@ -110,6 +134,7 @@ ${queueItems},
   }
 
   const fixture = usesPopup ? '{ page, context }' : '{ page }';
+  const isDDT   = ddtRows.length > 0;
 
   // Risk 6: timeouts como constantes configurables en el spec generado
   let code = `
@@ -121,10 +146,26 @@ import { ${importedActions.join(', ')} } from '@utils/smart-actions';
 const POPUP_TIMEOUT  = Number(process.env.POPUP_TIMEOUT  || 30000);
 const VERIFY_TIMEOUT = Number(process.env.VERIFY_TIMEOUT || 20000);
 const FILL_WAIT_MS   = Number(process.env.FILL_WAIT_MS   || 0);
+`;
 
+  // ── Datos variables (DDT): un test por fila del archivo de datos ───────────
+  if (isDDT) {
+    code += `
+// Datos variables cargados desde ${JSON.stringify(path.basename(ddtFile || ''))} (BoxTestData/)
+const DDT_ROWS: Record<string, string>[] = ${JSON.stringify(ddtRows, null, 2)};
+
+for (let __ddtIdx = 0; __ddtIdx < DDT_ROWS.length; __ddtIdx++) {
+  const __ddtRow = DDT_ROWS[__ddtIdx];
+  test(\`${name} — Fila \${__ddtIdx + 1}/\${DDT_ROWS.length}\`, async (${fixture}) => {
+    console.log(\`@@DDT_ROW_START@@\\n\${JSON.stringify({ row: __ddtIdx + 1, total: DDT_ROWS.length, data: __ddtRow })}\\n@@DDT_ROW_END@@\`);
+    await smartGoto(page, '${name}');
+${dialogQueueBlock}`;
+  } else {
+    code += `
 test('${name}', async (${fixture}) => {
   await smartGoto(page, '${name}');
 ${dialogQueueBlock}`;
+  }
 
   let i = 0;
   while (i < uniqueSteps.length) {
@@ -238,7 +279,7 @@ ${dialogQueueBlock}`;
     if (step.action === 'select' || step.action === 'selectOption') {
       const selector = safeNormalize(step.selector || step.target);
       const value    = step.value || '';
-      if (selector && value) code += `\n  await smartSelect(page, \`${selector}\`, '${value}');`;
+      if (selector && value) code += `\n  await smartSelect(page, \`${selector}\`, ${valueExpr(i, value)});`;
       i++; continue;
     }
 
@@ -389,7 +430,7 @@ ${dialogQueueBlock}`;
   //    Luego vuelve a ejecutar: npm run generate`;
       } else {
         // Risk 3: FILL_WAIT_MS reemplaza el waitForTimeout(500) hardcodeado
-        code += `\n  await smartFill(page, \`${selector}\`, '${value}');`;
+        code += `\n  await smartFill(page, \`${selector}\`, ${valueExpr(i, value)});`;
         code += `\n  await page.waitForTimeout(FILL_WAIT_MS);`;
       }
       i++; continue;
@@ -411,7 +452,7 @@ ${dialogQueueBlock}`;
     i++;
   }
 
-  code += `\n});\n`;
+  code += isDDT ? `\n  });\n}\n` : `\n});\n`;
   fs.writeFileSync(output, code);
-  console.log(`✅ UI Test generado: ${output}`);
+  console.log(`✅ UI Test generado: ${output}${isDDT ? ` (${ddtRows.length} fila(s) de datos)` : ''}`);
 }

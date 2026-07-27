@@ -253,12 +253,15 @@ playwright-enterprise-template_UI_API_Performance3/
 │   └── example_soap/                     ← ejemplos de referencia de tests SOAP manuales
 │
 ├── BoxAPIsExecute/                       ← pegar un curl crudo aquí y npm run generate lo convierte en spec
-│   ├── REST/{get,post}/
-│   └── SOAP/{get,post}/
+│   ├── REST/{get,post,put,delete}/
+│   └── SOAP/{get,post,put,delete}/
+│
+├── BoxTestData/                          ← datos variables por suite (.csv/.txt/.xlsx) — ver Sección 9.11
+│   └── <NombreSuite>.csv                 ← mismo nombre que la suite; alimenta UI y API
 │
 ├── ConfigurationAgents/ia-testing/
 │   ├── agents/
-│   │   ├── core/                         ← parser, selector-engine, healer, learning-store (13 archivos)
+│   │   ├── core/                         ← parser, selector-engine, healer, learning-store, data-binding (14 archivos)
 │   │   ├── generators/                   ← ui, performance, accessibility, security, visual (agent.ts)
 │   │   ├── network/                      ← api-discovery, api-test-generator, box-api-executor, network-sniffer
 │   │   └── recorder/                     ← recorder-parser-agent.ts
@@ -266,7 +269,7 @@ playwright-enterprise-template_UI_API_Performance3/
 │   └── utils/                            ← openai-client, fs-utils, selector-builder, url-extractor
 │
 ├── ConfigurationTest/tests/
-│   ├── utils/                            ← smart-actions, navigation-helper, api-helper, modal-handler, test-data-resolver
+│   ├── utils/                            ← smart-actions, navigation-helper, api-helper, modal-handler, test-data-resolver, data-file-parser
 │   ├── pages/                            ← Page Objects
 │   ├── fixtures/                         ← customFixtures (loginPage)
 │   ├── setup/                            ← auth.setup.ts
@@ -857,6 +860,126 @@ Estos valores están en `ConfigurationTest/tests/utils/smart-actions.ts` y afect
 | Visual | `BASE_URL`, `VISUAL_DIFF_RATIO`, `VISUAL_WAIT_MS` |
 | Non-Functional | Ninguna — todo se configura en `nf-config.ts` |
 | Todo el framework | `OPENAI_API_KEY`, `OPENAI_SUPPRESS_WARN`, `USER`, `PASS`, `SUITE_TIMEOUT_MS`, `PARALLEL_SUITES` |
+
+---
+
+### 9.11 Datos variables por archivo (Data-Driven Testing) — CSV / TXT / XLSX
+
+Permite ejecutar el mismo flujo UI o la misma prueba de API **varias veces**, una por cada fila de un archivo `.csv`, `.txt` o `.xlsx`, sin escribir código. El framework empareja automáticamente (por IA) cada columna del archivo con el campo o la clave de API correspondiente.
+
+**Carpeta:** `BoxTestData/` (nueva, en la raíz del proyecto — mismo patrón que `BoxRecordings/` y `BoxAPIsExecute/`).
+
+**Convención:** el nombre del archivo debe ser **exactamente igual al nombre de la suite**. Un solo archivo por suite, compartido entre UI y API:
+
+```
+BoxTestData/
+└── Homebanking_TransferenciasTestingQA.csv    ← mismo nombre que la suite
+```
+
+Primera fila = encabezados (nombres de columna). Cada fila siguiente = una ejecución completa del flujo/prueba con esos valores.
+
+#### Cómo funciona el emparejamiento
+
+`ConfigurationAgents/ia-testing/agents/core/data-binding.agent.ts` compara cada encabezado de columna contra:
+- **UI**: la etiqueta visible del campo grabado — ej. columna `Usuario` ↔ `page.getByRole('textbox', { name: 'Usuario' })`.
+- **API (REST, desde `BoxAPIsExecute`)**: las claves top-level del body JSON del curl — ej. columna `Monto` ↔ `"monto"`.
+- **API (SOAP, desde `BoxAPIsExecute`)**: los tags hoja del XML — ej. columna `intA` ↔ `<tem:intA>`.
+
+El match se intenta primero de forma local (exacto, luego por contención, ignorando acentos/mayúsculas/espacios); lo que no logra match local se manda en **una sola llamada** a OpenAI (`gpt-4o-mini`) pidiendo el emparejamiento — igual mecanismo que ya usa el proyecto para detectar a qué suite pertenece un test manual de API (`findMatchingSuite`/`findMatchingSuiteWithAI` en `box-api-executor.agent.ts`). Sin `OPENAI_API_KEY`, ese paso se omite y solo aplica el match local. Las columnas que no logran emparejar con nada quedan sin usar — se loguea cuáles durante `npm run generate`, sin romper la generación.
+
+#### Ejemplo real y funcional
+
+`BoxTestData/Homebanking_TransferenciasTestingQA.csv`:
+
+```csv
+Usuario,Contraseña,Monto,Descripción (opcional)
+demo,demo123,500,Transferencia prueba DDT fila 1
+demo,demo123,1200,Transferencia prueba DDT fila 2
+demo,demo123,2500,Transferencia prueba DDT fila 3
+```
+
+Al ejecutar `npm run generate` con este archivo presente:
+
+```
+🔢 [DDT] 3 fila(s) de datos detectadas para "Homebanking_TransferenciasTestingQA" (BoxTestData\Homebanking_TransferenciasTestingQA.csv)
+🔗 [DDT] Campos emparejados: 4
+✅ UI Test generado: GenerateTest\tests\Homebanking_TransferenciasTestingQA\ui\Homebanking_TransferenciasTestingQA.spec.ts (3 fila(s) de datos)
+```
+
+El spec UI generado pasa de un único `test(...)` a un loop de 3 ejecuciones (`GenerateTest/tests/Homebanking_TransferenciasTestingQA/ui/Homebanking_TransferenciasTestingQA.spec.ts`):
+
+```typescript
+const DDT_ROWS: Record<string, string>[] = [
+  { "Usuario": "demo", "Contraseña": "demo123", "Monto": "500", "Descripción (opcional)": "Transferencia prueba DDT fila 1" },
+  { "Usuario": "demo", "Contraseña": "demo123", "Monto": "1200", "Descripción (opcional)": "Transferencia prueba DDT fila 2" },
+  { "Usuario": "demo", "Contraseña": "demo123", "Monto": "2500", "Descripción (opcional)": "Transferencia prueba DDT fila 3" },
+];
+
+for (let __ddtIdx = 0; __ddtIdx < DDT_ROWS.length; __ddtIdx++) {
+  const __ddtRow = DDT_ROWS[__ddtIdx];
+  test(`Homebanking_TransferenciasTestingQA — Fila ${__ddtIdx + 1}/${DDT_ROWS.length}`, async ({ page }) => {
+    ...
+    await smartFill(page, `page.getByRole('spinbutton', { name: 'Monto' })`, (__ddtRow['Monto'] ?? '10000'));
+    ...
+  });
+}
+```
+
+Y el spec de API generado desde el curl pegado en `BoxAPIsExecute/REST/post/` repite **solo el test "Éxito"** por fila (los de error técnico/datos inválidos no varían):
+
+```typescript
+const DDT_BODIES: any[] = [
+  { "cuenta_destino": "ACC002", "cuenta_origen": "ACC001", "monto": "500",  "motivo": "Varios", "tipo": "propia" },
+  { "cuenta_destino": "ACC002", "cuenta_origen": "ACC001", "monto": "1200", "motivo": "Varios", "tipo": "propia" },
+  { "cuenta_destino": "ACC002", "cuenta_origen": "ACC001", "monto": "2500", "motivo": "Varios", "tipo": "propia" },
+];
+
+for (let __ddtIdx = 0; __ddtIdx < DDT_BODIES.length; __ddtIdx++) {
+  test(`POST /transferencias/ - Éxito (Fila ${__ddtIdx + 1}/${DDT_BODIES.length})`, async ({ request }) => {
+    const response = await restRequest(request, 'POST', 'https://homebanking-demo.onrender.com/transferencias/', {
+      headers: { accept: 'application/json', 'Content-Type': 'application/json' },
+      data: DDT_BODIES[__ddtIdx]
+    });
+    ...
+  });
+}
+```
+
+#### API manual (`api-testing-rest-soap/`) — helper, no generación automática
+
+Como esos specs los escribe el tester a mano, no se generan solos — se ofrece un helper para que el propio tester itere el archivo de datos:
+
+```typescript
+import { loadSuiteTestData } from '../../../../ConfigurationTest/tests/utils/data-file-parser';
+
+const data = loadSuiteTestData('Homebanking_TransferenciasTestingQA');
+
+for (const [i, row] of data.entries()) {
+  test(`POST /transferencias - fila ${i + 1}`, async ({ request }) => {
+    const response = await restRequest(request, 'POST', url, {
+      data: { monto: row['Monto'], cuenta_destino: row['cuenta_destino'] },
+    });
+    expect(response.status()).toBe(200);
+  });
+}
+```
+
+#### Dónde se ve reflejado en el reporte
+
+- **UI**: `npm run portal` agrega un panel "📋 Datos de prueba — Fila N/M" debajo de cada ejecución en la pestaña UI, con la tabla columna→valor exacta usada.
+- **API**: no requiere nada adicional — el panel de Request/Response que ya trae el portal muestra el body real enviado en cada fila, que ya varía según el dato.
+
+#### Regla de oro y limitaciones
+
+| Aspecto | Comportamiento |
+|---|---|
+| ¿Se sobreescribe el spec en `npm run generate`? | Sí, igual que hoy — el archivo de datos es la única fuente de verdad. Nunca edites el loop generado a mano. |
+| Sin archivo en `BoxTestData/` | Comportamiento idéntico a antes de esta funcionalidad: un solo `test()`, valores grabados/del curl. Cero regresión. |
+| Campos dentro de un popup | No soportados en esta primera versión — conservan su valor grabado aunque exista una columna con el mismo nombre. |
+| Mismo campo llenado dos veces en la grabación | El dato variable se aplica solo al primer `fill` que coincide con la columna; un `fill` posterior sobre el mismo campo conserva su valor grabado (y es el que queda visible en pantalla, por ser el último). |
+| Tests de error técnico / datos inválidos (API) | No varían por fila — solo el test "Éxito" se repite, ya que variar datos en un caso que espera fallo no aporta valor. |
+
+**Archivos involucrados:** `ConfigurationTest/tests/utils/data-file-parser.ts` (parser CSV/TXT/XLSX, sin dependencias para CSV/TXT; usa `xlsx` — instalada desde el CDN oficial de SheetJS para evitar la vulnerabilidad conocida de la versión publicada en npm — solo para `.xlsx`), `ConfigurationAgents/ia-testing/agents/core/data-binding.agent.ts` (emparejamiento columna↔campo), y los generadores `ui-agent.ts` / `box-api-executor.agent.ts` (loop de ejecución).
 
 ---
 

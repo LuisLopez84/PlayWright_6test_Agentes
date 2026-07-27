@@ -240,6 +240,19 @@ function extractA11yMetrics(tc) {
   };
 }
 
+/** DDT (datos variables): extrae la fila de BoxTestData/ usada en un testcase de UI,
+ *  emitida por ui-agent.ts vía @@DDT_ROW_START@@{row,total,data}@@DDT_ROW_END@@ */
+function extractDdtRow(output) {
+  const clean = stripAnsi(output || '');
+  const m = clean.match(/@@DDT_ROW_START@@\s*([\s\S]*?)\s*@@DDT_ROW_END@@/);
+  if (!m) return null;
+  try {
+    const parsed = JSON.parse(m[1]);
+    if (parsed && typeof parsed === 'object' && parsed.data) return parsed;
+  } catch (_) { /* marcador malformado — ignorar */ }
+  return null;
+}
+
 /** Security: mapea nombre de testcase a categoría */
 function securityCategory(tcName) {
   const n = tcName.toLowerCase();
@@ -1019,6 +1032,16 @@ function renderUI(suiteList) {
       for (const tc of r.testcases) {
         if (!tc.passed && tc.failure) {
           html += `<tr class="row-detail"><td colspan="6"><pre class="error-msg">${esc(tc.failure.substring(0,400))}${tc.failure.length>400?'…':''}</pre></td></tr>`;
+        }
+        // Datos variables (DDT): qué fila de BoxTestData/ alimentó esta ejecución
+        const ddt = extractDdtRow(tc.output);
+        if (ddt) {
+          html += `<tr class="row-detail"><td colspan="6">
+            <div class="ddt-panel">
+              <div class="ddt-panel-title">📋 Datos de prueba — Fila ${esc(ddt.row)}/${esc(ddt.total)}</div>
+              ${renderHeadersTable(ddt.data)}
+            </div>
+          </td></tr>`;
         }
       }
     }
@@ -2320,6 +2343,11 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .api-hdr-key { color:var(--muted); padding:3px 8px 3px 0; font-family:monospace;
       white-space:nowrap; vertical-align:top; width:35%; }
     .api-hdr-val { color:var(--text); padding:3px 0; word-break:break-all; font-family:monospace; }
+
+    /* ─── DDT (datos variables) ──────────────── */
+    .ddt-panel       { padding:6px 2px; }
+    .ddt-panel-title { font-size:11px; font-weight:700; color:#a78bfa; text-transform:uppercase;
+      letter-spacing:.5px; margin-bottom:6px; }
 
     .api-body { background:#0a0d18; border-radius:6px; padding:10px 12px; font-size:11px;
       font-family:monospace; color:var(--text); overflow-x:auto; max-height:280px;

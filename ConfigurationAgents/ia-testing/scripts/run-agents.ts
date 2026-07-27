@@ -358,8 +358,10 @@ async function runAgents() {
       }
 
       // 4. UI Test (usa enhancedSteps para contexto semántico de flujo)
+      // Nota: generateUITest es async — resuelve datos DDT (BoxTestData/) y su
+      // emparejamiento de columnas antes de escribir el spec.
       try {
-        generateUITest(name, enhancedSteps as any[]);
+        await generateUITest(name, enhancedSteps as any[]);
       } catch (err) {
         console.error('⚠️ Error generating UI test', err);
       }

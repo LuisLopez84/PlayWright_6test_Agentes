@@ -17,6 +17,8 @@ import path from 'path';
 import type OpenAI from 'openai';
 import { openai as sharedOpenai, hasOpenAI } from '../../utils/openai-client';
 import { ensureDir } from '../../utils/fs-utils';
+import { loadSuiteTestData, DataRow } from '../../../../ConfigurationTest/tests/utils/data-file-parser';
+import { bindApiColumns } from '../core/data-binding.agent';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -248,14 +250,61 @@ Responde ÚNICAMENTE con el nombre exacto de la suite del array, o null si ningu
 
 const IMPORT_PATH = `'../../../../ConfigurationTest/tests/utils/api-helper'`;
 
-function buildRestSpec(spec: BoxApiSpec): string {
+/** Datos variables (DDT) resueltos para una suite: filas del archivo + mapeo clave→columna. */
+export interface DdtApiInfo {
+  rows: DataRow[];
+  binding: Record<string, string>; // { bodyKey/xmlTag: columnName }
+}
+
+/**
+ * Extrae las claves top-level de un body REST (JSON) o los nombres de los tags
+ * hoja (sin hijos) dentro de <Body> de un XML SOAP — son los candidatos contra
+ * los que se empareja cada columna del archivo de datos.
+ */
+function extractBodyKeys(spec: BoxApiSpec): string[] {
+  if (!spec.body) return [];
+  if (spec.serviceType === 'SOAP') {
+    const bodyMatch = spec.body.match(/<(?:[a-zA-Z]+:)?Body[^>]*>([\s\S]*?)<\/(?:[a-zA-Z]+:)?Body>/);
+    const inner = bodyMatch?.[1] ?? spec.body;
+    const leafRe = /<(?:[a-zA-Z]+:)?([A-Za-z0-9_]+)>([^<]*)<\/(?:[a-zA-Z]+:)?\1>/g;
+    const keys = new Set<string>();
+    let m: RegExpExecArray | null;
+    while ((m = leafRe.exec(inner)) !== null) keys.add(m[1]);
+    return [...keys];
+  }
+  try {
+    const parsed = JSON.parse(spec.body);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) return Object.keys(parsed);
+  } catch {}
+  return [];
+}
+
+/** Reemplaza el contenido de texto de tags XML hoja según { tagName: valor }. */
+function substituteXmlLeafValues(xml: string, values: Record<string, string>): string {
+  let result = xml;
+  for (const [tag, value] of Object.entries(values)) {
+    const re = new RegExp(`(<(?:[a-zA-Z]+:)?${tag}(?:\\s[^>]*)?>)([^<]*)(</(?:[a-zA-Z]+:)?${tag}>)`, 'g');
+    const safeValue = value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    result = result.replace(re, `$1${safeValue}$3`);
+  }
+  return result;
+}
+
+function buildRestSpec(spec: BoxApiSpec, ddt?: DdtApiInfo): string {
   const urlPath  = spec.url.replace(/https?:\/\/[^/]+/, '') || '/';
   const isJson   = spec.body && !spec.body.trim().startsWith('<');
-  let bodyJson: object | null = null;
+  let bodyJson: Record<string, any> | null = null;
   if (isJson && spec.body) { try { bodyJson = JSON.parse(spec.body); } catch {} }
 
   const hasBody = spec.method !== 'GET' && spec.method !== 'DELETE' && spec.body;
-  const bodyDecl = hasBody
+
+  // ── Datos variables (DDT): solo aplica al test "Éxito", solo si hay body JSON
+  //    y al menos una clave emparejada con una columna del archivo de datos.
+  const ddtApplicable = !!(ddt && ddt.rows.length > 0 && hasBody && bodyJson && Object.keys(ddt.binding).length > 0);
+
+  // `requestBody` solo se declara si el test "Éxito" no-DDT la va a usar
+  // (en modo DDT cada fila arma su propio body dentro de DDT_BODIES).
+  const bodyDecl = (hasBody && !ddtApplicable)
     ? `const requestBody = ${bodyJson ? JSON.stringify(bodyJson, null, 2) : JSON.stringify(spec.body)};\n\n`
     : '';
 
@@ -274,18 +323,47 @@ function buildRestSpec(spec: BoxApiSpec): string {
     : `{\n      headers: { accept: 'application/json'${authHeaderStr} }\n    }`;
   const baseUrlDecl = !hasBody ? `    const baseUrl = '${spec.url}'.replace(/\\/+$/, '');\n` : '';
 
-  return `import { test, expect } from '@playwright/test';
-import { restRequest } from ${IMPORT_PATH};
+  let successBlock: string;
+  if (ddtApplicable) {
+    const perRowBodies = ddt!.rows.map(row => {
+      const merged: Record<string, any> = { ...(bodyJson as object) };
+      for (const [bodyKey, col] of Object.entries(ddt!.binding)) {
+        if (row[col] !== undefined && row[col] !== '') merged[bodyKey] = row[col];
+      }
+      return merged;
+    });
+    successBlock = `
+  // Datos variables cargados desde BoxTestData/ — ${perRowBodies.length} fila(s)
+  const DDT_BODIES: any[] = ${JSON.stringify(perRowBodies, null, 2)};
 
-${bodyDecl}test.describe('${descName}', () => {
-
+  for (let __ddtIdx = 0; __ddtIdx < DDT_BODIES.length; __ddtIdx++) {
+    test(\`${spec.method} ${urlPath} - Éxito (Fila \${__ddtIdx + 1}/\${DDT_BODIES.length})\`, async ({ request }) => {
+      const response = await restRequest(request, '${spec.method}', '${spec.url}', {
+        headers: { ${successHeaders} },
+        data: DDT_BODIES[__ddtIdx]
+      });
+      expect(response.status()).toBeGreaterThanOrEqual(200);
+      expect(response.status()).toBeLessThan(300);
+      ${spec.method !== 'DELETE' ? `const body = await response.json();\n      expect(body).toBeDefined();` : ''}
+    });
+  }
+`;
+  } else {
+    successBlock = `
   test('${spec.method} ${urlPath} - Éxito', async ({ request }) => {
     const response = await restRequest(request, '${spec.method}', '${spec.url}', ${successOpts});
     expect(response.status()).toBeGreaterThanOrEqual(200);
     expect(response.status()).toBeLessThan(300);
     ${spec.method !== 'DELETE' ? `const body = await response.json();\n    expect(body).toBeDefined();` : ''}
   });
+`;
+  }
 
+  return `import { test, expect } from '@playwright/test';
+import { restRequest } from ${IMPORT_PATH};
+
+${bodyDecl}test.describe('${descName}', () => {
+${successBlock}
   test('${spec.method} ${urlPath} - Error técnico (servicio no disponible)', async ({ request }) => {
     let errorDetected = false;
     try {
@@ -308,7 +386,7 @@ ${baseUrlDecl}    const response = await restRequest(request, '${spec.method}', 
 `;
 }
 
-function buildSoapSpec(spec: BoxApiSpec): string {
+function buildSoapSpec(spec: BoxApiSpec, ddt?: DdtApiInfo): string {
   const xmlBody    = spec.body ?? '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body/></soap:Envelope>';
   const soapAction = spec.soapAction ?? '';
   const bodyContentMatch = xmlBody.match(/<(?:[a-zA-Z]+:)?Body[^>]*>[\s\S]*?<(?:[a-zA-Z]+:)?([A-Za-z0-9_]+)/);
@@ -317,14 +395,38 @@ function buildSoapSpec(spec: BoxApiSpec): string {
   const descName   = spec.fileName.replace(/\.spec\.ts$/, '');
   const malformedXml = '<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><InvalidRequest/></soap:Body></soap:Envelope>';
 
-  return `import { test, expect } from '@playwright/test';
-import { soapRequest } from ${IMPORT_PATH};
+  // ── Datos variables (DDT): solo aplica al test "Éxito", solo si hay al menos
+  //    un tag hoja emparejado con una columna del archivo de datos.
+  const ddtApplicable = !!(ddt && ddt.rows.length > 0 && Object.keys(ddt.binding).length > 0);
 
-const xmlBody = \`${xmlBody}\`;
-const malformedXml = \`${malformedXml}\`;
+  let successBlock: string;
+  if (ddtApplicable) {
+    const perRowXml = ddt!.rows.map(row => {
+      const values: Record<string, string> = {};
+      for (const [tag, col] of Object.entries(ddt!.binding)) {
+        if (row[col] !== undefined && row[col] !== '') values[tag] = row[col];
+      }
+      return substituteXmlLeafValues(xmlBody, values);
+    });
+    successBlock = `
+  // Datos variables cargados desde BoxTestData/ — ${perRowXml.length} fila(s)
+  const DDT_XML_BODIES: string[] = ${JSON.stringify(perRowXml, null, 2)};
 
-test.describe('${descName}', () => {
-
+  for (let __ddtIdx = 0; __ddtIdx < DDT_XML_BODIES.length; __ddtIdx++) {
+    test(\`SOAP ${opName} - Éxito (Fila \${__ddtIdx + 1}/\${DDT_XML_BODIES.length})\`, async ({ request }) => {
+      const response = await soapRequest(request, '${spec.url}', DDT_XML_BODIES[__ddtIdx]${soapActionArg});
+      expect(response.status()).toBe(200);
+      const text = await response.text();
+      // Risk 8: WSDL puede usar ${opName} o ${opName}Response como tag de respuesta
+      expect(
+        text.includes('${opName}'),
+        'Respuesta debe contener tag ${opName} o ${opName}Response'
+      ).toBe(true);
+    });
+  }
+`;
+  } else {
+    successBlock = `
   test('SOAP ${opName} - Éxito', async ({ request }) => {
     const response = await soapRequest(request, '${spec.url}', xmlBody${soapActionArg});
     expect(response.status()).toBe(200);
@@ -335,7 +437,17 @@ test.describe('${descName}', () => {
       'Respuesta debe contener tag ${opName} o ${opName}Response'
     ).toBe(true);
   });
+`;
+  }
 
+  return `import { test, expect } from '@playwright/test';
+import { soapRequest } from ${IMPORT_PATH};
+
+const xmlBody = \`${xmlBody}\`;
+const malformedXml = \`${malformedXml}\`;
+
+test.describe('${descName}', () => {
+${successBlock}
   test('SOAP ${opName} - Error técnico (endpoint no disponible)', async ({ request }) => {
     let errorDetected = false;
     try {
@@ -647,9 +759,23 @@ export async function processBoxAPIsExecute(
     spec.suiteName = targetSuite;
     console.log(suite ? `✅ Suite detectada: "${suite}"` : `📁 Sin suite → "${SOLO_API_DIR}"`);
 
+    // ── Datos variables (DDT) — BoxTestData/<targetSuite>.csv|.txt|.xlsx ──────
+    const ddtRows = loadSuiteTestData(targetSuite);
+    let ddt: DdtApiInfo | undefined;
+    if (ddtRows.length > 0) {
+      const bodyKeys  = extractBodyKeys(spec);
+      const binding   = await bindApiColumns(bodyKeys, Object.keys(ddtRows[0]));
+      ddt = { rows: ddtRows, binding };
+      console.log(`🔢 [DDT] ${ddtRows.length} fila(s) de datos detectadas para "${targetSuite}" — ${Object.keys(binding).length} clave(s) emparejada(s)`);
+    }
+
     // Generar spec content
     let specContent: string;
-    if (hasAI) {
+    if (ddt) {
+      // Con datos variables: builder local determinista (el loop generado debe
+      // ser exacto — no se delega en texto libre de IA para este caso).
+      specContent = spec.serviceType === 'SOAP' ? buildSoapSpec(spec, ddt) : buildRestSpec(spec, ddt);
+    } else if (hasAI) {
       console.log(`🤖 Generando trama con OpenAI para ${spec.fileName}...`);
       specContent = await buildSpecWithAI(spec);
     } else {
