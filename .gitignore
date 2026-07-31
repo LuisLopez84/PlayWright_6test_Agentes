@@ -7,6 +7,9 @@ playwright-report/
 reports/
 storage/
 
+# Histórico local de ejecuciones del portal (tendencia multi-run, generate-portal.js)
+.report-history.json
+
 # Environment
 .env
 .env.local

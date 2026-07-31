@@ -8,7 +8,7 @@
 
 const fs            = require('fs');
 const path          = require('path');
-const { exec }      = require('child_process');
+const { exec, execSync } = require('child_process');
 
 // ─── Motor estadístico PNF ────────────────────────────────────────────────────
 let statEngine = null;
@@ -25,6 +25,8 @@ const REPORT_DIR   = path.join(ROOT, 'playwright-report');
 const OUT_FILE     = path.join(REPORT_DIR, 'portal.html');
 const CSV_FILE     = path.join(REPORT_DIR, 'report.csv');
 const FEATURES_DIR = path.join(ROOT, 'GenerateTest', 'features');
+const HISTORY_FILE = path.join(ROOT, '.report-history.json');
+const HISTORY_MAX  = 20;
 
 // ─── Módulos ──────────────────────────────────────────────────────────────────
 const MODULES = [
@@ -34,7 +36,7 @@ const MODULES = [
   { key: 'security',      label: 'Security',        icon: '🔒',  color: '#ef4444', glow: 'rgba(239,68,68,0.35)',    hostnames: ['security'],         pathSeg: '/security/' },
   { key: 'accessibility', label: 'Accessibility',   icon: '♿',  color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)',   hostnames: ['accessibility'],    pathSeg: '/accessibility/' },
   { key: 'visual',        label: 'Visual Testing',  icon: '👁️',  color: '#06b6d4', glow: 'rgba(6,182,212,0.35)',    hostnames: ['visual'],           pathSeg: '/visual/' },
-  { key: 'bdd',           label: 'BDD / Gherkin',   icon: '🥒',  color: '#84cc16', glow: 'rgba(132,204,22,0.35)',   hostnames: ['bdd-ui'],           pathSeg: null },
+  { key: 'bdd',           label: 'BDD / Gherkin',   icon: '🥒',  color: '#22c55e', glow: 'rgba(34,197,94,0.35)',    hostnames: ['bdd-ui'],           pathSeg: null },
   { key: 'nonfunctional', label: 'Non-Functional',  icon: '📈',  color: '#f97316', glow: 'rgba(249,115,22,0.35)',   hostnames: ['non-functional'],   pathSeg: '/non-functional/' },
 ];
 
@@ -202,6 +204,88 @@ function stats(suiteList) {
     (a, s) => ({ tests: a.tests+s.tests, failures: a.failures+s.failures, time: a.time+s.time }),
     { tests: 0, failures: 0, time: 0 }
   );
+}
+
+/** Rama y commit actuales — best-effort, nunca lanza si no es un repo git o falta el binario */
+function getGitInfo() {
+  const opts = { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'] };
+  try {
+    const branch = execSync('git rev-parse --abbrev-ref HEAD', opts).toString().trim();
+    const commit = execSync('git rev-parse --short HEAD', opts).toString().trim();
+    return { branch: branch || null, commit: commit || null };
+  } catch (e) {
+    return { branch: null, commit: null };
+  }
+}
+
+/** BaseURL(s) activas — lee GenerateTest/<Suite>.metadata.json; best-effort */
+function getEnvironmentLabel() {
+  if (process.env.BASE_URL) return process.env.BASE_URL;
+  try {
+    const genTestDir = path.join(ROOT, 'GenerateTest');
+    if (!fs.existsSync(genTestDir)) return null;
+    const files = fs.readdirSync(genTestDir).filter(f => f.endsWith('.metadata.json'));
+    const urls = new Set();
+    for (const f of files) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(path.join(genTestDir, f), 'utf-8'));
+        if (meta && meta.baseURL) urls.add(meta.baseURL);
+      } catch (e) { /* metadata individual corrupta — se omite, no rompe el resto */ }
+    }
+    if (urls.size === 0) return null;
+    if (urls.size === 1) return [...urls][0];
+    return `${urls.size} entornos distintos`;
+  } catch (e) {
+    return null;
+  }
+}
+
+/** Histórico de ejecuciones — persiste fuera de playwright-report/ (gitignorado) para
+ *  sobrevivir a la limpieza del reporte entre corridas locales. Best-effort: nunca lanza. */
+function readHistory() {
+  try {
+    if (!fs.existsSync(HISTORY_FILE)) return [];
+    const data = JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf-8'));
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function appendHistory(entry) {
+  try {
+    const history = [...readHistory(), entry].slice(-HISTORY_MAX);
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), 'utf-8');
+    return history;
+  } catch (e) {
+    console.warn('⚠️ [Portal] No se pudo guardar el histórico de ejecuciones:', e.message);
+    return readHistory();
+  }
+}
+
+/** Diagnóstico + narrativa ejecutiva a nivel de todo el reporte (mismo patrón que
+ *  computeOverallDiagnosis() del análisis PNF, aplicado a los módulos de prueba). */
+function computeGlobalDiagnosis(groups, totals) {
+  const moduleStats = MODULES.map(mod => ({ ...mod, ...stats(groups[mod.key] || []) }));
+  const executed     = moduleStats.filter(m => m.tests > 0);
+  const notExecuted  = moduleStats.filter(m => m.tests === 0);
+  const failing      = executed.filter(m => m.failures > 0).sort((a, b) => b.failures - a.failures);
+
+  let narrative;
+  if (totals.tests === 0) {
+    narrative = 'Aún no hay resultados de ejecución para analizar — ejecuta las pruebas y vuelve a generar el portal.';
+  } else if (failing.length === 0) {
+    narrative = `Los ${executed.length} módulo${executed.length === 1 ? '' : 's'} ejecutado${executed.length === 1 ? '' : 's'} `
+      + `(${executed.map(m => m.label).join(', ')}) pasaron sin fallos. Sistema listo para continuar el pipeline.`;
+  } else {
+    const top = failing.slice(0, 3).map(m => `${m.label} (${m.failures} fallo${m.failures === 1 ? '' : 's'})`).join(', ');
+    narrative = `${failing.length} módulo${failing.length === 1 ? '' : 's'} con fallas${failing.length === 1 ? '' : ', ordenados por severidad'}: ${top}`
+      + `${failing.length > 3 ? '…' : ''}. Revisar antes de continuar.`;
+  }
+  if (notExecuted.length) {
+    narrative += ` (Sin ejecutar: ${notExecuted.map(m => m.label).join(', ')}.)`;
+  }
+  return { narrative, failing, notExecuted, executed };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -792,6 +876,30 @@ function renderStatisticalAnalysis(statisticalAnalysis) {
   </script>`;
 
   return html;
+}
+
+/** Tarjeta de tendencia histórica (% de éxito en las últimas ejecuciones locales).
+ *  Se alimenta de .report-history.json (fuera de playwright-report/, sobrevive entre corridas).
+ *  Devuelve '' si aún no hay al menos 2 ejecuciones registradas — no agrega ruido en la primera corrida. */
+function renderTrendCard(history) {
+  if (!history || history.length < 2) return '';
+
+  const last    = history[history.length - 1];
+  const prev    = history[history.length - 2];
+  const delta   = last.rate - prev.rate;
+  const deltaStr = delta === 0 ? 'sin cambio vs. la anterior'
+    : (delta > 0 ? `▲ +${delta} pts vs. la anterior` : `▼ ${delta} pts vs. la anterior`);
+  const deltaColor = delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : 'var(--muted)';
+
+  return `
+    <div class="trend-card">
+      <div class="trend-header">
+        <span class="trend-title">📈 Tendencia — últimas ${history.length} ejecuciones locales</span>
+        <span class="trend-delta" style="color:${deltaColor}">${deltaStr}</span>
+      </div>
+      <div class="trend-chart-wrap"><canvas id="chart-trend" height="70"></canvas></div>
+    </div>
+    <script>window.__TREND_HISTORY__ = ${JSON.stringify(history)};</script>`;
 }
 
 /** Tarjeta compacta del Análisis Estadístico PNF para el tab "Resumen".
@@ -1997,11 +2105,13 @@ function renderModuleContent(key, suiteList, features) {
 // Risk 5 (architectural): función monolítica que combina CSS, JS cliente, Chart.js y HTML.
 // Para mejorar la mantenibilidad se recomienda separar en archivos de plantilla externos
 // (portal.css, portal.client.js) y cargarlos con fs.readFileSync en tiempo de generación.
-function buildPortalHTML(groups, totals, generatedAt, features, allSuites, statisticalAnalysis) {
+function buildPortalHTML(groups, totals, generatedAt, features, allSuites, statisticalAnalysis, runContext) {
   const globalPassed = totals.tests - totals.failures - totals.errors;
   const globalRate   = totals.tests > 0 ? Math.round((globalPassed / totals.tests) * 100) : 0;
   const globalOk     = totals.failures === 0 && totals.errors === 0;
   const globalColor  = globalOk ? '#10b981' : '#ef4444';
+  const { gitInfo = { branch: null, commit: null }, envLabel = null, history = [] } = runContext || {};
+  const globalDiag   = computeGlobalDiagnosis(groups, totals);
 
   // Donut SVG helper
   const arcLen = 2 * Math.PI * 18;
@@ -2079,6 +2189,13 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>QA Portal — Test Automation Dashboard</title>
+  <script>
+    /* Aplica el tema guardado ANTES del primer paint, para evitar parpadeo dark→light */
+    try {
+      const savedTheme = localStorage.getItem('qaPortalTheme');
+      if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    } catch (e) { /* localStorage no disponible (file:// en algunos navegadores) — se ignora */ }
+  </script>
   <style>
     /* ─── Reset ──────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -2086,14 +2203,30 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       --bg:#0d0f1a; --surface:#111827; --surface2:#1a2035; --border:#1e2a45;
       --text:#e2e8f0; --muted:#64748b; --pass:#10b981; --fail:#ef4444;
       --warn:#f59e0b; --font:'Segoe UI',system-ui,-apple-system,sans-serif;
+      --shadow-elev: 0 1px 3px rgba(0,0,0,.35);
+      --shadow-elev-hover: 0 8px 20px rgba(0,0,0,.28);
+    }
+    /* ─── Tema claro (para proyección/impresión en reuniones ejecutivas) ─── */
+    :root[data-theme="light"] {
+      --bg:#f4f6fb; --surface:#ffffff; --surface2:#eef1f8; --border:#dde3ef;
+      --text:#1a2233; --muted:#5b6478;
+      --shadow-elev: 0 1px 3px rgba(15,23,42,.08);
+      --shadow-elev-hover: 0 8px 20px rgba(15,23,42,.10);
     }
     html,body { height:100%; }
-    body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; overflow-x:hidden; }
+    body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; overflow-x:hidden; transition:background .2s,color .2s; }
     body::before {
       content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
       background:
-        radial-gradient(ellipse 80% 60% at 10% 20%,rgba(99,102,241,.07) 0%,transparent 60%),
-        radial-gradient(ellipse 60% 50% at 90% 80%,rgba(16,185,129,.06) 0%,transparent 55%);
+        radial-gradient(ellipse 80% 60% at 10% 20%,rgba(99,102,241,.04) 0%,transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 80%,rgba(16,185,129,.03) 0%,transparent 55%);
+    }
+    :root[data-theme="light"] body::before { display:none; }
+    @media print {
+      .nav-bar, .btn-csv, .btn-pdf-exec, .theme-toggle, .btn-detail, .lightbox, .copy-toast { display:none !important; }
+      body::before { display:none !important; }
+      main.main { padding:0 !important; }
+      .mod-section-wrap[style*="display:none"], section[style*="display:none"] { display:none !important; }
     }
 
     /* ─── Header ─────────────────────────────── */
@@ -2102,24 +2235,31 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
     .logo-wrap { display:flex; align-items:center; gap:14px; }
     .logo-icon { width:50px; height:50px; border-radius:13px; background:linear-gradient(135deg,#6366f1,#8b5cf6);
-      display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 0 22px rgba(99,102,241,.45); }
-    .logo-title { font-size:20px; font-weight:700; color:#fff; }
+      display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:var(--shadow-elev); }
+    .logo-title { font-size:20px; font-weight:700; color:var(--text); }
     .logo-sub   { font-size:12px; color:var(--muted); }
     .global-badge { display:flex; align-items:center; gap:12px; background:var(--surface2);
       border:1px solid var(--border); border-radius:12px; padding:10px 18px; }
     .global-circle { width:42px; height:42px; border-radius:50%; border:3px solid ${globalColor};
       display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;
-      color:${globalColor}; box-shadow:0 0 12px ${globalColor}44; }
+      color:${globalColor}; }
     .global-status { font-size:15px; font-weight:700; color:${globalColor}; }
     .global-detail { font-size:12px; color:var(--muted); }
     .meta-info { font-size:12px; color:var(--muted); text-align:right; line-height:1.9; }
     .meta-info b { color:var(--text); }
-    .btn-csv { display:inline-flex; align-items:center; gap:6px; margin-top:6px;
+    .meta-actions { display:flex; gap:8px; margin-top:6px; justify-content:flex-end; flex-wrap:wrap; }
+    .btn-csv, .btn-pdf-exec { display:inline-flex; align-items:center; gap:6px;
       padding:6px 14px; border-radius:8px; font-size:12px; font-weight:600;
-      background:linear-gradient(135deg,#10b981,#059669); color:#fff;
-      text-decoration:none; border:none; cursor:pointer;
-      box-shadow:0 0 12px rgba(16,185,129,.35); transition:opacity .2s; }
-    .btn-csv:hover { opacity:.85; }
+      color:#fff; text-decoration:none; border:none; cursor:pointer;
+      box-shadow:var(--shadow-elev); transition:opacity .2s,box-shadow .2s; }
+    .btn-csv { background:linear-gradient(135deg,#10b981,#059669); }
+    .btn-pdf-exec { background:linear-gradient(135deg,#6366f1,#4f46e5); }
+    .btn-csv:hover, .btn-pdf-exec:hover { opacity:.85; box-shadow:var(--shadow-elev-hover); }
+    .btn-csv:disabled, .btn-pdf-exec:disabled { opacity:.55; cursor:wait; }
+    .theme-toggle { width:34px; height:34px; border-radius:9px; border:1px solid var(--border);
+      background:var(--surface2); color:var(--text); font-size:15px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; transition:background .2s; }
+    .theme-toggle:hover { background:var(--border); }
 
     /* ─── Nav ────────────────────────────────── */
     .nav-bar { position:relative; z-index:10; padding:0 48px; background:rgba(17,24,39,.6);
@@ -2146,7 +2286,30 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .c-pass  { color:var(--pass); }
     .c-fail  { color:var(--fail); }
     .c-warn  { color:var(--warn); }
-    .c-neutral { color:#fff; }
+    .c-neutral { color:var(--text); }
+
+    /* ─── Hero ejecutivo (KPI principal) ─────── */
+    .exec-hero { display:flex; gap:26px; flex-wrap:wrap; align-items:stretch;
+      background:var(--surface); border:1px solid var(--border); border-radius:16px;
+      padding:26px 30px; margin-bottom:22px; }
+    .exec-hero-main { display:flex; align-items:center; gap:22px; flex:1.1; min-width:300px; }
+    .exec-hero-ring { position:relative; width:110px; height:110px; flex-shrink:0; }
+    .exec-hero-ring svg { width:100%; height:100%; }
+    .exec-hero-pct { position:absolute; inset:0; display:flex; align-items:center;
+      justify-content:center; font-size:28px; font-weight:800; color:var(--hero-color); }
+    .exec-hero-text { display:flex; flex-direction:column; gap:7px; min-width:0; }
+    .exec-hero-status { font-size:20px; font-weight:700; color:var(--text); }
+    .exec-hero-narrative { font-size:13px; color:var(--muted); line-height:1.65; max-width:560px; }
+    .exec-hero-stats { flex:1.3; min-width:320px; }
+
+    /* ─── Tendencia histórica ─────────────────── */
+    .trend-card { background:var(--surface); border:1px solid var(--border); border-radius:16px;
+      padding:20px 24px; margin-bottom:22px; }
+    .trend-header { display:flex; align-items:center; justify-content:space-between;
+      flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+    .trend-title { font-size:13px; font-weight:600; color:var(--text); }
+    .trend-delta { font-size:12px; font-weight:700; }
+    .trend-chart-wrap { position:relative; height:70px; }
 
     /* ─── Cards grid ─────────────────────────── */
     .cards-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:18px; }
@@ -2154,7 +2317,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       padding:0 22px 20px; cursor:pointer; position:relative; overflow:hidden;
       transition:transform .2s,box-shadow .2s,border-color .2s;
       animation:fadeUp .4s ease both; }
-    .card:hover { transform:translateY(-4px); box-shadow:0 12px 36px var(--glow),0 4px 14px rgba(0,0,0,.4); border-color:var(--accent); }
+    .card:hover { transform:translateY(-3px); box-shadow:var(--shadow-elev-hover); border-color:var(--accent); }
     .card-top-bar { height:3px; margin:0 -22px 18px; width:calc(100% + 44px); opacity:.85; }
     .card-header { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
     .card-icon   { font-size:20px; }
@@ -2529,6 +2692,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     @media(max-width:768px){
       .header,.main{padding:18px 16px;} .nav-bar{padding:0 16px;} .footer{padding:16px;}
       .cards-grid{grid-template-columns:1fr;} .metrics-grid{grid-template-columns:1fr;}
+      .exec-hero{flex-direction:column;} .exec-hero-main{flex-wrap:wrap;}
     }
 
     /* ─── Análisis Estadístico PNF ───────────────────────────────── */
@@ -2632,7 +2796,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     <div class="logo-icon">🧪</div>
     <div>
       <div class="logo-title">QA Automation Portal</div>
-      <div class="logo-sub">Playwright Enterprise Test Framework</div>
+      <div class="logo-sub">Playwright Enterprise Test Framework${envLabel ? ' · ' + esc(envLabel) : ''}${gitInfo.branch ? ` · 🌿 ${esc(gitInfo.branch)}${gitInfo.commit ? ' @ ' + esc(gitInfo.commit) : ''}` : ''}</div>
     </div>
   </div>
   <div class="global-badge">
@@ -2643,10 +2807,16 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     </div>
   </div>
   <div class="meta-info">
-    <div>Generado: <b>${generatedAt}</b></div>
+    <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end">
+      <span>Generado: <b>${generatedAt}</b></span>
+      <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Cambiar tema claro/oscuro">🌙</button>
+    </div>
     <div>Duración total: <b>${fmtSec(totals.time)}</b></div>
     <div>Fallos: <b style="color:${totals.failures>0 ? '#ef4444' : '#10b981'}">${totals.failures}</b></div>
-    <a href="report.csv" download="report.csv" class="btn-csv">⬇ Descargar CSV</a>
+    <div class="meta-actions">
+      <a href="report.csv" download="report.csv" class="btn-csv">⬇ CSV</a>
+      <button class="btn-pdf-exec" id="btn-pdf-exec" onclick="downloadExecPdf()">⬇ Resumen Ejecutivo (PDF)</button>
+    </div>
   </div>
 </header>
 
@@ -2664,15 +2834,29 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   <!-- Overview -->
   <section id="sec-overview">
     <p class="section-title">Resumen Ejecutivo</p>
-    <div class="summary-bar">
-      <div class="sum-card"><span class="sum-label">Total</span><span class="sum-value c-neutral">${totals.tests}</span></div>
-      <div class="sum-card"><span class="sum-label">Pasaron</span><span class="sum-value c-pass">${globalPassed}</span></div>
-      <div class="sum-card"><span class="sum-label">Fallaron</span><span class="sum-value c-fail">${totals.failures}</span></div>
-      <div class="sum-card"><span class="sum-label">Omitidas</span><span class="sum-value c-warn">${totals.skipped}</span></div>
-      <div class="sum-card"><span class="sum-label">Tasa de Éxito</span><span class="sum-value" style="color:${globalColor}">${globalRate}%</span></div>
-      <div class="sum-card"><span class="sum-label">Duración</span><span class="sum-value c-neutral" style="font-size:18px">${fmtSec(totals.time)}</span></div>
+
+    <div class="exec-hero" id="exec-hero-root">
+      <div class="exec-hero-main" style="--hero-color:${globalColor}">
+        <div class="exec-hero-ring">
+          ${donut(globalRate, globalColor)}
+          <div class="exec-hero-pct">${totals.tests > 0 ? globalRate + '%' : '—'}</div>
+        </div>
+        <div class="exec-hero-text">
+          <div class="exec-hero-status">${totals.tests === 0 ? '⏳ Sin datos' : globalOk ? '✅ Todo en orden' : '⚠️ Requiere atención'}</div>
+          <div class="exec-hero-narrative">${esc(globalDiag.narrative)}</div>
+        </div>
+      </div>
+      <div class="summary-bar exec-hero-stats">
+        <div class="sum-card"><span class="sum-label">Total</span><span class="sum-value c-neutral">${totals.tests}</span></div>
+        <div class="sum-card"><span class="sum-label">Pasaron</span><span class="sum-value c-pass">${globalPassed}</span></div>
+        <div class="sum-card"><span class="sum-label">Fallaron</span><span class="sum-value c-fail">${totals.failures}</span></div>
+        <div class="sum-card"><span class="sum-label">Omitidas</span><span class="sum-value c-warn">${totals.skipped}</span></div>
+        <div class="sum-card"><span class="sum-label">Duración</span><span class="sum-value c-neutral" style="font-size:18px">${fmtSec(totals.time)}</span></div>
+      </div>
     </div>
-    <br/>
+
+    ${renderTrendCard(history)}
+
     <p class="section-title">Módulos de Prueba</p>
     <div class="cards-grid">${summaryCards}</div>
     ${renderPnfSummaryCard(statisticalAnalysis)}
@@ -2724,6 +2908,20 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
 <div class="copy-toast" id="copyToast">✅ Comando copiado al portapapeles</div>
 
 <script>
+  /* ── Tema claro/oscuro ── */
+  function applyThemeButtonIcon() {
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+  }
+  function toggleTheme() {
+    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+    if (isLight) document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', 'light');
+    try { localStorage.setItem('qaPortalTheme', isLight ? 'dark' : 'light'); } catch (e) {}
+    applyThemeButtonIcon();
+  }
+  applyThemeButtonIcon();
+
   /* ── Navegación de secciones ── */
   function showSection(key) {
     document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
@@ -2963,7 +3161,112 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
         }
       });
     }
+    setTimeout(initTrendChart, 120);
   });
+
+  /* Gráfico de tendencia (% de éxito) en la pestaña Resumen — visible desde el primer render */
+  function initTrendChart() {
+    if (typeof Chart === 'undefined' || !window.__TREND_HISTORY__) return;
+    const ctx = document.getElementById('chart-trend');
+    if (!ctx) return;
+    const hist = window.__TREND_HISTORY__;
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: hist.map(h => h.label || h.date),
+        datasets: [{
+          label: '% de éxito', data: hist.map(h => h.rate),
+          borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,.12)',
+          borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#6366f1',
+          tension: .25, fill: true,
+        }],
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: ctx => ctx.parsed.y + '% de éxito' } },
+        },
+        scales: {
+          x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { display: false } },
+          y: { min: 0, max: 100, ticks: { color: '#64748b', font: { size: 10 }, stepSize: 25 },
+               grid: { color: 'rgba(255,255,255,.05)' } },
+        },
+      },
+    });
+  }
+
+  /* ── PDF del Resumen Ejecutivo (portada + hero + módulos) ──────── */
+  async function downloadExecPdf() {
+    const btn = document.getElementById('btn-pdf-exec');
+    if (!window.jspdf || !window.html2canvas) {
+      alert('Las librerías de PDF (jsPDF / html2canvas) no se cargaron. Verifica la conexión a internet.');
+      return;
+    }
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Generando PDF...';
+
+    try {
+      const { jsPDF } = window.jspdf;
+      const root = document.getElementById('sec-overview');
+      const wasHidden = root.style.display === 'none';
+      if (wasHidden) root.style.display = '';
+
+      const canvas = await html2canvas(root, {
+        backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#0d0f1a',
+        scale: 1.6, useCORS: true, logging: false, windowWidth: 1280,
+      });
+
+      if (wasHidden) root.style.display = 'none';
+
+      const imgData = canvas.toDataURL('image/png', 0.95);
+      const pdf     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const pdfW    = pdf.internal.pageSize.getWidth();
+      const pdfH    = pdf.internal.pageSize.getHeight();
+      const margin  = 10;
+      const usableW = pdfW - margin * 2;
+      const imgH    = (canvas.height / canvas.width) * usableW;
+
+      pdf.setFillColor(13, 15, 26);
+      pdf.rect(0, 0, pdfW, pdfH, 'F');
+      pdf.setTextColor(226, 232, 240);
+      pdf.setFontSize(18);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('QA Automation Portal — Resumen Ejecutivo', pdfW / 2, 28, { align: 'center' });
+      pdf.setFontSize(11);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Generado: ' + new Date().toLocaleString('es-CO', { timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' }), pdfW / 2, 36, { align: 'center' });
+
+      let yPos = 46, remaining = imgH, srcY = 0;
+      while (remaining > 0) {
+        const pageH = pdfH - yPos - margin;
+        const slice = Math.min(remaining, pageH);
+        const sliceRatio = slice / imgH;
+        const srcSliceH = canvas.height * sliceRatio;
+
+        const sliceCanvas = document.createElement('canvas');
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = srcSliceH;
+        sliceCanvas.getContext('2d').drawImage(canvas, 0, srcY, canvas.width, srcSliceH, 0, 0, canvas.width, srcSliceH);
+
+        pdf.addImage(sliceCanvas.toDataURL('image/png', 0.92), 'PNG', margin, yPos, usableW, slice);
+
+        srcY += srcSliceH;
+        remaining -= slice;
+        yPos = margin;
+        if (remaining > 0) pdf.addPage();
+      }
+
+      pdf.save('QA_Portal_Resumen_Ejecutivo.pdf');
+    } catch (e) {
+      alert('Error al generar el PDF: ' + e.message);
+      console.error(e);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = original;
+    }
+  }
 
   /* ── PDF download ──────────────────────────────────────────────── */
   async function downloadPnfPdf() {
@@ -3212,7 +3515,24 @@ async function main() {
     console.warn('Análisis estadístico PNF no disponible:', e.message);
   }
 
-  let html = buildPortalHTML(groups, totals, generatedAt, features, suites, statisticalAnalysis);
+  // ── Contexto de la corrida: git, entorno, histórico multi-ejecución (best-effort) ──
+  const gitInfo  = getGitInfo();
+  const envLabel = getEnvironmentLabel();
+  let history = readHistory();
+  if (totals.tests > 0) {
+    const globalPassedForHist = totals.tests - totals.failures - totals.errors;
+    history = appendHistory({
+      date: new Date().toISOString(),
+      label: generatedAt,
+      rate: Math.round((globalPassedForHist / totals.tests) * 100),
+      tests: totals.tests,
+      failures: totals.failures + totals.errors,
+      branch: gitInfo.branch,
+      commit: gitInfo.commit,
+    });
+  }
+
+  let html = buildPortalHTML(groups, totals, generatedAt, features, suites, statisticalAnalysis, { gitInfo, envLabel, history });
 
   // Risk 6: banner visible en el portal cuando no hay datos de prueba
   if (!fs.existsSync(XML_FILE)) {
