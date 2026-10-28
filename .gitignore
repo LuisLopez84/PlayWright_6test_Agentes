@@ -6,6 +6,7 @@ test-results/
 playwright-report/
 reports/
 storage/
+smart-report/
 
 # Histórico local de ejecuciones del portal (tendencia multi-run, generate-portal.js)
 .report-history.json
@@ -43,3 +44,6 @@ GenerateTest/tests/**/visual/**/*.jpg
 
 # Claude.md
 CLAUDE.md
+
+# Claude Code: archivo de bloqueo local
+.claude/scheduled_tasks.lock

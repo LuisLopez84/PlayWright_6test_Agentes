@@ -383,6 +383,8 @@ Se definen en un archivo `.env` en la raíz del proyecto (usar `.env-example` co
 | `API_KEY` | `api-test-generator.agent.ts` | (vacío) | Header `x-api-key` en tests de API auto-generados |
 | `SUITE_TIMEOUT_MS` | `split-reports.js` | sin límite | Timeout por suite al ejecutar `npm run test` |
 | `PARALLEL_SUITES` | `split-reports.js` | `false` | `true` ejecuta las suites en paralelo en lugar de secuencial |
+| `SMART_REPORT_DIR` | `playwright.config.ts` | `smart-report` | Carpeta donde `playwright-smart-reporter` escribe `smart-report.html` y `test-history.json`. `split-reports.js` y `test-suite.ts` lo fijan a `smart-report/<Suite>` |
+| `SMART_REPORT_DISABLE` | `playwright.config.ts` | (vacío) | `1` omite el smart-reporter en esa corrida (los scripts lo usan en la corrida acotada de `bdd-ui`) |
 
 > Estas variables **no requieren volver a ejecutar `npm run generate`** — se leen en tiempo de ejecución de los tests (`process.env.X`). Cámbialas en `.env` o expórtalas antes de correr `npx playwright test`.
 
@@ -898,7 +900,7 @@ Permite ejecutar el mismo flujo UI o la misma prueba de API **varias veces**, un
 
 **Carpeta:** `BoxTestData/` (nueva, en la raíz del proyecto — mismo patrón que `BoxRecordings/` y `BoxAPIsExecute/`).
 
-**Convención:** el nombre del archivo debe ser **exactamente igual al nombre de la suite**. Un solo archivo por suite, compartido entre UI y API:
+**Convención:** el nombre del archivo debe ser **exactamente igual al nombre de la suite**, opcionalmente con un sufijo de tipo. Por defecto es un solo archivo por suite, compartido entre UI y API:
 
 ```
 BoxTestData/
@@ -906,6 +908,39 @@ BoxTestData/
 ```
 
 Primera fila = encabezados (nombres de columna). Cada fila siguiente = una ejecución completa del flujo/prueba con esos valores.
+
+#### Sets de datos separados por tipo de prueba
+
+Cuando UI y API necesitan datos **distintos** para la misma suite, se agrega un sufijo al nombre del archivo. `findSuiteDataFile()` (`ConfigurationTest/tests/utils/data-file-parser.ts`) recibe un tercer parámetro `kind: 'ui' | 'rest' | 'soap'` y prueba, en orden, las variantes de ese tipo antes de caer al archivo sin sufijo:
+
+| `kind` | Sufijos probados (en orden) | Quién lo pasa |
+|---|---|---|
+| `'ui'` | `_Web`, `_UI`, *(sin sufijo)* | `ui-agent.ts` |
+| `'rest'` | `_REST`, `_API`, *(sin sufijo)* | `box-api-executor.agent.ts` cuando `spec.serviceType === 'REST'` |
+| `'soap'` | `_SOAP`, `_API`, *(sin sufijo)* | `box-api-executor.agent.ts` cuando `spec.serviceType === 'SOAP'` |
+
+`_API` es intencional para REST y SOAP: permite un archivo compartido entre ambos que sea distinto del de UI, sin obligar a separar REST de SOAP si no hace falta.
+
+**Ejemplo real verificado** (`Homebanking_Tarjeta_Virtual`):
+
+```
+BoxTestData/
+├── Homebanking_Tarjeta_Virtual_Web.csv    ← Usuario,Contraseña   (solo UI)
+└── Homebanking_Tarjeta_Virtual_SOAP.csv   ← intA,intB            (solo SOAP)
+```
+
+`npm run generate` produce, de forma independiente:
+```
+🔢 [DDT] 2 fila(s) de datos detectadas para "Homebanking_Tarjeta_Virtual" (...\BoxTestData\Homebanking_Tarjeta_Virtual_Web.csv)
+🔗 [DDT] Campos emparejados: 2
+✅ UI Test generado: ...Homebanking_Tarjeta_Virtual.spec.ts (2 fila(s) de datos)
+...
+🔢 [DDT] 2 fila(s) de datos detectadas para "Homebanking_Tarjeta_Virtual" — 2 clave(s) emparejada(s)
+✅ Spec generada: ...Homebanking_Tarjeta_Virtual_SOAP_POST.spec.ts
+```
+El spec UI queda con 2 ejecuciones usando `Usuario`/`Contraseña`; el spec SOAP queda con 2 ejecuciones del test "Éxito" usando `intA`/`intB` — las columnas de un archivo nunca interfieren con el otro.
+
+Si solo existe el archivo sin sufijo (esquema anterior, sigue funcionando igual), el comportamiento es idéntico al de antes de esta función: un único set de datos compartido entre UI y API.
 
 #### Cómo funciona el emparejamiento
 
@@ -981,7 +1016,12 @@ Como esos specs los escribe el tester a mano, no se generan solos — se ofrece 
 ```typescript
 import { loadSuiteTestData } from '../../../../ConfigurationTest/tests/utils/data-file-parser';
 
+// Sin 3er argumento: solo busca el archivo sin sufijo (comportamiento histórico).
 const data = loadSuiteTestData('Homebanking_TransferenciasTestingQA');
+
+// Con 3er argumento ('ui' | 'rest' | 'soap'): busca primero la variante con sufijo
+// de ese tipo (ej. '_SOAP') y cae al archivo sin sufijo si no existe.
+const soapData = loadSuiteTestData('Homebanking_Tarjeta_Virtual', undefined, 'soap');
 
 for (const [i, row] of data.entries()) {
   test(`POST /transferencias - fila ${i + 1}`, async ({ request }) => {
@@ -1026,6 +1066,47 @@ Orden de ejecución:
 6. Job Summary en Markdown (tabla de resultados por tipo, generada parseando el JUnit con un script Python embebido)
 7. Se suben como artifacts `playwright-report/` (14 días de retención) y `test-results/` (7 días)
 8. **El pipeline solo falla** si fallan los tipos críticos: **UI (los 3 navegadores), API o Security**. Performance, Accessibility, Visual y Non-Functional son informativos y no rompen el build.
+
+> El `playwright-smart-reporter` (sección 10.1) **no corre en CI**: cada step pasa `--reporter=...` por CLI, que reemplaza la lista de reporters de `playwright.config.ts`.
+
+### 10.1 Smart Report (playwright-smart-reporter)
+
+Reporte HTML **adicional** (dependencia de desarrollo `playwright-smart-reporter`). No reemplaza al HTML nativo, al JUnit ni al `portal.html`; se suma como un reporter más en `playwright.config.ts`.
+
+| Aspecto | Detalle |
+|---|---|
+| Salida | `smart-report/<Suite>/smart-report.html` (autocontenido, se abre con doble clic) |
+| Historial | `smart-report/<Suite>/test-history.json` — acumula hasta 20 corridas por suite → tendencias, flakiness, regresiones de tiempo |
+| Qué aporta | Fallas agrupadas por causa, línea de tiempo causal del fallo, salud/estabilidad (A–F) por prueba, comparación entre corridas, galería de capturas/videos/trazas, eficiencia (reintentos, workers) |
+| Con `npm run test` / `npm run test:suite` | Un reporte e historial por suite (los scripts fijan `SMART_REPORT_DIR=smart-report/<Suite>`) |
+| Con `npx playwright test` directo | `smart-report/smart-report.html` |
+| `bdd-ui` | Se excluye (`SMART_REPORT_DISABLE=1`) en su corrida acotada: es informativo y de 1 prueba, y ensuciaría el historial |
+| Acceso desde el índice | `npm run reports-index` agrega un botón «Smart Report» junto a cada suite que lo tenga |
+| IA | **Apagada** (`enableAIRecommendations: false`): el reporter no envía datos a ningún proveedor |
+| Trace viewer embebido | `npx playwright-smart-reporter-serve smart-report/<Suite>/smart-report.html` |
+| Idioma | **Español**: interfaz traducida + botón flotante **«Guía del reporte»** (abajo a la derecha) con la introducción y la explicación de cada tarjeta, panel, métrica y vista. La guía se abre sola la primera vez que se abre un reporte en un navegador |
+
+**Cómo funciona la capa en español.** `playwright.config.ts` no usa `playwright-smart-reporter` directamente sino un envoltorio
+(`ConfigurationAgents/ia-testing/reporters/smart-reporter-es.ts`) que ejecuta el reporter original sin cambios y, al terminar la corrida,
+agrega al HTML un bloque con la traducción. No modifica datos, historial ni lógica; si la traducción fallara, el reporte queda en inglés y las pruebas no se afectan.
+
+| Archivo (`ConfigurationAgents/ia-testing/reporters/smart-report-es/`) | Qué editar ahí |
+|---|---|
+| `client.js` | Diccionario de traducción (`EXACT` = textos fijos, `RULES` = textos con números, `STEPS` = nombres de pasos de Playwright). Lo que no está en el diccionario —títulos de pruebas, errores, rutas, código— no se toca |
+| `about.html` | Apartado visible **«Sobre este reporte»** (resumen para stakeholders) que aparece arriba del Resumen, en 5 pestañas: qué es y para qué sirve · el plus frente al reporte estándar · métricas que implementa · por qué es importante · lectura rápida. Se pliega con un clic (se recuerda la elección) y solo se muestra en la vista Resumen |
+| `guide.html` | Texto de la guía completa (HTML normal, 12 secciones; se abre con el botón «Guía del reporte» o con «Abrir guía completa» del apartado) |
+| `styles.css` | Estilo del botón y de la guía (usa los colores del tema del propio reporte: claro, oscuro y alto contraste) |
+
+Después de editar cualquiera de esos archivos, para actualizar los reportes que ya existen **sin volver a correr las pruebas**:
+
+```bash
+npm run smart-report:es                         # todos los smart-report/**/smart-report.html
+npm run smart-report:es -- smart-report/<Suite> # solo una suite
+```
+
+Es idempotente (no duplica la capa al repetirlo).
+
+Para quitarlo sin tocar nada más: `npm uninstall playwright-smart-reporter`, eliminar el bloque `smartReporter` y su `...smartReporter` en `playwright.config.ts`, y borrar la carpeta `ConfigurationAgents/ia-testing/reporters/` y el script `smart-report:es`. Para volver al reporte en inglés conservando el paquete, basta con poner `'playwright-smart-reporter'` en lugar de la ruta del envoltorio en `playwright.config.ts`.
 
 ---
 

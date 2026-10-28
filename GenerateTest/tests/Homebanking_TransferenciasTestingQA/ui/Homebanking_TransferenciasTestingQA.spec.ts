@@ -14,19 +14,7 @@ const DDT_ROWS: Record<string, string>[] = [
     "Usuario": "demo",
     "Contraseña": "demo123",
     "Monto": "500",
-    "Descripción (opcional)": "Transferencia prueba DDT fila 1"
-  },
-  {
-    "Usuario": "demo",
-    "Contraseña": "demo123",
-    "Monto": "1200",
-    "Descripción (opcional)": "Transferencia prueba DDT fila 2"
-  },
-  {
-    "Usuario": "demo",
-    "Contraseña": "demo123",
-    "Monto": "2500",
-    "Descripción (opcional)": "Transferencia prueba DDT fila 3"
+    "Descripción (opcional)": "Transferencia prueba IA 002"
   }
 ];
 
@@ -42,21 +30,31 @@ for (let __ddtIdx = 0; __ddtIdx < DDT_ROWS.length; __ddtIdx++) {
   await page.keyboard.press('Tab');
   await smartFill(page, `page.getByRole('textbox', { name: 'Contraseña' })`, (__ddtRow['Contraseña'] ?? 'demo123'));
   await page.waitForTimeout(FILL_WAIT_MS);
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Tab');
   await smartClick(page, `page.getByRole('button', { name: 'Ingresar' })`);
   await smartClick(page, `page.getByRole('list').getByText('Transferencias')`);
   await smartSelect(page, `#source-account`, 'ACC002');
-  await smartClick(page, `page.getByRole('spinbutton', { name: 'Monto' })`);
-  await smartFill(page, `page.getByRole('spinbutton', { name: 'Monto' })`, (__ddtRow['Monto'] ?? '10000'));
+  await smartClick(page, `page.getByRole('button', { name: 'Transferir' })`);
+  await smartFill(page, `page.getByRole('spinbutton', { name: 'Monto' })`, (__ddtRow['Monto'] ?? '1555'));
   await page.waitForTimeout(FILL_WAIT_MS);
   await smartClick(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`);
-  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, (__ddtRow['Descripción (opcional)'] ?? 'T'));
+  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, (__ddtRow['Descripción (opcional)'] ?? 'P'));
   await page.waitForTimeout(FILL_WAIT_MS);
-  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'Tranferencia prueba 15 2026');
+  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'Prueba ');
+  await page.waitForTimeout(FILL_WAIT_MS);
+  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'Prueba C');
+  await page.waitForTimeout(FILL_WAIT_MS);
+  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'Prueba Cobertura ');
+  await page.waitForTimeout(FILL_WAIT_MS);
+  await smartFill(page, `page.getByRole('textbox', { name: 'Descripción (opcional)' })`, 'Prueba Cobertura IA');
   await page.waitForTimeout(FILL_WAIT_MS);
   await smartClick(page, `page.getByRole('button', { name: 'Transferir' })`);
   await Promise.all([
     smartWaitForText(page, `Transferencia realizada`, VERIFY_TIMEOUT),
     smartClick(page, `page.getByRole('button', { name: 'Confirmar' })`),
   ]);
+  await smartClick(page, `page.getByRole('button', { name: 'Salir' })`);
+  await smartClick(page, `page.getByRole('button', { name: 'Confirmar' })`);
   });
 }

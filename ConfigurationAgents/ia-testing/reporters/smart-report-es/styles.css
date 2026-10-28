@@ -1,0 +1,152 @@
+/* Capa en español del Smart Reporter: botón flotante + guía. Usa las variables de tema del propio reporte
+   (--bg, --text, --accent…) para verse bien en claro, oscuro y alto contraste. */
+#smart-es-root { font-family: var(--font-sans, system-ui, sans-serif); }
+
+#smart-es-fab {
+  position: fixed; right: 16px; bottom: 16px; z-index: 900;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 14px; border-radius: 999px; cursor: pointer;
+  background: var(--accent); color: var(--accent-fg);
+  border: 0; font: 600 13px/1 var(--font-sans, system-ui, sans-serif);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .28);
+}
+#smart-es-fab:hover { filter: brightness(1.08); }
+#smart-es-fab:focus-visible, .es-x:focus-visible, .es-chip:focus-visible, .es-sec summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#smart-es-fab svg { width: 16px; height: 16px; flex: none; }
+
+#smart-es-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: none;
+  background: var(--backdrop, rgba(0, 0, 0, .45));
+  align-items: center; justify-content: center; padding: 16px;
+}
+#smart-es-backdrop.es-open { display: flex; }
+
+#smart-es-dialog {
+  width: min(960px, 100%); max-height: min(90vh, 900px);
+  display: flex; flex-direction: column;
+  background: var(--bg); color: var(--text);
+  border-radius: 10px; box-shadow: var(--elevation, 0 8px 32px rgba(0, 0, 0, .35));
+  overflow: hidden;
+}
+.es-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding: 18px 22px 12px; border-bottom: 1px solid var(--border);
+}
+.es-head h2 { margin: 0; font-size: 19px; line-height: 1.3; }
+.es-head p { margin: 4px 0 0; color: var(--text-muted); font-size: 13px; line-height: 1.5; max-width: 70ch; }
+.es-x {
+  flex: none; width: 32px; height: 32px; border-radius: 6px; cursor: pointer;
+  background: transparent; color: var(--text-muted); border: 1px solid var(--border);
+  font-size: 18px; line-height: 1;
+}
+.es-x:hover { background: var(--bg-hover); color: var(--text); }
+
+.es-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 22px; border-bottom: 1px solid var(--border); background: var(--bg-subtle); }
+.es-chip {
+  cursor: pointer; padding: 4px 10px; border-radius: 999px; font-size: 12px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text-muted);
+}
+.es-chip:hover { background: var(--bg-hover); color: var(--text); }
+
+.es-scroll { overflow: auto; padding: 8px 22px 22px; font-size: 13.5px; line-height: 1.6; }
+.es-sec { border-bottom: 1px solid var(--border); padding: 2px 0; }
+.es-sec > summary { cursor: pointer; list-style: none; padding: 12px 0; display: flex; align-items: center; gap: 8px; }
+.es-sec > summary::-webkit-details-marker { display: none; }
+.es-sec > summary::before { content: "▸"; color: var(--text-muted); font-size: 12px; transition: transform .12s; }
+.es-sec[open] > summary::before { transform: rotate(90deg); }
+.es-sec h3 { margin: 0; font-size: 15px; }
+.es-body { padding: 0 0 14px 20px; }
+.es-body h4 { margin: 18px 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+.es-body p { margin: 8px 0; }
+.es-body ul { margin: 8px 0; padding-left: 20px; }
+.es-body li { margin: 4px 0; }
+.es-body code, .es-body kbd {
+  font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px;
+  background: var(--bg-hover); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px;
+}
+.es-body kbd { border-bottom-width: 2px; }
+.es-callout {
+  margin: 12px 0; padding: 10px 14px; border-radius: 8px; line-height: 1.55;
+  background: var(--bg-subtle); border: 1px solid var(--border); border-left: 3px solid var(--accent);
+}
+.es-note { color: var(--text-muted); font-size: 12.5px; }
+
+.es-tbl { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+.es-tbl th { text-align: left; font-weight: 600; color: var(--text-muted); font-size: 12px; padding: 6px 10px; border-bottom: 1px solid var(--border-strong, var(--border)); }
+.es-tbl td { vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.es-tbl td:first-child { white-space: nowrap; }
+.es-tbl td ul { margin: 4px 0 0; }
+.es-keys td:first-child { white-space: normal; }
+.es-dl { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 8px 0; }
+.es-dl dt { font-weight: 600; }
+.es-dl dd { margin: 0; color: var(--text-muted); }
+
+@media (max-width: 720px) {
+  .es-tbl td:first-child { white-space: normal; }
+  .es-dl { grid-template-columns: 1fr; }
+  .es-body { padding-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .es-sec > summary::before { transition: none; } }
+
+/* ───────── Apartado «Sobre este reporte» (arriba del Resumen) ───────── */
+.es-ab {
+  margin: 0 0 var(--space-5, 24px); border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-subtle); color: var(--text); font-size: 13.5px; line-height: 1.55;
+}
+.es-ab[hidden] { display: none; }
+.es-ab-sum {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; cursor: pointer; list-style: none;
+}
+.es-ab-sum::-webkit-details-marker { display: none; }
+.es-ab-sum::before { content: "▸"; color: var(--text-muted); font-size: 12px; margin-right: 2px; transition: transform .12s; }
+.es-ab[open] > .es-ab-sum::before { transform: rotate(90deg); }
+.es-ab-sum:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 8px; }
+.es-ab-sum-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.es-ab-title { font-size: 15px; font-weight: 600; }
+.es-ab-sub { color: var(--text-muted); font-size: 12.5px; }
+.es-ab-btn {
+  flex: none; cursor: pointer; padding: 6px 12px; border-radius: 6px; font: 600 12px/1 var(--font-sans, system-ui, sans-serif);
+  background: var(--accent); color: var(--accent-fg); border: 0;
+}
+.es-ab-btn:hover { filter: brightness(1.08); }
+.es-ab-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.es-ab-body { padding: 4px 16px 16px; border-top: 1px solid var(--border); }
+.es-ab-body p { margin: 6px 0; }
+.es-ab-h {
+  margin: 18px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted);
+}
+.es-ab-grid { display: grid; gap: 10px; margin-top: 12px; }
+.es-ab-grid3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.es-ab-grid4 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-top: 0; }
+.es-ab-card, .es-ab-metric, .es-ab-q {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px;
+}
+.es-ab-card h4 { margin: 0 0 4px; font-size: 13px; }
+.es-ab-metric b, .es-ab-q b { display: block; font-size: 13px; margin-bottom: 2px; }
+.es-ab-metric span, .es-ab-q span { display: block; color: var(--text-muted); font-size: 12.5px; }
+.es-ab-q { border-left: 3px solid var(--accent); }
+
+.es-ab-tblwrap { overflow-x: auto; }
+.es-ab-tbl { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; }
+.es-ab-tbl th { text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted); padding: 8px 12px; border-bottom: 1px solid var(--border-strong, var(--border)); width: 50%; }
+.es-ab-tbl th:last-child { color: var(--accent); }
+.es-ab-tbl td { vertical-align: top; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.es-ab-tbl tr:last-child td { border-bottom: 0; }
+.es-ab-list { margin: 6px 0; padding-left: 20px; }
+.es-ab-list li { margin: 5px 0; }
+.es-ab-foot { margin-top: 14px !important; color: var(--text-muted); font-size: 12.5px; }
+@media (prefers-reduced-motion: reduce) { .es-ab-sum::before { transition: none; } }
+
+/* Pestañas del apartado «Sobre este reporte» */
+.es-ab-tabs { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0 12px; border-bottom: 1px solid var(--border); }
+.es-ab-tab {
+  cursor: pointer; padding: 7px 12px; margin-bottom: -1px; font: 500 12.5px/1.2 var(--font-sans, system-ui, sans-serif);
+  background: transparent; color: var(--text-muted); border: 1px solid transparent; border-radius: 6px 6px 0 0;
+}
+.es-ab-tab:hover { color: var(--text); background: var(--bg-hover); }
+.es-ab-tab[aria-selected="true"] { color: var(--text); background: var(--bg); border-color: var(--border); border-bottom-color: var(--bg); font-weight: 600; }
+.es-ab-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.es-ab-pan[hidden] { display: none; }
+.es-ab-pan > .es-ab-grid { margin-top: 0; }

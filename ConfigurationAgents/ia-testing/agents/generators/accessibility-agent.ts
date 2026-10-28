@@ -24,7 +24,13 @@ export function generateAccessibility(name: string, url: string) {
 
   const code = `import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import fs from 'fs';
 ${navImport}
+// Violaciones en español: axe-core trae el locale es.json. AxeBuilder no expone configure(),
+// así que se le pasa el código de axe + la configuración de idioma como axeSource.
+const AXE_SOURCE_ES =
+  fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf-8') +
+  \`\\n;axe.configure({ locale: \${fs.readFileSync(require.resolve('axe-core/locales/es.json'), 'utf-8')} });\`;
 // Risk 7: viewport fijo para resultados consistentes entre ejecuciones
 const VIEWPORT = { width: 1280, height: 720 };
 
@@ -48,7 +54,8 @@ test.describe('Accessibility: ${name}', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.waitForLoadState('networkidle');
 
-    let builder = new AxeBuilder({ page })
+    // axeSource con locale 'es': la descripción de cada regla violada sale en español (consola y portal)
+    let builder = new AxeBuilder({ page, axeSource: AXE_SOURCE_ES })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21aa']);
 
     // Risk 8: excluir widgets de terceros para evitar falsos positivos

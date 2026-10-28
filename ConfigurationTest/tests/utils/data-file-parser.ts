@@ -9,6 +9,11 @@ import * as XLSX from 'xlsx';
  * y los convierte en un array de filas { columna: valor } — una fila = una ejecución
  * de prueba con esos datos.
  *
+ * Un archivo `<Suite>.csv` sin sufijo se comparte entre UI y API. Si el tester
+ * necesita datos DISTINTOS por tipo de prueba, puede declarar variantes con
+ * sufijo: `<Suite>_Web.csv` (UI), `<Suite>_REST.csv` / `<Suite>_SOAP.csv` (API) —
+ * ver DataKind y KIND_SUFFIXES más abajo.
+ *
  * Se ubica en ConfigurationTest/tests/utils/ (no en ConfigurationAgents/) porque lo
  * usan dos consumidores distintos:
  *   - El motor de generación (data-binding.agent.ts) en tiempo de "npm run generate".
@@ -18,18 +23,43 @@ import * as XLSX from 'xlsx';
 
 export type DataRow = Record<string, string>;
 
+/** Tipo de prueba consumidor del archivo de datos — permite separar el set de
+ *  datos de UI del de API (REST/SOAP) cuando el tester lo necesite. */
+export type DataKind = 'ui' | 'rest' | 'soap';
+
 const DEFAULT_DATA_DIR = 'BoxTestData';
 const SUPPORTED_EXTENSIONS = ['.csv', '.txt', '.xlsx'] as const;
 
+/** Sufijos de nombre de archivo aceptados por tipo, en orden de preferencia.
+ *  '_API' es intencional en rest y soap: permite UN archivo compartido entre
+ *  REST y SOAP que sea distinto del de UI, sin obligar a separar REST de SOAP. */
+const KIND_SUFFIXES: Record<DataKind, string[]> = {
+  ui:   ['_Web', '_UI'],
+  rest: ['_REST', '_API'],
+  soap: ['_SOAP', '_API'],
+};
+
 /**
- * Busca `<suiteName>.csv|.txt|.xlsx` dentro de BoxTestData/ (en ese orden de
- * preferencia si existiera más de uno). Devuelve la ruta absoluta o null si no hay.
+ * Busca el archivo de datos de una suite dentro de BoxTestData/.
+ *
+ * Si se indica `kind`, prueba primero las variantes específicas de ese tipo
+ * (ej. kind='ui' → `<suite>_Web.csv`, `<suite>_UI.csv`) y solo si ninguna
+ * existe cae al archivo sin sufijo `<suite>.csv` (compatibilidad con el
+ * esquema de "un solo archivo compartido"). Sin `kind`, se busca únicamente
+ * `<suite>.csv|.txt|.xlsx` — comportamiento histórico, usado por specs
+ * manuales que no distinguen tipo de prueba.
+ *
+ * Para cada sufijo probado, el orden de extensión es .csv → .txt → .xlsx.
+ * Devuelve la ruta absoluta del primer archivo encontrado, o null si no hay.
  */
-export function findSuiteDataFile(suiteName: string, dir: string = DEFAULT_DATA_DIR): string | null {
+export function findSuiteDataFile(suiteName: string, dir: string = DEFAULT_DATA_DIR, kind?: DataKind): string | null {
   const root = path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir);
-  for (const ext of SUPPORTED_EXTENSIONS) {
-    const candidate = path.join(root, `${suiteName}${ext}`);
-    if (fs.existsSync(candidate)) return candidate;
+  const suffixes = kind ? [...KIND_SUFFIXES[kind], ''] : [''];
+  for (const suffix of suffixes) {
+    for (const ext of SUPPORTED_EXTENSIONS) {
+      const candidate = path.join(root, `${suiteName}${suffix}${ext}`);
+      if (fs.existsSync(candidate)) return candidate;
+    }
   }
   return null;
 }
@@ -49,8 +79,8 @@ export function parseDataFile(filePath: string): DataRow[] {
  * Devuelve [] si la suite no tiene archivo de datos — así se puede usar sin
  * comprobaciones extra tanto en el motor de generación como en specs manuales.
  */
-export function loadSuiteTestData(suiteName: string, dir: string = DEFAULT_DATA_DIR): DataRow[] {
-  const file = findSuiteDataFile(suiteName, dir);
+export function loadSuiteTestData(suiteName: string, dir: string = DEFAULT_DATA_DIR, kind?: DataKind): DataRow[] {
+  const file = findSuiteDataFile(suiteName, dir, kind);
   return file ? parseDataFile(file) : [];
 }
 

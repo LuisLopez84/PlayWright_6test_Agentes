@@ -38,13 +38,59 @@ const RESULTS_DIR  = path.join(ROOT, 'test-results', suiteName);
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
-function run(label: string, cmd: string, opts: { allowFail?: boolean } = {}): boolean {
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Fusiona dos archivos JUnit XML (bloques <testsuite> + totales) en uno solo.
+ * Usado porque el proyecto bdd-ui se corre en un comando aparte (ver más abajo)
+ * y su reporter JUnit, si no se fusiona, sobreescribiría el de los demás
+ * proyectos (o viceversa) en vez de sumarse.
+ */
+function mergeJUnitFiles(mainXmlPath: string, extraXmlPath: string | null): void {
+  if (!extraXmlPath || !fs.existsSync(extraXmlPath)) return;
+  if (!fs.existsSync(mainXmlPath)) {
+    fs.copyFileSync(extraXmlPath, mainXmlPath);
+    return;
+  }
+
+  const totals = { tests: 0, failures: 0, skipped: 0, errors: 0, time: 0 };
+  let allTestSuites = '';
+
+  for (const xmlFile of [mainXmlPath, extraXmlPath]) {
+    const content = fs.readFileSync(xmlFile, 'utf-8');
+    const blocks = content.match(/<testsuite[\s\S]*?<\/testsuite>/g) || [];
+    allTestSuites += blocks.join('\n') + '\n';
+
+    const rootTagM = content.match(/<testsuites([^>]*)>/);
+    const attrs = rootTagM ? rootTagM[1] : '';
+    const gi = (k: string) => parseInt((attrs.match(new RegExp(`\\b${k}="(\\d+)"`)) || [0, '0'])[1] as string, 10);
+    const gf = (k: string) => parseFloat((attrs.match(new RegExp(`\\b${k}="([^"]+)"`)) || [0, '0'])[1] as string);
+    totals.tests    += gi('tests');
+    totals.failures += gi('failures');
+    totals.skipped  += gi('skipped');
+    totals.errors   += gi('errors');
+    totals.time     += gf('time');
+  }
+
+  const merged =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<testsuites id="" name="" tests="${totals.tests}" failures="${totals.failures}" ` +
+    `skipped="${totals.skipped}" errors="${totals.errors}" time="${totals.time.toFixed(6)}">\n` +
+    allTestSuites +
+    `</testsuites>\n`;
+
+  fs.writeFileSync(mainXmlPath, merged, 'utf-8');
+}
+
+function run(label: string, cmd: string, opts: { allowFail?: boolean; env?: NodeJS.ProcessEnv } = {}): boolean {
   console.log(`\n${'─'.repeat(60)}`);
   console.log(`▶  ${label}`);
   console.log(`   ${cmd}`);
   console.log('─'.repeat(60));
   try {
-    execSync(cmd, { stdio: 'inherit', cwd: ROOT });
+    execSync(cmd, { stdio: 'inherit', cwd: ROOT, env: opts.env ? { ...process.env, ...opts.env } : process.env });
     return true;
   } catch (err: any) {
     if (opts.allowFail) {
@@ -95,8 +141,35 @@ async function main() {
   run(
     `EJECUTAR tests de Playwright — ${suiteName}`,
     `npx playwright test "${suiteRelPath}" --output="${RESULTS_DIR}" ${projectFlags}`.trim(),
-    { allowFail: true },   // los fallos de tests no deben abortar el reporte
+    // los fallos de tests no deben abortar el reporte
+    // SMART_REPORT_DIR: un smart-report + historial por suite (ver playwright.config.ts)
+    { allowFail: true, env: { SMART_REPORT_DIR: path.join('smart-report', suiteName) } },
   );
+
+  // ── Paso 3b: Ejecutar bdd-ui acotado a esta suite ───────────────────────────
+  // El proyecto bdd-ui compila sus specs en .features-gen/, fuera de
+  // GenerateTest/tests/<suite> — el filtro de ruta del paso 3 nunca lo alcanza,
+  // así que se corre aparte con --grep sobre "@UI" + el nombre exacto de la
+  // suite (coincide con "Flujo <suite>", el título de Scenario que genera
+  // generator-agent.ts). Su JUnit se fusiona con el del paso 3 en vez de
+  // sobreescribirlo.
+  const mainXmlPath = path.join(RESULTS_DIR, 'results.xml');
+  const bddXmlPath  = path.join(RESULTS_DIR, `${suiteName}.bdd.results.xml`);
+  const grepPattern = `(?=.*@UI)(?=.*${escapeRegExp(suiteName)})`;
+  run(
+    `EJECUTAR bdd-ui (acotado a la suite) — ${suiteName}`,
+    // --output PROPIO (<suite>/_bdd): Playwright vacía su carpeta de salida al arrancar; con la misma
+    // carpeta que el paso 3 borraría los videos/trazas/capturas de todos los demás tipos de prueba.
+    `npx playwright test --project=bdd-ui --grep "${grepPattern}" --output="${path.join(RESULTS_DIR, '_bdd')}"`,
+    // Playwright solo reconoce PLAYWRIGHT_<REPORTER>_OUTPUT_FILE (ver
+    // resolveOutputFile() en node_modules/playwright/lib/reporters/base.js) —
+    // *_OUTPUT_NAME se ignora en silencio y el reporter cae al outputFile fijo
+    // de playwright.config.ts, sobrescribiendo el results.xml real de la suite.
+    // SMART_REPORT_DISABLE: bdd-ui es informativo y de 1 test — no debe sobreescribir el
+    // smart-report de la suite del paso 3 ni ensuciar su historial (ver playwright.config.ts).
+    { allowFail: true, env: { PLAYWRIGHT_JUNIT_OUTPUT_FILE: bddXmlPath, SMART_REPORT_DISABLE: '1' } },
+  );
+  mergeJUnitFiles(mainXmlPath, fs.existsSync(bddXmlPath) ? bddXmlPath : null);
 
   // ── Paso 4: Mover reporte HTML a reports/<suite> ────────────────────────────
   const defaultReport = path.join(ROOT, 'playwright-report');

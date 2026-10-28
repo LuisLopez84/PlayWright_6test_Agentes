@@ -67,23 +67,121 @@ function moveReport(defaultReport, targetReport) {
   console.log(`   ✅ Reporte HTML movido a: ${targetReport}`);
 }
 
+// ─── Escapar un nombre de suite para uso seguro dentro de un regex de --grep ──
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ─── Fusiona uno o más archivos JUnit XML en un único XML combinado ──────────
+// (misma lógica que usaba mergeJUnitXMLs, extraída para reutilizarla también
+// por-suite cuando hay más de una fuente — ej. proyectos normales + bdd-ui).
+function mergeXmlFiles(xmlFiles) {
+  let allTestSuites = '';
+  const totals = { tests: 0, failures: 0, skipped: 0, errors: 0, time: 0 };
+
+  for (const xmlFile of xmlFiles) {
+    const content = fs.readFileSync(xmlFile, 'utf-8');
+    const blocks = content.match(/<testsuite[\s\S]*?<\/testsuite>/g) || [];
+    allTestSuites += blocks.join('\n') + '\n';
+
+    const rootTagM = content.match(/<testsuites([^>]*)>/);
+    if (rootTagM) {
+      const attrs = rootTagM[1];
+      const gi = k => parseInt( (attrs.match(new RegExp(`\\b${k}="(\\d+)"`))    || [0,'0'])[1], 10);
+      const gf = k => parseFloat((attrs.match(new RegExp(`\\b${k}="([^"]+)"`)) || [0,'0'])[1]);
+      totals.tests    += gi('tests');
+      totals.failures += gi('failures');
+      totals.skipped  += gi('skipped');
+      totals.errors   += gi('errors');
+      totals.time     += gf('time');
+    } else {
+      const suiteRe = /<testsuite\s([^>]+)>/g;
+      let sm;
+      while ((sm = suiteRe.exec(content)) !== null) {
+        const a   = sm[1];
+        const g   = k => parseInt( (a.match(new RegExp(`${k}="(\\d+)"`)  ) || [0,'0'])[1], 10);
+        const gf2 = k => parseFloat((a.match(new RegExp(`${k}="([^"]+)"`)) || [0,'0'])[1]);
+        totals.tests    += g('tests');
+        totals.failures += g('failures');
+        totals.skipped  += g('skipped');
+        totals.errors   += g('errors');
+        totals.time     += gf2('time');
+      }
+    }
+  }
+
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<testsuites id="" name="" tests="${totals.tests}" failures="${totals.failures}" ` +
+    `skipped="${totals.skipped}" errors="${totals.errors}" time="${totals.time.toFixed(6)}">\n` +
+    allTestSuites +
+    `</testsuites>\n`;
+
+  return { xml, totals };
+}
+
 // ─── Registrar resultado de una suite tras su ejecución ──────────────────────
-function processSuiteResult(suite) {
+// Risk 9: bddXmlPath es opcional — cuando existe (el proyecto bdd-ui SÍ corrió
+// para esta suite, ver runBddForSuite()), se fusiona con MAIN_XML en vez de
+// simplemente copiar MAIN_XML, para no perder ninguna de las dos fuentes.
+function processSuiteResult(suite, bddXmlPath) {
   const suiteXmlBackup = path.join(RESULTS_DIR, `${suite}.results.xml`);
   const defaultReport  = path.join(ROOT, 'playwright-report');
   const targetReport   = path.join(REPORTS_DIR, suite);
 
   allExecutedSuites.push(suite); // Risk 8: registrar independientemente del XML
 
-  if (fs.existsSync(MAIN_XML)) {
-    fs.copyFileSync(MAIN_XML, suiteXmlBackup);
-    console.log(`   💾 XML guardado: ${suiteXmlBackup}`);
+  const sources = [MAIN_XML, bddXmlPath].filter(f => f && fs.existsSync(f));
+  if (sources.length > 0) {
+    const { xml } = mergeXmlFiles(sources);
+    fs.writeFileSync(suiteXmlBackup, xml, 'utf-8');
+    console.log(`   💾 XML guardado: ${suiteXmlBackup}${sources.length > 1 ? ' (incluye bdd-ui)' : ''}`);
     executedSuites.push(suite);
   } else {
     console.warn(`   ⚠️  No se encontró results.xml tras ejecutar "${suite}"`);
   }
 
   moveReport(defaultReport, targetReport);
+}
+
+// ─── Corre el proyecto bdd-ui acotado a UNA suite (ver Risk 10 más abajo) ────
+// El proyecto bdd-ui compila sus specs en .features-gen/, fuera de
+// GenerateTest/tests/<suite> — el filtro de ruta usado para las demás
+// pruebas nunca lo alcanza, así que se corre aparte con --grep sobre el
+// nombre exacto de la suite (coincide con "Flujo <suite>", el título de
+// Scenario que genera generator-agent.ts) combinado con el tag @UI que ya
+// exige el proyecto. Devuelve la ruta del XML generado, o null si no hubo
+// features/no corrió nada (ej. sin OPENAI_API_KEY el feature no cambia,
+// pero igual puede no encontrar features tageados @UI).
+function runBddForSuite(suite, suiteResultDir) {
+  const bddXmlPath = path.join(RESULTS_DIR, `${suite}.bdd.results.xml`);
+  const grepPattern = `(?=.*@UI)(?=.*${escapeRegExp(suite)})`;
+  // --output PROPIO (<suite>/_bdd): Playwright vacía su carpeta de salida al arrancar; con la misma
+  // carpeta que la corrida principal borraría los videos/trazas/capturas de UI, API, performance,
+  // security, accessibility y visual recién generados (el portal los mostraba rotos).
+  const bddOutDir = path.join(suiteResultDir, '_bdd');
+  const cmd = `npx playwright test --project=bdd-ui --grep "${grepPattern}" --output="${bddOutDir}"`;
+
+  console.log(`   Comando BDD: ${cmd}`);
+  try {
+    execSync(cmd, {
+      stdio: 'inherit',
+      cwd: ROOT,
+      timeout: SUITE_TIMEOUT_MS,
+      // Playwright solo reconoce PLAYWRIGHT_<REPORTER>_OUTPUT_FILE (ver
+      // resolveOutputFile() en node_modules/playwright/lib/reporters/base.js) —
+      // *_OUTPUT_NAME no existe y se ignora en silencio, con lo cual el reporter
+      // cae al outputFile fijo de playwright.config.ts (test-results/results.xml)
+      // y esta corrida de bdd-ui sobrescribe el XML real de la suite.
+      // SMART_REPORT_DISABLE: bdd-ui es informativo y de 1 test — no debe sobreescribir el
+      // smart-report de la suite (ver playwright.config.ts) ni ensuciar su historial de runs.
+      env: { ...process.env, PLAYWRIGHT_JUNIT_OUTPUT_FILE: bddXmlPath, SMART_REPORT_DISABLE: '1' },
+    });
+  } catch {
+    // Exit ≠ 0 (escenario BDD fallido) no debe abortar el script — igual que el resto.
+  }
+
+  return fs.existsSync(bddXmlPath) ? bddXmlPath : null;
 }
 
 // ─── Modo SECUENCIAL (default) ───────────────────────────────────────────────
@@ -101,12 +199,22 @@ function runSequential() {
     if (!fs.existsSync(suiteResultDir)) fs.mkdirSync(suiteResultDir, { recursive: true });
 
     try {
-      execSync(cmd, { stdio: 'inherit', cwd: ROOT, timeout: SUITE_TIMEOUT_MS }); // Risk 4: timeout
+      execSync(cmd, {
+        stdio: 'inherit',
+        cwd: ROOT,
+        timeout: SUITE_TIMEOUT_MS, // Risk 4: timeout
+        // playwright-smart-reporter: un reporte + historial por suite (ver playwright.config.ts)
+        env: { ...process.env, SMART_REPORT_DIR: path.join('smart-report', suite) },
+      });
     } catch {
       // Exit ≠ 0 (test failures) no deben abortar el script
     }
 
-    processSuiteResult(suite);
+    // Risk 10: bdd-ui no lo cubre el comando de arriba (ver runBddForSuite) — se
+    // corre aparte y se fusiona en processSuiteResult().
+    const bddXmlPath = runBddForSuite(suite, suiteResultDir);
+
+    processSuiteResult(suite, bddXmlPath);
   }
 }
 
@@ -127,8 +235,9 @@ async function runParallel() {
     // para evitar conflicto en el archivo compartido test-results/results.xml
     const env = {
       ...process.env,
-      PLAYWRIGHT_JUNIT_OUTPUT_NAME: suiteXmlPath,
+      PLAYWRIGHT_JUNIT_OUTPUT_FILE: suiteXmlPath,
       PLAYWRIGHT_HTML_REPORT: targetReport,
+      SMART_REPORT_DIR: path.join('smart-report', suite),
     };
 
     const cmd = `npx playwright test "${suiteRelPath}" --output="${suiteResultDir}" ${projectFlags}`.trim();
@@ -191,52 +300,8 @@ function mergeJUnitXMLs(suiteNames) {
     return;
   }
 
-  let allTestSuites = '';
-  const totals = { tests: 0, failures: 0, skipped: 0, errors: 0, time: 0 };
-
-  for (const xmlFile of xmlFiles) {
-    const content = fs.readFileSync(xmlFile, 'utf-8');
-
-    const blocks = content.match(/<testsuite[\s\S]*?<\/testsuite>/g) || [];
-    allTestSuites += blocks.join('\n') + '\n';
-
-    // Risk 3 (ya corregido): extrae cada atributo por nombre (word-boundary \b)
-    // independientemente del orden que emita Playwright en futuras versiones
-    const rootTagM = content.match(/<testsuites([^>]*)>/);
-    if (rootTagM) {
-      const attrs = rootTagM[1];
-      const gi = k => parseInt( (attrs.match(new RegExp(`\\b${k}="(\\d+)"`))    || [0,'0'])[1], 10);
-      const gf = k => parseFloat((attrs.match(new RegExp(`\\b${k}="([^"]+)"`)) || [0,'0'])[1]);
-      totals.tests    += gi('tests');
-      totals.failures += gi('failures');
-      totals.skipped  += gi('skipped');
-      totals.errors   += gi('errors');
-      totals.time     += gf('time');
-    } else {
-      // Fallback: acumular desde cada <testsuite>
-      const suiteRe = /<testsuite\s([^>]+)>/g;
-      let sm;
-      while ((sm = suiteRe.exec(content)) !== null) {
-        const a   = sm[1];
-        const g   = k => parseInt( (a.match(new RegExp(`${k}="(\\d+)"`)  ) || [0,'0'])[1], 10);
-        const gf2 = k => parseFloat((a.match(new RegExp(`${k}="([^"]+)"`)) || [0,'0'])[1]);
-        totals.tests    += g('tests');
-        totals.failures += g('failures');
-        totals.skipped  += g('skipped');
-        totals.errors   += g('errors');
-        totals.time     += gf2('time');
-      }
-    }
-  }
-
-  const merged =
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<testsuites id="" name="" tests="${totals.tests}" failures="${totals.failures}" ` +
-    `skipped="${totals.skipped}" errors="${totals.errors}" time="${totals.time.toFixed(6)}">\n` +
-    allTestSuites +
-    `</testsuites>\n`;
-
-  fs.writeFileSync(MAIN_XML, merged, 'utf-8');
+  const { xml, totals } = mergeXmlFiles(xmlFiles);
+  fs.writeFileSync(MAIN_XML, xml, 'utf-8');
   console.log(`\n✅ XML mergeado → ${MAIN_XML}`);
   console.log(`   📊 Total: ${totals.tests} pruebas | ${totals.failures} fallos | ${xmlFiles.length} suite(s)`);
 }

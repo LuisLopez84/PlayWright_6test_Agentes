@@ -31,6 +31,10 @@ export async function generateUITest(name: string, steps: any[]) {
   const seen = new Set();
   const NON_DEDUP_ACTIONS = new Set([
     'click', 'dblclick', 'press_enter', 'press_key', 'dialog_handler',
+    // enhanceFlow renombra ciertos 'click' a confirm / navigate_section: si no se listan aquí,
+    // el 2.º clic al mismo botón se descarta (ej. "Transferir" abre el formulario y luego lo
+    // envía; "Confirmar" confirma la transferencia y luego el cierre de sesión).
+    'confirm', 'navigate_section',
     'page_load', 'hover', 'rightclick', 'drag', 'frame_click', 'frame_fill', 'scroll',
     'input', 'fill',      // fills ya deduplicados en parser con orden preservado
     'select', 'selectOption', // selects: múltiples selects en el mismo campo son válidos
@@ -47,10 +51,12 @@ export async function generateUITest(name: string, steps: any[]) {
   }
   console.log(`📊 generateUITest: ${uniqueSteps.length} steps únicos de ${steps.length}`);
 
-  // ── Datos variables (DDT) — BoxTestData/<name>.csv|.txt|.xlsx ──────────────
+  // ── Datos variables (DDT) — BoxTestData/<name>_Web.csv|.txt|.xlsx ──────────
   // Si existe un archivo de datos para esta suite, cada fila genera una ejecución
   // independiente del mismo flujo. Sin archivo, comportamiento idéntico a hoy.
-  const ddtFile    = findSuiteDataFile(name);
+  // kind='ui': prueba primero <name>_Web / <name>_UI (set de datos exclusivo de
+  // UI) y solo si no existe cae al <name> sin sufijo (compartido con API).
+  const ddtFile    = findSuiteDataFile(name, undefined, 'ui');
   const ddtRows: DataRow[] = ddtFile ? parseDataFile(ddtFile) : [];
   const ddtBinding = ddtRows.length > 0 ? await bindUiColumns(uniqueSteps, Object.keys(ddtRows[0])) : {};
   if (ddtRows.length > 0) {

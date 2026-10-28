@@ -1,0 +1,98 @@
+<!-- Apartado "Sobre este reporte" (resumen para stakeholders). Lo inyecta inject.js en <template id="smart-es-about-tpl">
+     y client.js lo muestra arriba del Resumen (Insights), organizado en pestañas para no empujar las métricas fuera de pantalla.
+     HTML normal: se edita sin tocar JS (cada pestaña es un <div role="tabpanel"> con su botón en .es-ab-tabs). -->
+<details class="es-ab" id="smart-es-about" open>
+  <summary class="es-ab-sum">
+    <span class="es-ab-sum-text">
+      <span class="es-ab-title">Sobre este reporte</span>
+      <span class="es-ab-sub">Resumen para stakeholders: qué es el Smart Reporter, qué aporta y por qué importa</span>
+    </span>
+    <button type="button" class="es-ab-btn" data-es-guide>Abrir guía completa</button>
+  </summary>
+
+  <div class="es-ab-body">
+    <div class="es-ab-tabs" role="tablist" aria-label="Secciones del apartado">
+      <button type="button" role="tab" class="es-ab-tab" id="es-tab-1" aria-controls="es-pan-1" aria-selected="true">Qué es y para qué sirve</button>
+      <button type="button" role="tab" class="es-ab-tab" id="es-tab-2" aria-controls="es-pan-2" aria-selected="false" tabindex="-1">El plus frente al estándar</button>
+      <button type="button" role="tab" class="es-ab-tab" id="es-tab-3" aria-controls="es-pan-3" aria-selected="false" tabindex="-1">Métricas que implementa</button>
+      <button type="button" role="tab" class="es-ab-tab" id="es-tab-4" aria-controls="es-pan-4" aria-selected="false" tabindex="-1">¿Por qué es importante?</button>
+      <button type="button" role="tab" class="es-ab-tab" id="es-tab-5" aria-controls="es-pan-5" aria-selected="false" tabindex="-1">Lectura rápida</button>
+    </div>
+
+    <!-- 1 · Qué es y para qué sirve -->
+    <div role="tabpanel" class="es-ab-pan" id="es-pan-1" aria-labelledby="es-tab-1">
+      <div class="es-ab-grid es-ab-grid3">
+        <section class="es-ab-card">
+          <h4>¿Qué es?</h4>
+          <p>El <b>Playwright Smart Reporter</b> es un informe que se genera solo, después de cada ejecución de pruebas. Toma los resultados de la corrida actual y los <b>combina con el historial de las anteriores</b> para explicar no solo <i>qué pasó</i>, sino <i>por qué</i>, si es <i>nuevo</i> y <i>hacia dónde va</i> la calidad.</p>
+        </section>
+        <section class="es-ab-card">
+          <h4>¿Cuál es su finalidad?</h4>
+          <p>Convertir resultados técnicos en <b>información para decidir</b>: qué corregir primero, si podemos confiar en las pruebas y si la calidad mejora o se deteriora, <b>antes</b> de que el problema llegue a producción.</p>
+        </section>
+        <section class="es-ab-card">
+          <h4>¿Cómo se relaciona con el Portal QA?</h4>
+          <p>El <b>Portal QA</b> muestra el resultado por tipo de prueba (UI, API, Performance, Seguridad…) para negocio. El <b>Smart Reporter</b> es su complemento de diagnóstico para QA e ingeniería: causas, tendencias y estabilidad. Ambos salen de la misma ejecución.</p>
+        </section>
+      </div>
+    </div>
+
+    <!-- 2 · El plus frente al estándar -->
+    <div role="tabpanel" class="es-ab-pan" id="es-pan-2" aria-labelledby="es-tab-2" hidden>
+      <div class="es-ab-tblwrap">
+        <table class="es-ab-tbl">
+          <thead><tr><th>Reporte estándar de Playwright</th><th>Smart Reporter</th></tr></thead>
+          <tbody>
+            <tr><td>Una <b>foto</b> de una sola corrida.</td><td>Una <b>película</b>: compara con las corridas anteriores (historial por suite, hasta 20 corridas).</td></tr>
+            <tr><td>Lista cada falla por separado.</td><td><b>Agrupa las fallas por causa</b> y dice si son nuevas, recurrentes o si regresaron.</td></tr>
+            <tr><td>Marca «flaky» solo si la prueba pasó al reintentar.</td><td>Mide la <b>intermitencia a lo largo de varias corridas</b> y anticipa qué pruebas están por volverse inestables.</td></tr>
+            <tr><td>No indica si una prueba se volvió más lenta.</td><td>Detecta <b>regresiones de rendimiento</b> frente a la mediana histórica de cada prueba.</td></tr>
+            <tr><td>Resultados sueltos, sin una lectura global.</td><td>Resume la <b>salud de la suite en una nota A–F</b> y muestra dónde se pierde tiempo (reintentos, workers).</td></tr>
+            <tr><td>Evidencias por prueba.</td><td><b>Línea de tiempo causal</b>: pasos, red y consola en un mismo eje, con la «primera anomalía posible» antes de la falla.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 3 · Métricas -->
+    <div role="tabpanel" class="es-ab-pan" id="es-pan-3" aria-labelledby="es-tab-3" hidden>
+      <div class="es-ab-grid es-ab-grid4">
+        <div class="es-ab-metric"><b>Tasa de aprobación</b><span>Porcentaje de pruebas aprobadas sobre las ejecutadas (las omitidas no cuentan).</span></div>
+        <div class="es-ab-metric"><b>Grupos de fallas</b><span>Fallas con la misma causa, etiquetadas <i>Nueva</i>, <i>Recurrente</i> o <i>Regresada</i>, con su tendencia.</span></div>
+        <div class="es-ab-metric"><b>Salud (A–F)</b><span>Nota global de la suite que combina aprobación, estabilidad y rendimiento.</span></div>
+        <div class="es-ab-metric"><b>Intermitencia (flaky)</b><span>Pruebas que a veces pasan y a veces fallan, con intervalo de confianza del 95 %.</span></div>
+        <div class="es-ab-metric"><b>En riesgo (pronóstico)</b><span>Pruebas que hoy aprueban pero muestran señales de volverse inestables.</span></div>
+        <div class="es-ab-metric"><b>Regresiones de rendimiento</b><span>Pruebas que tardan ≥ 20 % y ≥ 250 ms más que su mediana histórica.</span></div>
+        <div class="es-ab-metric"><b>Tiempo perdido en reintentos</b><span>Tiempo consumido por intentos que hubo que repetir.</span></div>
+        <div class="es-ab-metric"><b>Cola larga y uso de workers</b><span>Cuánto del tiempo total consumen pocas pruebas y qué tan bien se aprovecha el paralelismo.</span></div>
+        <div class="es-ab-metric"><b>Tendencias e historial</b><span>Aprobación, duración, intermitentes y lentas corrida a corrida, más un mapa de confiabilidad.</span></div>
+        <div class="es-ab-metric"><b>Comparación con la corrida base</b><span>Variación en puntos, fallas nuevas, corregidas, mejoras y regresiones.</span></div>
+        <div class="es-ab-metric"><b>Línea de tiempo causal</b><span>Pasos, peticiones de red y consola sobre un eje, con la primera anomalía posible.</span></div>
+        <div class="es-ab-metric"><b>Matriz entre navegadores</b><span>Pruebas que pasan en un proyecto y fallan en otro: señal de un problema de entorno.</span></div>
+      </div>
+    </div>
+
+    <!-- 4 · Por qué es importante -->
+    <div role="tabpanel" class="es-ab-pan" id="es-pan-4" aria-labelledby="es-tab-4" hidden>
+      <ul class="es-ab-list">
+        <li><b>Decisiones con datos, no con intuición.</b> La nota de salud, las fallas nuevas y las tendencias respaldan la decisión de avanzar o detenerse.</li>
+        <li><b>Menos tiempo de diagnóstico.</b> Muchas fallas se reducen a pocas causas y cada una enlaza a su evidencia (video, traza, captura, línea de tiempo).</li>
+        <li><b>Confianza en la automatización.</b> Separa las fallas reales del «ruido» de pruebas intermitentes, evitando falsas alarmas y que se terminen ignorando fallas reales.</li>
+        <li><b>Cuida el costo y la velocidad del pipeline.</b> Muestra cuánto se pierde en reintentos y esperas, y si los recursos en paralelo se aprovechan.</li>
+        <li><b>Detecta el deterioro a tiempo.</b> La lentitud o la inestabilidad crecientes se ven en las tendencias antes de convertirse en fallas.</li>
+      </ul>
+    </div>
+
+    <!-- 5 · Lectura rápida -->
+    <div role="tabpanel" class="es-ab-pan" id="es-pan-5" aria-labelledby="es-tab-5" hidden>
+      <div class="es-ab-grid es-ab-grid4">
+        <div class="es-ab-q"><b>¿Podemos avanzar?</b><span>Mira <i>Fallidas</i> (y cuántas son nuevas) y la <i>Tasa de aprobación</i>.</span></div>
+        <div class="es-ab-q"><b>¿Confiamos en las pruebas?</b><span>Mira <i>Intermitentes</i>, <i>En riesgo</i> y la nota de <i>Salud</i>.</span></div>
+        <div class="es-ab-q"><b>¿Mejoramos o empeoramos?</b><span>Mira <i>Historial → Tendencias / Comparar</i> y <i>Regresiones</i>.</span></div>
+        <div class="es-ab-q"><b>¿Por dónde empiezo a corregir?</b><span>Mira <i>Grupos de fallas</i>: una sola causa puede explicar varias pruebas.</span></div>
+      </div>
+    </div>
+
+    <p class="es-ab-foot">La IA de este reporte está apagada: no se envía ningún dato a proveedores externos. Las métricas que dependen del historial (intermitencia, regresiones, pronóstico) se afinan a medida que se acumulan corridas.</p>
+  </div>
+</details>

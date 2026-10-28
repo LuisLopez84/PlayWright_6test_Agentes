@@ -1,23 +1,23 @@
-// Generated from: GenerateTest\features\Homebanking_TransferenciasTestingQA_POST_REST_api.feature
+// Generated from: GenerateTest\features\Homebanking_TransferenciasTestingQA_Rest_Post_api.feature
 import { test } from "playwright-bdd";
 
-test.describe('API REST POST - Homebanking TransferenciasTestingQA POST REST', () => {
+test.describe('API REST POST - Homebanking TransferenciasTestingQA Rest Post', () => {
 
   test.beforeEach('Background', async ({ Given }, testInfo) => { if (testInfo.error) return;
     await Given('el servicio REST "POST" "https://homebanking-demo.onrender.com/transferencias/" está configurado para pruebas API'); 
   });
   
-  test('Homebanking TransferenciasTestingQA POST REST - Petición exitosa', async ({ When, Then, request }) => { 
+  test('Homebanking TransferenciasTestingQA Rest Post - Petición exitosa', async ({ When, Then, request }) => { 
     await When('ejecuto la petición API configurada', null, { request }); 
     await Then('la respuesta debe tener un estado de éxito 2xx'); 
   });
 
-  test('Homebanking TransferenciasTestingQA POST REST - Error técnico del servidor', async ({ When, Then, request }) => { 
+  test('Homebanking TransferenciasTestingQA Rest Post - Error técnico del servidor', async ({ When, Then, request }) => { 
     await When('ejecuto la petición API a un endpoint con error técnico', null, { request }); 
     await Then('la respuesta debe indicar un fallo técnico de red o 5xx'); 
   });
 
-  test('Homebanking TransferenciasTestingQA POST REST - Error por datos inválidos', async ({ When, Then, request }) => { 
+  test('Homebanking TransferenciasTestingQA Rest Post - Error por datos inválidos', async ({ When, Then, request }) => { 
     await When('ejecuto la petición API con datos inválidos', null, { request }); 
     await Then('la respuesta debe indicar error de validación de datos 4xx'); 
   });
@@ -30,7 +30,7 @@ test.beforeEach('BeforeEach Hooks', ({ $runScenarioHooks }) => $runScenarioHooks
 
 test.use({
   $test: [({}, use) => use(test), { scope: 'test', box: true }],
-  $uri: [({}, use) => use('GenerateTest\\features\\Homebanking_TransferenciasTestingQA_POST_REST_api.feature'), { scope: 'test', box: true }],
+  $uri: [({}, use) => use('GenerateTest\\features\\Homebanking_TransferenciasTestingQA_Rest_Post_api.feature'), { scope: 'test', box: true }],
   $bddFileData: [({}, use) => use(bddFileData), { scope: "test", box: true }],
 });
 

@@ -4,6 +4,7 @@ import path from 'path';
 import 'dotenv/config';
 import { openai as sharedOpenai, hasOpenAI } from '../utils/openai-client';
 import { Action } from '../types/action.types'; // Risk 1: usar tipo canónico
+import { mapWithConcurrency } from '../utils/concurrency';
 
 import { parseRecording } from '../agents/recorder/recorder-parser-agent';
 import { generateUITest } from '../agents/generators/ui-agent';
@@ -286,9 +287,15 @@ async function runAgents() {
   // ============================================
   // Procesar cada recording (se omite si no hay)
   // ============================================
-  for (const file of files) {
+  // Risk 8: las suites son independientes entre sí (cada una escribe solo en sus
+  // propios archivos/carpetas namespaced por nombre) — se procesan en paralelo
+  // con un límite de concurrencia acotado (evita saturar la API de OpenAI con
+  // llamadas simultáneas sin límite). Configurable vía GENERATE_CONCURRENCY.
+  const SUITE_CONCURRENCY = Math.max(1, parseInt(process.env.GENERATE_CONCURRENCY ?? '4', 10) || 4);
+
+  await mapWithConcurrency(files, SUITE_CONCURRENCY, async (file) => {
     try {
-      if (!file.endsWith('.ts') && !file.endsWith('.js')) continue;
+      if (!file.endsWith('.ts') && !file.endsWith('.js')) return;
 
       const recordingPath = path.join(recordingsDir, file);
       const name = file.replace(/\.(ts|js)$/, '');
@@ -301,11 +308,11 @@ async function runAgents() {
         steps = parseRecording(recordingPath) as Action[];
       } catch (err) {
         console.error(`❌ Error parsing recording: ${file}`, err);
-        continue;
+        return;
       }
       if (!steps || steps.length === 0) {
         console.log('⚠️ No steps detected, skipping');
-        continue;
+        return;
       }
       console.log(`🧠 Steps detected: ${steps.length}`);
 
@@ -318,11 +325,11 @@ async function runAgents() {
         gherkin = await buildFeature(name, steps);
       } catch (err) {
         console.error('❌ Error generating Gherkin', err);
-        continue;
+        return;
       }
       if (!gherkin || gherkin.trim().length === 0) {
         console.log('⚠️ Empty Gherkin, skipping');
-        continue;
+        return;
       }
       const featurePath = path.join(featureDir, `${name}.feature`);
       fs.writeFileSync(featurePath, gherkin);
@@ -427,7 +434,7 @@ async function runAgents() {
     } catch (globalError) {
       console.error(`🔥 ERROR GLOBAL procesando ${file}`, globalError);
     }
-  }
+  });
 
   // ============================================
   // 8. Procesar tests de API manuales (REST y SOAP)  — Risk 1: renumerado (era 9)

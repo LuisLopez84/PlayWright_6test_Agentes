@@ -29,15 +29,18 @@ const HISTORY_FILE = path.join(ROOT, '.report-history.json');
 const HISTORY_MAX  = 20;
 
 // ─── Módulos ──────────────────────────────────────────────────────────────────
+// BDD/Gherkin NO está en esta lista a propósito: no es un tipo de prueba con
+// pass/fail/% propio, es la narración en lenguaje natural del mismo flujo de UI
+// ya evaluado por ui-chromium/firefox/webkit. Se renderiza aparte, como sección
+// informativa (ver "Sección BDD" más abajo), no como tarjeta de módulo con badge.
 const MODULES = [
-  { key: 'ui',            label: 'UI Testing',      icon: '🖥️',  color: '#6366f1', glow: 'rgba(99,102,241,0.35)',   hostnames: ['ui-chromium','ui-firefox','ui-webkit'], pathSeg: '/ui/' },
-  { key: 'api',           label: 'API Testing',     icon: '🔌',  color: '#10b981', glow: 'rgba(16,185,129,0.35)',   hostnames: ['api'],              pathSeg: '/api/' },
-  { key: 'performance',   label: 'Performance',     icon: '⚡',  color: '#f59e0b', glow: 'rgba(245,158,11,0.35)',   hostnames: ['performance'],      pathSeg: '/performance/' },
-  { key: 'security',      label: 'Security',        icon: '🔒',  color: '#ef4444', glow: 'rgba(239,68,68,0.35)',    hostnames: ['security'],         pathSeg: '/security/' },
-  { key: 'accessibility', label: 'Accessibility',   icon: '♿',  color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)',   hostnames: ['accessibility'],    pathSeg: '/accessibility/' },
-  { key: 'visual',        label: 'Visual Testing',  icon: '👁️',  color: '#06b6d4', glow: 'rgba(6,182,212,0.35)',    hostnames: ['visual'],           pathSeg: '/visual/' },
-  { key: 'bdd',           label: 'BDD / Gherkin',   icon: '🥒',  color: '#22c55e', glow: 'rgba(34,197,94,0.35)',    hostnames: ['bdd-ui'],           pathSeg: null },
-  { key: 'nonfunctional', label: 'Non-Functional',  icon: '📈',  color: '#f97316', glow: 'rgba(249,115,22,0.35)',   hostnames: ['non-functional'],   pathSeg: '/non-functional/' },
+  { key: 'ui',            label: 'UI Testing',      icon: '🖥️',  lucide: 'monitor',       color: '#6366f1', glow: 'rgba(99,102,241,0.35)',   hostnames: ['ui-chromium','ui-firefox','ui-webkit'], pathSeg: '/ui/' },
+  { key: 'api',           label: 'API Testing',     icon: '🔌',  lucide: 'plug-zap',      color: '#10b981', glow: 'rgba(16,185,129,0.35)',   hostnames: ['api'],              pathSeg: '/api/' },
+  { key: 'performance',   label: 'Performance',     icon: '⚡',  lucide: 'gauge',         color: '#f59e0b', glow: 'rgba(245,158,11,0.35)',   hostnames: ['performance'],      pathSeg: '/performance/' },
+  { key: 'security',      label: 'Security',        icon: '🔒',  lucide: 'shield-check',  color: '#ef4444', glow: 'rgba(239,68,68,0.35)',    hostnames: ['security'],         pathSeg: '/security/' },
+  { key: 'accessibility', label: 'Accessibility',   icon: '♿',  lucide: 'accessibility', color: '#8b5cf6', glow: 'rgba(139,92,246,0.35)',   hostnames: ['accessibility'],    pathSeg: '/accessibility/' },
+  { key: 'visual',        label: 'Visual Testing',  icon: '👁️',  lucide: 'eye',           color: '#06b6d4', glow: 'rgba(6,182,212,0.35)',    hostnames: ['visual'],           pathSeg: '/visual/' },
+  { key: 'nonfunctional', label: 'Non-Functional',  icon: '📈',  lucide: 'trending-up',   color: '#f97316', glow: 'rgba(249,115,22,0.35)',   hostnames: ['non-functional'],   pathSeg: '/non-functional/' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -892,7 +895,7 @@ function renderTrendCard(history) {
   const deltaColor = delta > 0 ? '#10b981' : delta < 0 ? '#ef4444' : 'var(--muted)';
 
   return `
-    <div class="trend-card">
+    <div class="trend-card animate__animated animate__fadeInUp" style="--animate-duration:.5s; --animate-delay:.1s">
       <div class="trend-header">
         <span class="trend-title">📈 Tendencia — últimas ${history.length} ejecuciones locales</span>
         <span class="trend-delta" style="color:${deltaColor}">${deltaStr}</span>
@@ -1068,6 +1071,13 @@ function readFeatureFiles(dir) {
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+/** Ícono SVG (Lucide, vía CDN + lucide.createIcons() en runtime). Si el CDN no carga
+ *  (sin internet), el <i> queda vacío pero el texto/label junto a él sigue siendo legible
+ *  — misma degradación tolerante que Chart.js/jsPDF en este mismo archivo. */
+function icon(name, cls) {
+  return `<i data-lucide="${esc(name)}" class="ic${cls ? ' ' + esc(cls) : ''}" aria-hidden="true"></i>`;
+}
 function fmt(ms) {
   if (ms < 1000) return `${ms.toFixed(0)}ms`;
   return `${(ms/1000).toFixed(2)}s`;
@@ -1080,8 +1090,8 @@ function passRate(t, f) { return t > 0 ? Math.round(((t-f)/t)*100) : 0; }
 
 function statusBadge(passed) {
   return passed
-    ? `<span class="badge b-pass">PASS</span>`
-    : `<span class="badge b-fail">FAIL</span>`;
+    ? `<span class="badge b-pass">${icon('check-circle-2')} PASS</span>`
+    : `<span class="badge b-fail">${icon('x-circle')} FAIL</span>`;
 }
 
 /** Gauge lineal para métricas con 3 umbrales: bueno / regular / malo */
@@ -1139,7 +1149,7 @@ function renderUI(suiteList) {
       // Detalles de fallos
       for (const tc of r.testcases) {
         if (!tc.passed && tc.failure) {
-          html += `<tr class="row-detail"><td colspan="6"><pre class="error-msg">${esc(tc.failure.substring(0,400))}${tc.failure.length>400?'…':''}</pre></td></tr>`;
+          html += `<tr class="row-detail"><td colspan="6">${renderErrorMsg(tc.failure, 400)}</td></tr>`;
         }
         // Datos variables (DDT): qué fila de BoxTestData/ alimentó esta ejecución
         const ddt = extractDdtRow(tc.output);
@@ -1171,6 +1181,18 @@ function renderHeadersTable(headers) {
 }
 
 /** Intenta formatear un body: JSON → pretty, XML → highlight, texto → plain */
+/** Mensaje de error/stack-trace: resaltado con Highlight.js (autodetección de sintaxis)
+ *  cuando está disponible — mismo patrón de degradación tolerante que formatBody()/Prism. */
+function renderErrorMsg(failureText, maxLen) {
+  const len = maxLen || 300;
+  const truncated = failureText.length > len;
+  const text = esc(failureText.substring(0, len)) + (truncated ? '…' : '');
+  return `<pre class="error-msg"><code class="language-plaintext hljs">${text}</code></pre>`;
+}
+
+/** Cuerpo de request/response: resaltado con Prism.js (JSON/XML) cuando está disponible.
+ *  El <pre class="api-body"> conserva su propio fondo/scroll; Prism solo tokeniza el <code>
+ *  interior (Prism.highlightAllUnder() se llama una vez al final del render, ver <script>). */
 function formatBody(body) {
   if (!body || body === '(sin body)' || body === '(none)') {
     return `<span class="api-no-data">(sin body)</span>`;
@@ -1179,13 +1201,14 @@ function formatBody(body) {
   // JSON
   try {
     const obj = JSON.parse(s);
-    return `<pre class="api-body api-body-json">${esc(JSON.stringify(obj, null, 2).substring(0, 1200))}</pre>`;
+    const pretty = JSON.stringify(obj, null, 2).substring(0, 1200);
+    return `<pre class="api-body"><code class="language-json">${esc(pretty)}</code></pre>`;
   } catch { /* no JSON */ }
   // XML / SOAP
   if (s.startsWith('<')) {
-    return `<pre class="api-body api-body-xml">${esc(s.substring(0, 1200))}</pre>`;
+    return `<pre class="api-body"><code class="language-markup">${esc(s.substring(0, 1200))}</code></pre>`;
   }
-  return `<pre class="api-body">${esc(s.substring(0, 1200))}</pre>`;
+  return `<pre class="api-body"><code class="language-none">${esc(s.substring(0, 1200))}</code></pre>`;
 }
 
 /** Extrae código HTTP del campo status "200 OK" → "200" */
@@ -1224,7 +1247,7 @@ function renderAPI(suiteList) {
         <td>${fmtSec(tc.time)}</td><td>${statusBadge(tc.passed)}</td>
       </tr>`;
       if (!tc.passed && tc.failure) {
-        html += `<tr class="row-detail"><td colspan="5"><pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre></td></tr>`;
+        html += `<tr class="row-detail"><td colspan="5">${renderErrorMsg(tc.failure, 300)}</td></tr>`;
       }
     }
   }
@@ -1415,7 +1438,7 @@ function renderPerformance(suiteList) {
         </div>`;
       }
       if (!hasData && !tc.passed && tc.failure) {
-        html += `<pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre>`;
+        html += renderErrorMsg(tc.failure, 300);
       }
       html += `</div>`;
     }
@@ -1499,7 +1522,7 @@ function renderSecurity(suiteList) {
         <td>${esc(tc.name)}</td><td>${fmtSec(tc.time)}</td><td>${statusBadge(tc.passed)}</td>
       </tr>`;
       if (!tc.passed && tc.failure) {
-        html += `<tr class="row-detail"><td colspan="3"><pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre></td></tr>`;
+        html += `<tr class="row-detail"><td colspan="3">${renderErrorMsg(tc.failure, 300)}</td></tr>`;
       }
     }
     html += `</tbody></table></div>`;
@@ -1513,18 +1536,20 @@ function renderAccessibility(suiteList) {
   if (!suiteList.length) return noData();
 
   const wcagInfo = {
-    CRITICAL: { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  icon: '🔴', desc: 'Bloquea el acceso para usuarios con discapacidad. Impacto máximo.' },
-    SERIOUS:  { color: '#f97316', bg: 'rgba(249,115,22,0.1)', icon: '🟠', desc: 'Dificulta gravemente el acceso. Debe corregirse urgente.' },
-    MODERATE: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', icon: '🟡', desc: 'Causa problemas significativos a algunos usuarios.' },
-    MINOR:    { color: '#84cc16', bg: 'rgba(132,204,22,0.1)', icon: '🟢', desc: 'Mejora menor de experiencia accesible.' },
+    CRITICAL: { label: 'CRÍTICA',  color: '#ef4444', bg: 'rgba(239,68,68,0.1)',  icon: '🔴', desc: 'Bloquea el acceso para usuarios con discapacidad. Impacto máximo.' },
+    SERIOUS:  { label: 'GRAVE',    color: '#f97316', bg: 'rgba(249,115,22,0.1)', icon: '🟠', desc: 'Dificulta gravemente el acceso. Debe corregirse urgente.' },
+    MODERATE: { label: 'MODERADA', color: '#f59e0b', bg: 'rgba(245,158,11,0.1)', icon: '🟡', desc: 'Causa problemas significativos a algunos usuarios.' },
+    MINOR:    { label: 'MENOR',    color: '#84cc16', bg: 'rgba(132,204,22,0.1)', icon: '🟢', desc: 'Mejora menor de experiencia accesible.' },
   };
+  // Las claves (CRITICAL…) son las que escribe el spec en el log; solo se traduce lo que se muestra.
+  const levelLabel = (lvl) => (wcagInfo[String(lvl).toUpperCase()] || {}).label || String(lvl);
 
   let html = `<div class="mod-section">
     <p class="mod-info">Análisis automático con <b>axe-core</b> siguiendo el estándar <b>WCAG 2.1 AA</b>. Se detectan violaciones por nivel de severidad.</p>
     <div class="a11y-legend">
       ${Object.entries(wcagInfo).map(([lvl, i]) => `
       <div class="a11y-leg-item" style="border-color:${i.color};background:${i.bg}">
-        <span>${i.icon} <b>${lvl}</b></span>
+        <span>${i.icon} <b>${i.label}</b></span>
         <span class="a11y-leg-desc">${i.desc}</span>
       </div>`).join('')}
     </div>
@@ -1559,7 +1584,7 @@ function renderAccessibility(suiteList) {
             const info = wcagInfo[k.toUpperCase()] || {};
             return `<div class="a11y-count" style="border-color:${info.color||'#64748b'};background:${info.bg||'transparent'}">
               <span class="a11y-count-num" style="color:${info.color||'#fff'}">${v}</span>
-              <span class="a11y-count-lbl">${info.icon||''} ${k}</span>
+              <span class="a11y-count-lbl">${info.icon||''} ${levelLabel(k)}</span>
             </div>`;
           }).join('')}
           <div class="a11y-count" style="border-color:#64748b">
@@ -1575,7 +1600,7 @@ function renderAccessibility(suiteList) {
         for (const v of m.violations) {
           const info = wcagInfo[v.level] || {};
           html += `<div class="a11y-viol-item" style="border-left:3px solid ${info.color||'#64748b'}">
-            <span class="a11y-viol-badge" style="background:${info.color||'#64748b'}">${v.level}</span>
+            <span class="a11y-viol-badge" style="background:${info.color||'#64748b'}">${levelLabel(v.level)}</span>
             <span class="a11y-viol-rule"><code>${esc(v.rule)}</code></span>
             <span class="a11y-viol-desc">${esc(v.desc)}</span>
           </div>`;
@@ -1607,7 +1632,7 @@ function renderVisual(suiteList) {
         <td>${fmtSec(tc.time)}</td><td>${statusBadge(tc.passed)}</td>
       </tr>`;
       if (!tc.passed && tc.failure) {
-        html += `<tr class="row-detail"><td colspan="4"><pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre></td></tr>`;
+        html += `<tr class="row-detail"><td colspan="4">${renderErrorMsg(tc.failure, 300)}</td></tr>`;
       }
     }
   }
@@ -1629,7 +1654,7 @@ function highlightStepText(text) {
 }
 
 /** BDD: muestra features Gherkin con syntax-highlight + resultado de ejecución */
-function renderBDD(suiteList, features) {
+function renderBDD(suiteList, features, ctx = {}) {
   // Construir índice de resultados por nombre de feature/escenario
   // Los tests BDD en el XML tienen hostname 'bdd-ui' y su nombre suele ser
   // el scenario name o el feature name
@@ -1638,10 +1663,18 @@ function renderBDD(suiteList, features) {
     for (const tc of s.testcases) {
       const key = tc.name.toLowerCase().trim();
       resultIndex[key] = tc;
+      // playwright-bdd nombra el testcase como "Feature › Scenario" combinados —
+      // indexar también solo por el nombre del escenario (última parte tras "›")
+      // para que el match a nivel de escenario no dependa únicamente del
+      // fallback a nivel de feature de más abajo.
+      const scenarioOnly = tc.name.split('›').pop().trim().toLowerCase();
+      if (scenarioOnly && !resultIndex[scenarioOnly]) resultIndex[scenarioOnly] = tc;
     }
-    // También indexar por el nombre del archivo de suite
+    // También indexar por el nombre del archivo de suite — soporta tanto specs
+    // manuales (<Suite>.spec.ts) como specs BDD compilados por playwright-bdd
+    // (<Suite>.feature.spec.js, siempre .js, nunca .ts).
     const suiteName = s.name.replace(/\\/g,'/').split('/').pop()
-      .replace('.spec.ts','').replace('.feature','').toLowerCase();
+      .replace(/\.spec\.(ts|js)$/, '').replace('.feature','').toLowerCase();
     if (!resultIndex[suiteName]) {
       resultIndex[suiteName] = {
         passed:  s.failures === 0,
@@ -1652,7 +1685,42 @@ function renderBDD(suiteList, features) {
     }
   }
 
-  const hasBddResults = suiteList.length > 0;
+  // ── Features de API (<X>_api.feature): no las ejecuta bdd-ui (solo corre @UI) — su resultado
+  //    real es el del spec api/<X>.spec.ts (proyecto api). Se toma de ahí para no mostrarlas
+  //    como "Sin ejecutar" cuando en Test Sets ya aparecen ejecutadas.
+  const norm = (t) => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const apiSpecs = {};
+  for (const s of (ctx.apiSuites || [])) {
+    const base = s.name.replace(/\\/g, '/').split('/').pop().replace(/\.spec\.(ts|js)$/, '').toLowerCase();
+    apiSpecs[base] = s;
+  }
+  const apiSpecOf = (feat) => /_api\.feature$/i.test(feat.fileName)
+    ? apiSpecs[feat.fileName.replace(/_api\.feature$/i, '').toLowerCase()] : null;
+  const apiFeatureResult = (feat) => {
+    const sp = apiSpecOf(feat);
+    if (!sp || !sp.testcases.length) return null;
+    const bad = sp.testcases.find(tc => !tc.passed);
+    return { passed: !bad, time: sp.time, failure: bad ? bad.failure : null, _suite: true };
+  };
+  const apiScenarioResult = (feat, scenarioName) => {
+    const sp = apiSpecOf(feat);
+    if (!sp) return null;
+    const n = norm(scenarioName);
+    const cat = /tecnic/.test(n) ? 'error tecnico'
+              : /dato|invalid/.test(n) ? 'error de datos'
+              : /exito|2xx/.test(n) ? 'exito' : null;
+    if (!cat) return null;
+    const tcs = sp.testcases.filter(tc => norm(tc.name).includes(cat));
+    if (!tcs.length) return null;
+    const bad = tcs.find(tc => !tc.passed);
+    return { passed: !bad, time: tcs.reduce((a, tc) => a + tc.time, 0), failure: bad ? bad.failure : null };
+  };
+  // Feature de una suite que no está en esta corrida (ej. features viejas que quedaron en disco)
+  const suiteDirs = (ctx.suiteDirs || []).map(d => d.toLowerCase());
+  const outOfRun = (feat) => suiteDirs.length > 0 && !suiteDirs.some(d => feat.fileName.toLowerCase().startsWith(d));
+  const notRunLabel = (feat) => outOfRun(feat) ? 'Fuera de esta corrida' : 'Sin ejecutar';
+
+  const hasBddResults = suiteList.length > 0 || (ctx.apiSuites || []).length > 0;
 
   // Si no hay features en disco, caer al render genérico
   if (!features || !features.length) {
@@ -1669,7 +1737,7 @@ function renderBDD(suiteList, features) {
           <td>${esc(tc.name)}</td><td class="cell-mono">${esc(sn)}</td>
           <td>${fmtSec(tc.time)}</td><td>${statusBadge(tc.passed)}</td></tr>`;
         if (!tc.passed && tc.failure) {
-          html2 += `<tr class="row-detail"><td colspan="4"><pre class="error-msg">${esc(tc.failure.substring(0,300))}</pre></td></tr>`;
+          html2 += `<tr class="row-detail"><td colspan="4">${renderErrorMsg(tc.failure, 300)}</td></tr>`;
         }
       }
     }
@@ -1693,8 +1761,8 @@ function renderBDD(suiteList, features) {
     <tbody>`;
   for (const feat of features) {
     const key  = feat.featureName.toLowerCase().trim();
-    const res  = resultIndex[key] || resultIndex[feat.fileName.replace('.feature','').toLowerCase()];
-    const statLabel = !res ? 'Sin ejecutar'
+    const res  = resultIndex[key] || resultIndex[feat.fileName.replace('.feature','').toLowerCase()] || apiFeatureResult(feat);
+    const statLabel = !res ? notRunLabel(feat)
       : res.passed    ? 'PASS'
       : 'FAIL';
     const statCls = !res ? 'status-none' : res.passed ? 'status-pass' : 'status-fail';
@@ -1711,7 +1779,7 @@ function renderBDD(suiteList, features) {
   // Detalle de cada feature con Gherkin
   for (const feat of features) {
     const featKey  = feat.featureName.toLowerCase().trim();
-    const featRes  = resultIndex[featKey] || resultIndex[feat.fileName.replace('.feature','').toLowerCase()];
+    const featRes  = resultIndex[featKey] || resultIndex[feat.fileName.replace('.feature','').toLowerCase()] || apiFeatureResult(feat);
     const featOk   = !featRes ? null : featRes.passed;
     const borderCol = featOk === null ? 'var(--border)' : featOk ? '#10b981' : '#ef4444';
 
@@ -1724,7 +1792,7 @@ function renderBDD(suiteList, features) {
         <span class="bdd-feature-name">${esc(feat.featureName)}</span>
         <span class="bdd-feature-file">${esc(feat.fileName)}</span>
         ${featOk === null
-          ? `<span class="badge status-none">SIN EJECUTAR</span>`
+          ? `<span class="badge status-none">${notRunLabel(feat).toUpperCase()}</span>`
           : statusBadge(featOk)}
         ${featRes && featRes.time ? `<span class="bdd-time">⏱ ${fmtSec(featRes.time)}</span>` : ''}
         <button class="ev-toggle-btn" onclick="toggleEvidence('${panelId}')">Ver Gherkin ▾</button>
@@ -1736,7 +1804,7 @@ function renderBDD(suiteList, features) {
     if (featRes && !featRes.passed && featRes.failure) {
       html += `<div class="bdd-error-wrap">
         <div class="bdd-error-title">❌ Error de ejecución</div>
-        <pre class="error-msg">${esc(featRes.failure.substring(0, 400))}</pre>
+        ${renderErrorMsg(featRes.failure, 400)}
       </div>`;
     }
 
@@ -1744,7 +1812,7 @@ function renderBDD(suiteList, features) {
     for (const scenario of feat.scenarios) {
       // Buscar resultado específico del escenario
       const scKey  = scenario.name.toLowerCase().trim();
-      const scRes  = resultIndex[scKey] || featRes;
+      const scRes  = resultIndex[scKey] || apiScenarioResult(feat, scenario.name) || featRes;
       const scOk   = scRes ? scRes.passed : null;
 
       html += `
@@ -1753,7 +1821,7 @@ function renderBDD(suiteList, features) {
           <span class="gk-scenario-kw">${esc(scenario.type)}</span>
           <span class="gk-scenario-name">${esc(scenario.name)}</span>
           ${scOk === null
-            ? `<span class="badge status-none" style="font-size:9px">SIN EJECUTAR</span>`
+            ? `<span class="badge status-none" style="font-size:9px">${notRunLabel(feat).toUpperCase()}</span>`
             : statusBadge(scOk)}
           ${scRes && scRes.time && !scRes._suite ? `<span class="bdd-time">⏱ ${fmtSec(scRes.time)}</span>` : ''}
         </div>
@@ -2094,7 +2162,6 @@ function renderModuleContent(key, suiteList, features) {
     case 'security':      body = renderSecurity(suiteList);        break;
     case 'accessibility': body = renderAccessibility(suiteList);   break;
     case 'visual':        body = renderVisual(suiteList);          break;
-    case 'bdd':           body = renderBDD(suiteList, features);   break;
     case 'nonfunctional': body = renderNonFunctional(suiteList);   break;
     default:              return noData();
   }
@@ -2118,7 +2185,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   function donut(pct, color) {
     const dash = (pct / 100) * arcLen;
     return `<svg viewBox="0 0 44 44" class="donut">
-      <circle cx="22" cy="22" r="18" fill="none" stroke="#1e2538" stroke-width="5"/>
+      <circle cx="22" cy="22" r="18" fill="none" stroke="var(--border)" stroke-width="5"/>
       <circle cx="22" cy="22" r="18" fill="none" stroke="${color}" stroke-width="5"
         stroke-dasharray="${dash.toFixed(2)} ${arcLen.toFixed(2)}"
         stroke-dashoffset="${(arcLen*0.25).toFixed(2)}" stroke-linecap="round"/>
@@ -2137,7 +2204,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     <div class="card" style="--accent:${mod.color};--glow:${mod.glow}" onclick="showSection('${mod.key}')">
       <div class="card-top-bar" style="background:${mod.color}"></div>
       <div class="card-header">
-        <span class="card-icon">${mod.icon}</span>
+        <span class="card-icon">${icon(mod.lucide || 'circle')}</span>
         <span class="card-label">${mod.label}</span>
         <span class="badge ${scls}">${status}</span>
       </div>
@@ -2167,7 +2234,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     return `
   <section id="sec-${mod.key}" class="mod-section-wrap" style="display:none">
     <div class="mod-header" style="--accent:${mod.color}">
-      <div class="mod-title">${mod.icon} ${mod.label}</div>
+      <div class="mod-title">${icon(mod.lucide || 'circle')} ${mod.label}</div>
       <div class="mod-stats-row">
         <span class="ms-item"><b style="color:var(--pass)">${s.tests - s.failures}</b> pasaron</span>
         <span class="ms-sep">·</span>
@@ -2183,6 +2250,22 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   </section>`;
   }).join('\n');
 
+  // BDD/Gherkin: no pasa por groupByModule() (ya no está en MODULES) — se filtra
+  // directo por hostname para alimentar la sección informativa (ver más abajo).
+  const bddSuites        = allSuites.filter(s => (s.hostname || '').toLowerCase() === 'bdd-ui');
+  // Contexto para features de API (resultado = spec del proyecto api) y para marcar las que
+  // pertenecen a suites que no están en esta corrida.
+  const apiBddSuites = allSuites.filter(s => (s.hostname || '').toLowerCase() === 'api');
+  const suiteDirsRun = [...new Set(allSuites.map(s => (s.name.replace(/\\/g, '/').match(/GenerateTest\/tests\/([^/]+)\//) || [])[1]).filter(Boolean))];
+  const bddSectionContent = renderBDD(bddSuites, features, { apiSuites: apiBddSuites, suiteDirs: suiteDirsRun });
+
+  // playwright-smart-reporter: smart-report/<Suite>/smart-report.html (ver playwright.config.ts).
+  // El botón solo aparece para las suites de esta corrida que tienen ese archivo.
+  const smartReportLinks = suiteDirsRun
+    .filter(sn => fs.existsSync(path.join(ROOT, 'smart-report', sn, 'smart-report.html')))
+    .map(sn => `<a href="../smart-report/${encodeURIComponent(sn)}/smart-report.html" target="_blank" class="btn-csv" title="Reporte inteligente de ${esc(sn)}: fallas agrupadas, flakiness, tendencias">${icon('activity')} Smart Report${suiteDirsRun.length > 1 ? ' · ' + esc(sn) : ''}</a>`)
+    .join('');
+
   return `<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -2190,38 +2273,73 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>QA Portal — Test Automation Dashboard</title>
   <script>
-    /* Aplica el tema guardado ANTES del primer paint, para evitar parpadeo dark→light */
+    /* Aplica el tema guardado ANTES del primer paint (default: claro), para evitar parpadeo claro→oscuro */
     try {
       const savedTheme = localStorage.getItem('qaPortalTheme');
-      if (savedTheme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+      if (savedTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     } catch (e) { /* localStorage no disponible (file:// en algunos navegadores) — se ignora */ }
   </script>
+
+  <!-- Google Fonts: Inter (UI) + JetBrains Mono (código/logs) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Lucide (íconos SVG, reemplaza emoji en las superficies ejecutivas) -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Animate.css (entradas ligeras de tarjetas/paneles) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+  <!-- Prism.js (resalta JSON/XML de request-response de API) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <!-- Highlight.js (resalta logs / stack traces de fallos) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+  <!-- lottie-web (micro-animación de éxito en el hero) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js"></script>
+
   <style>
     /* ─── Reset ──────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:#0d0f1a; --surface:#111827; --surface2:#1a2035; --border:#1e2a45;
-      --text:#e2e8f0; --muted:#64748b; --pass:#10b981; --fail:#ef4444;
-      --warn:#f59e0b; --font:'Segoe UI',system-ui,-apple-system,sans-serif;
-      --shadow-elev: 0 1px 3px rgba(0,0,0,.35);
-      --shadow-elev-hover: 0 8px 20px rgba(0,0,0,.28);
+      /* Tema claro profesional (default) — pensado para proyectarse/imprimirse ante gerencia */
+      --bg:#f7f8fb; --surface:#ffffff; --surface2:#f0f2f8; --border:#e3e6f0;
+      --text:#161a2c; --muted:#5c6478; --pass:#10b981; --fail:#ef4444;
+      --warn:#f59e0b; --font:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+      --font-mono:'JetBrains Mono',ui-monospace,Consolas,monospace;
+      --shadow-elev: 0 1px 2px rgba(16,24,64,.06), 0 1px 1px rgba(16,24,64,.04);
+      --shadow-elev-hover: 0 12px 28px rgba(16,24,64,.10);
+      --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-xl:20px;
+      --accent:#6366f1; --accent-2:#8b5cf6; --accent-3:#06b6d4;
+      --gradient-brand: linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 55%,var(--accent-3) 100%);
+      --glass-bg: rgba(255,255,255,.78); --glass-border: rgba(16,24,64,.06); --glass-blur: 16px;
+      --tint: rgba(16,24,64,.045);
     }
-    /* ─── Tema claro (para proyección/impresión en reuniones ejecutivas) ─── */
-    :root[data-theme="light"] {
-      --bg:#f4f6fb; --surface:#ffffff; --surface2:#eef1f8; --border:#dde3ef;
-      --text:#1a2233; --muted:#5b6478;
-      --shadow-elev: 0 1px 3px rgba(15,23,42,.08);
-      --shadow-elev-hover: 0 8px 20px rgba(15,23,42,.10);
+    /* ─── Tema oscuro (opcional, vía el botón 🌙 del header) ─── */
+    :root[data-theme="dark"] {
+      --bg:#0b0d16; --surface:#12141f; --surface2:#1a1d2c; --border:#242840;
+      --text:#eef1fb; --muted:#8891a8;
+      --shadow-elev: 0 1px 3px rgba(0,0,0,.35);
+      --shadow-elev-hover: 0 10px 28px rgba(0,0,0,.32);
+      --glass-bg: rgba(18,20,31,.72); --glass-border: rgba(255,255,255,.08);
+      --tint: rgba(255,255,255,.05);
     }
     html,body { height:100%; }
-    body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; overflow-x:hidden; transition:background .2s,color .2s; }
-    body::before {
-      content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+    body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; overflow-x:hidden; transition:background .2s,color .2s;
+      -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+    /* El degradado decorativo de fondo queda reservado al tema oscuro — en claro se prioriza un look plano y sobrio */
+    body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none; display:none; }
+    :root[data-theme="dark"] body::before {
+      display:block;
       background:
-        radial-gradient(ellipse 80% 60% at 10% 20%,rgba(99,102,241,.04) 0%,transparent 60%),
-        radial-gradient(ellipse 60% 50% at 90% 80%,rgba(16,185,129,.03) 0%,transparent 55%);
+        radial-gradient(ellipse 80% 60% at 10% 20%,rgba(99,102,241,.06) 0%,transparent 60%),
+        radial-gradient(ellipse 60% 50% at 90% 10%,rgba(139,92,246,.05) 0%,transparent 55%),
+        radial-gradient(ellipse 60% 50% at 90% 80%,rgba(6,182,212,.04) 0%,transparent 55%);
     }
-    :root[data-theme="light"] body::before { display:none; }
+    /* Íconos Lucide: heredan tamaño/color del texto que acompañan */
+    [data-lucide] { width:1em; height:1em; }
+    .ic { display:inline-flex; align-items:center; justify-content:center; vertical-align:-2px; }
+    .ic svg { stroke-width:2; }
     @media print {
       .nav-bar, .btn-csv, .btn-pdf-exec, .theme-toggle, .btn-detail, .lightbox, .copy-toast { display:none !important; }
       body::before { display:none !important; }
@@ -2231,7 +2349,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
 
     /* ─── Header ─────────────────────────────── */
     .header { position:relative; z-index:10; padding:28px 48px 22px; border-bottom:1px solid var(--border);
-      background:rgba(17,24,39,.85); backdrop-filter:blur(12px);
+      background:var(--glass-bg); backdrop-filter:blur(var(--glass-blur)); -webkit-backdrop-filter:blur(var(--glass-blur));
       display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; }
     .logo-wrap { display:flex; align-items:center; gap:14px; }
     .logo-icon { width:50px; height:50px; border-radius:13px; background:linear-gradient(135deg,#6366f1,#8b5cf6);
@@ -2262,25 +2380,27 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .theme-toggle:hover { background:var(--border); }
 
     /* ─── Nav ────────────────────────────────── */
-    .nav-bar { position:relative; z-index:10; padding:0 48px; background:rgba(17,24,39,.6);
+    .nav-bar { position:sticky; top:0; z-index:10; padding:0 48px; background:var(--glass-bg);
+      backdrop-filter:blur(var(--glass-blur)); -webkit-backdrop-filter:blur(var(--glass-blur));
       border-bottom:1px solid var(--border); display:flex; gap:2px; overflow-x:auto; }
     .nav-bar::-webkit-scrollbar { height:3px; }
     .nav-bar::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
-    .nav-btn { padding:13px 16px; font-size:13px; font-weight:500; color:var(--muted);
+    .nav-btn { display:inline-flex; align-items:center; gap:6px; padding:13px 16px; font-size:13px; font-weight:500; color:var(--muted);
       background:none; border:none; cursor:pointer; white-space:nowrap;
-      border-bottom:2px solid transparent; transition:color .2s,border-color .2s; }
+      border-bottom:2px solid transparent; transition:color .15s,border-color .15s; }
     .nav-btn:hover { color:var(--text); }
-    .nav-btn.active { color:#fff; border-bottom-color:#6366f1; }
+    .nav-btn.active { color:var(--text); border-image:var(--gradient-brand) 1; }
 
     /* ─── Main ───────────────────────────────── */
     .main { position:relative; z-index:5; padding:36px 48px; display:flex; flex-direction:column; gap:32px; }
     .section-title { font-size:12px; font-weight:600; text-transform:uppercase;
       letter-spacing:1.2px; color:var(--muted); margin-bottom:18px; }
 
-    /* ─── Summary bar ────────────────────────── */
-    .summary-bar { display:flex; gap:14px; flex-wrap:wrap; }
-    .sum-card { flex:1; min-width:140px; background:var(--surface); border:1px solid var(--border);
-      border-radius:12px; padding:16px 20px; }
+    /* ─── Summary bar (CSS Grid) ──────────────── */
+    .summary-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:14px; }
+    .sum-card { background:var(--surface); border:1px solid var(--border);
+      border-radius:var(--radius-md); padding:16px 20px; transition:border-color .2s,transform .2s; }
+    .sum-card:hover { border-color:var(--accent); transform:translateY(-2px); }
     .sum-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; display:block; margin-bottom:4px; }
     .sum-value { font-size:26px; font-weight:700; display:block; }
     .c-pass  { color:var(--pass); }
@@ -2289,16 +2409,22 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .c-neutral { color:var(--text); }
 
     /* ─── Hero ejecutivo (KPI principal) ─────── */
-    .exec-hero { display:flex; gap:26px; flex-wrap:wrap; align-items:stretch;
-      background:var(--surface); border:1px solid var(--border); border-radius:16px;
-      padding:26px 30px; margin-bottom:22px; }
+    .exec-hero { display:flex; gap:26px; flex-wrap:wrap; align-items:stretch; position:relative; overflow:hidden;
+      background:var(--glass-bg); backdrop-filter:blur(var(--glass-blur)); -webkit-backdrop-filter:blur(var(--glass-blur));
+      border:1px solid var(--glass-border); border-radius:var(--radius-lg);
+      padding:28px 32px; margin-bottom:22px; box-shadow:var(--shadow-elev); }
+    .exec-hero::after {
+      content:''; position:absolute; inset:0; z-index:-1; opacity:.5; pointer-events:none;
+      background:radial-gradient(ellipse 60% 100% at 0% 0%, rgba(99,102,241,.10) 0%, transparent 60%);
+    }
     .exec-hero-main { display:flex; align-items:center; gap:22px; flex:1.1; min-width:300px; }
     .exec-hero-ring { position:relative; width:110px; height:110px; flex-shrink:0; }
     .exec-hero-ring svg { width:100%; height:100%; }
     .exec-hero-pct { position:absolute; inset:0; display:flex; align-items:center;
       justify-content:center; font-size:28px; font-weight:800; color:var(--hero-color); }
     .exec-hero-text { display:flex; flex-direction:column; gap:7px; min-width:0; }
-    .exec-hero-status { font-size:20px; font-weight:700; color:var(--text); }
+    .exec-hero-status { display:flex; align-items:center; gap:8px; font-size:20px; font-weight:700; color:var(--text); }
+    .hero-lottie { display:inline-block; width:26px; height:26px; flex-shrink:0; }
     .exec-hero-narrative { font-size:13px; color:var(--muted); line-height:1.65; max-width:560px; }
     .exec-hero-stats { flex:1.3; min-width:320px; }
 
@@ -2320,8 +2446,9 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .card:hover { transform:translateY(-3px); box-shadow:var(--shadow-elev-hover); border-color:var(--accent); }
     .card-top-bar { height:3px; margin:0 -22px 18px; width:calc(100% + 44px); opacity:.85; }
     .card-header { display:flex; align-items:center; gap:10px; margin-bottom:18px; }
-    .card-icon   { font-size:20px; }
-    .card-label  { font-size:14px; font-weight:600; color:#fff; flex:1; }
+    .card-icon   { font-size:20px; color:var(--accent); display:inline-flex; }
+    .card-icon .ic svg { width:20px; height:20px; }
+    .card-label  { font-size:14px; font-weight:600; color:var(--text); flex:1; }
     .card-body   { display:flex; align-items:center; gap:18px; margin-bottom:14px; }
     .donut-wrap  { position:relative; width:68px; height:68px; flex-shrink:0; }
     .donut       { width:100%; height:100%; transform:rotate(-90deg); }
@@ -2332,14 +2459,14 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .stat-dot    { width:7px; height:7px; border-radius:50%; flex-shrink:0; }
     .pass-dot    { background:var(--pass); }
     .fail-dot    { background:var(--fail); }
-    .stat-num    { font-weight:600; color:#fff; min-width:24px; }
+    .stat-num    { font-weight:600; color:var(--text); min-width:24px; }
     .stat-lbl    { color:var(--muted); }
     .btn-detail  { width:100%; padding:8px; background:transparent; border:1px solid var(--accent);
       color:var(--accent); border-radius:8px; font-size:12px; cursor:pointer; transition:background .2s,color .2s; }
     .btn-detail:hover { background:var(--accent); color:#fff; }
 
     /* ─── Badges ─────────────────────────────── */
-    .badge { font-size:10px; font-weight:700; letter-spacing:.7px; padding:3px 8px;
+    .badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; letter-spacing:.7px; padding:3px 8px;
       border-radius:20px; text-transform:uppercase; white-space:nowrap; }
     .b-pass,.status-pass   { background:rgba(16,185,129,.15); color:var(--pass); border:1px solid rgba(16,185,129,.3); }
     .b-fail,.status-fail   { background:rgba(239,68,68,.15);  color:var(--fail); border:1px solid rgba(239,68,68,.3); }
@@ -2350,7 +2477,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .mod-section-wrap { display:flex; flex-direction:column; gap:24px; }
     .mod-header { background:var(--surface); border:1px solid var(--border); border-top:3px solid var(--accent);
       border-radius:12px; padding:20px 24px; }
-    .mod-title  { font-size:18px; font-weight:700; color:#fff; margin-bottom:8px; }
+    .mod-title  { font-size:18px; font-weight:700; color:var(--text); margin-bottom:8px; }
     .mod-stats-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--muted); }
     .ms-sep   { color:var(--border); }
     .mod-info { font-size:13px; color:var(--muted); line-height:1.7; margin-bottom:16px; }
@@ -2359,7 +2486,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     /* ─── Suite block ────────────────────────── */
     .suite-block { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px 22px; }
     .suite-header { display:flex; align-items:center; gap:10px; margin-bottom:14px; }
-    .suite-name   { font-size:14px; font-weight:600; color:#fff; flex:1; }
+    .suite-name   { font-size:14px; font-weight:600; color:var(--text); flex:1; }
 
     /* ─── Data table ─────────────────────────── */
     .data-table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -2367,7 +2494,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       text-transform:uppercase; letter-spacing:.7px; padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); }
     .data-table td { padding:9px 12px; border-bottom:1px solid var(--border); color:var(--text); vertical-align:top; }
     .data-table tr:last-child td { border-bottom:none; }
-    .data-table tr:hover td { background:rgba(255,255,255,.02); }
+    .data-table tr:hover td { background:var(--tint); }
     .row-fail td { background:rgba(239,68,68,.04); }
     .row-detail td { background:var(--surface2); padding:8px 12px; }
     .sm-table th, .sm-table td { padding:7px 10px; font-size:12px; }
@@ -2375,6 +2502,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .error-msg { background:rgba(239,68,68,.08); border-left:3px solid var(--fail);
       color:#fca5a5; font-size:11px; padding:10px; border-radius:0 6px 6px 0;
       white-space:pre-wrap; word-break:break-all; max-height:160px; overflow-y:auto; }
+    .error-msg code.hljs { background:none; padding:0; font-family:var(--font-mono); white-space:pre-wrap; word-break:break-all; }
 
     /* ─── Performance ────────────────────────── */
     .perf-legend { display:flex; gap:14px; margin-bottom:16px; font-size:12px; }
@@ -2385,7 +2513,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       padding:18px 22px; display:flex; flex-direction:column; gap:14px; }
     .perf-card-fail { border-color:rgba(239,68,68,.4); }
     .perf-card-header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-    .perf-tc-name { font-size:14px; font-weight:600; color:#fff; flex:1; }
+    .perf-tc-name { font-size:14px; font-weight:600; color:var(--text); flex:1; }
     .perf-time    { font-size:12px; color:var(--muted); }
     .metrics-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:14px; }
     .metric-item  { background:var(--surface2); border-radius:8px; padding:12px 14px; }
@@ -2416,7 +2544,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       padding:14px 18px; margin-bottom:20px; font-size:12px; }
     .a11y-params ul { margin-top:8px; padding-left:18px; }
     .a11y-params li { margin-bottom:4px; color:var(--muted); line-height:1.6; }
-    .a11y-params code { background:rgba(255,255,255,.08); padding:1px 5px; border-radius:4px; color:var(--text); font-size:11px; }
+    .a11y-params code { background:var(--tint); padding:1px 5px; border-radius:4px; color:var(--text); font-size:11px; }
     .a11y-summary { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
     .a11y-count   { border:1px solid; border-radius:10px; padding:10px 16px; text-align:center; min-width:80px; }
     .a11y-count-num { display:block; font-size:24px; font-weight:700; }
@@ -2427,7 +2555,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       display:flex; flex-wrap:wrap; gap:8px; align-items:baseline; }
     .a11y-viol-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px; color:#fff; white-space:nowrap; }
     .a11y-viol-rule  { font-size:12px; font-weight:600; }
-    .a11y-viol-rule code { background:rgba(255,255,255,.08); padding:1px 6px; border-radius:4px; }
+    .a11y-viol-rule code { background:var(--tint); padding:1px 6px; border-radius:4px; }
     .a11y-viol-desc  { font-size:12px; color:var(--muted); flex:1; }
     .a11y-ok { background:rgba(16,185,129,.1); border:1px solid rgba(16,185,129,.3);
       border-radius:8px; padding:12px 16px; color:var(--pass); font-size:13px; }
@@ -2448,9 +2576,9 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .nf-suite-title { font-weight:600; margin-right:10px; }
     .nf-suite-th .nf-url { display:inline; margin-right:10px; }
     .nf-suite-th .nf-tipo-badge { vertical-align:middle; }
-    .nf-total-row td { background:rgba(255,255,255,.04); font-weight:600; }
+    .nf-total-row td { background:var(--tint); font-weight:600; }
     .nf-result { margin-top:10px; font-size:13px; font-weight:600; padding:8px 12px;
-      background:rgba(255,255,255,.04); border-radius:6px; }
+      background:var(--tint); border-radius:6px; }
     .nf-table { font-size:12px; }
 
     /* ─── No data ────────────────────────────── */
@@ -2467,7 +2595,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .api-tc-status { font-size:16px; }
     .api-tc-badge  { font-size:10px; font-weight:700; padding:2px 8px; border-radius:12px;
       background:#6366f1; color:#fff; white-space:nowrap; }
-    .api-tc-name   { font-size:13px; font-weight:600; color:#fff; flex:1; min-width:120px; }
+    .api-tc-name   { font-size:13px; font-weight:600; color:var(--text); flex:1; min-width:120px; }
     .api-tc-time   { font-size:11px; color:var(--muted); }
 
     .api-interaction { border-top:1px solid var(--border); padding:16px 18px; }
@@ -2513,10 +2641,9 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       letter-spacing:.5px; margin-bottom:6px; }
 
     .api-body { background:#0a0d18; border-radius:6px; padding:10px 12px; font-size:11px;
-      font-family:monospace; color:var(--text); overflow-x:auto; max-height:280px;
+      font-family:var(--font-mono); color:var(--text); overflow-x:auto; max-height:280px;
       overflow-y:auto; white-space:pre-wrap; word-break:break-all; margin:0; }
-    .api-body-json { color:#93c5fd; }
-    .api-body-xml  { color:#86efac; }
+    .api-body code[class*="language-"] { text-shadow:none; background:none; font-family:var(--font-mono); white-space:pre-wrap; word-break:break-all; }
     .api-no-data   { font-size:11px; color:var(--muted); font-style:italic; }
 
     .api-no-interactions { background:var(--surface2); border:1px dashed var(--border);
@@ -2531,7 +2658,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .bdd-feature-header { display:flex; align-items:center; gap:10px; padding:13px 18px;
       background:var(--surface2); flex-wrap:wrap; }
     .bdd-feature-icon   { font-size:18px; }
-    .bdd-feature-name   { font-size:14px; font-weight:700; color:#fff; flex:1; min-width:120px; }
+    .bdd-feature-name   { font-size:14px; font-weight:700; color:var(--text); flex:1; min-width:120px; }
     .bdd-feature-file   { font-size:10px; font-family:monospace; color:var(--muted);
       background:var(--border); padding:2px 7px; border-radius:10px; }
     .bdd-time           { font-size:11px; color:var(--muted); }
@@ -2547,7 +2674,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .gk-scenario-kw   { font-size:11px; font-weight:700; text-transform:uppercase;
       letter-spacing:.8px; color:#8b5cf6; background:rgba(139,92,246,.15);
       padding:2px 8px; border-radius:10px; white-space:nowrap; }
-    .gk-scenario-name { font-size:13px; font-weight:600; color:#fff; flex:1; }
+    .gk-scenario-name { font-size:13px; font-weight:600; color:var(--text); flex:1; }
 
     .bdd-steps { display:flex; flex-direction:column; gap:4px;
       padding:8px 14px; background:#0a0d18; border-radius:8px; }
@@ -2556,14 +2683,14 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .gk-kw    { font-weight:700; min-width:48px; text-align:right; flex-shrink:0; }
     .gk-text  { color:#e2e8f0; }
     .gk-val   { color:#fbbf24; }   /* valores entre comillas → amarillo */
-    .gk-extra { background:rgba(255,255,255,.04); border-left:2px solid var(--border);
+    .gk-extra { background:var(--tint); border-left:2px solid var(--border);
       font-size:10px; color:var(--muted); padding:4px 10px; margin:2px 0 2px 56px;
       border-radius:0 4px 4px 0; font-family:monospace; white-space:pre-wrap; }
 
     /* ─── Evidence grid ─────────────────────── */
     .ev-section { margin-top:32px; border-top:1px solid var(--border); padding-top:28px; }
     .ev-section-header { display:flex; align-items:baseline; gap:14px; margin-bottom:20px; }
-    .ev-section-title  { font-size:15px; font-weight:700; color:#fff; }
+    .ev-section-title  { font-size:15px; font-weight:700; color:var(--text); }
     .ev-section-sub    { font-size:12px; color:var(--muted); }
 
     .ev-tc-block { background:var(--surface); border:1px solid var(--border);
@@ -2572,14 +2699,14 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .ev-tc-header { display:flex; align-items:center; gap:10px; padding:12px 18px;
       background:var(--surface2); flex-wrap:wrap; cursor:default; }
     .ev-tc-status { font-size:16px; }
-    .ev-tc-name   { font-size:13px; font-weight:600; color:#fff; flex:1; min-width:120px; }
+    .ev-tc-name   { font-size:13px; font-weight:600; color:var(--text); flex:1; min-width:120px; }
     .ev-tc-browser{ font-size:11px; color:var(--muted); background:var(--border);
       padding:2px 8px; border-radius:12px; white-space:nowrap; }
     .ev-tc-time   { font-size:11px; color:var(--muted); white-space:nowrap; }
     .ev-toggle-btn{ padding:5px 12px; font-size:11px; cursor:pointer;
       background:transparent; border:1px solid var(--border); color:var(--muted);
       border-radius:6px; transition:all .2s; white-space:nowrap; }
-    .ev-toggle-btn:hover { border-color:#6366f1; color:#fff; }
+    .ev-toggle-btn:hover { border-color:var(--accent); color:var(--text); }
 
     .ev-runs-wrap { padding:14px 18px; display:flex; flex-direction:column; gap:16px; }
     .ev-run       { display:flex; flex-direction:column; gap:10px; }
@@ -2623,7 +2750,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .ev-card-footer span { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .ev-dl-link { color:var(--muted); text-decoration:none; font-size:14px;
       padding:2px 4px; border-radius:4px; transition:color .2s; }
-    .ev-dl-link:hover { color:#fff; }
+    .ev-dl-link:hover { color:var(--text); }
 
     /* Trace command */
     .ev-trace-cmd { padding:6px 10px; font-family:monospace; font-size:10px;
@@ -2655,7 +2782,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
     .ts-set-header { display:flex; align-items:center; gap:12px; padding:14px 20px;
       background:var(--surface2); border-bottom:1px solid var(--border); flex-wrap:wrap; }
     .ts-set-icon  { font-size:18px; }
-    .ts-set-name  { font-size:15px; font-weight:700; color:#fff; flex:1; }
+    .ts-set-name  { font-size:15px; font-weight:700; color:var(--text); flex:1; }
     .ts-set-badge { font-size:13px; font-weight:600; }
     .ts-set-meta  { font-size:12px; color:var(--muted); }
     .ts-table { width:100%; border-collapse:collapse; font-size:13px; }
@@ -2663,7 +2790,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       text-transform:uppercase; letter-spacing:.7px; color:var(--muted); background:var(--surface2);
       border-bottom:1px solid var(--border); }
     .ts-table td { padding:10px 16px; border-bottom:1px solid var(--border); }
-    .ts-table tbody tr:hover { background:rgba(255,255,255,.03); }
+    .ts-table tbody tr:hover { background:var(--tint); }
     .ts-table tfoot td { border-top:1px solid var(--border); border-bottom:none; background:var(--surface2); }
     .ts-total-row td { font-size:13px; }
     .ts-status-badge { display:inline-block; padding:2px 8px; border-radius:6px;
@@ -2740,7 +2867,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       background:var(--surface2); border-bottom:1px solid var(--border);
     }
     .pnf-glossary-icon  { font-size:18px; }
-    .pnf-glossary-title { font-size:14px; font-weight:700; color:#fff; flex:1; }
+    .pnf-glossary-title { font-size:14px; font-weight:700; color:var(--text); flex:1; }
     .pnf-glossary-grid {
       display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
       gap:18px; padding:20px 24px;
@@ -2791,12 +2918,12 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
 <body>
 
 <!-- ── Header ──────────────────────────────────────────── -->
-<header class="header">
+<header class="header animate__animated animate__fadeIn">
   <div class="logo-wrap">
-    <div class="logo-icon">🧪</div>
+    <div class="logo-icon">${icon('flask-conical')}</div>
     <div>
       <div class="logo-title">QA Automation Portal</div>
-      <div class="logo-sub">Playwright Enterprise Test Framework${envLabel ? ' · ' + esc(envLabel) : ''}${gitInfo.branch ? ` · 🌿 ${esc(gitInfo.branch)}${gitInfo.commit ? ' @ ' + esc(gitInfo.commit) : ''}` : ''}</div>
+      <div class="logo-sub">Playwright Enterprise Test Framework${envLabel ? ' · ' + esc(envLabel) : ''}${gitInfo.branch ? ` · ${icon('git-branch')} ${esc(gitInfo.branch)}${gitInfo.commit ? ' @ ' + esc(gitInfo.commit) : ''}` : ''}</div>
     </div>
   </div>
   <div class="global-badge">
@@ -2809,23 +2936,25 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   <div class="meta-info">
     <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end">
       <span>Generado: <b>${generatedAt}</b></span>
-      <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Cambiar tema claro/oscuro">🌙</button>
+      <button class="theme-toggle" id="themeToggleBtn" onclick="toggleTheme()" title="Cambiar tema claro/oscuro">${icon('moon')}</button>
     </div>
     <div>Duración total: <b>${fmtSec(totals.time)}</b></div>
     <div>Fallos: <b style="color:${totals.failures>0 ? '#ef4444' : '#10b981'}">${totals.failures}</b></div>
     <div class="meta-actions">
-      <a href="report.csv" download="report.csv" class="btn-csv">⬇ CSV</a>
-      <button class="btn-pdf-exec" id="btn-pdf-exec" onclick="downloadExecPdf()">⬇ Resumen Ejecutivo (PDF)</button>
+      <a href="report.csv" download="report.csv" class="btn-csv">${icon('download')} CSV</a>
+      <button class="btn-pdf-exec" id="btn-pdf-exec" onclick="downloadExecPdf()">${icon('file-down')} Resumen Ejecutivo (PDF)</button>
+      ${smartReportLinks}
     </div>
   </div>
 </header>
 
 <!-- ── Nav ─────────────────────────────────────────────── -->
 <nav class="nav-bar">
-  <button class="nav-btn active" id="tab-overview" onclick="showSection('overview')">📊 Resumen</button>
-  ${MODULES.map(m=>`<button class="nav-btn" id="tab-${m.key}" onclick="showSection('${m.key}')">${m.icon} ${m.label}</button>`).join('\n  ')}
-  <button class="nav-btn" id="tab-testsets" onclick="showSection('testsets')">🗂️ Test Sets</button>
-  <button class="nav-btn" id="tab-pnfanalysis" onclick="showSection('pnfanalysis')">📊 Análisis Estadístico PNF</button>
+  <button class="nav-btn active" id="tab-overview" onclick="showSection('overview')">${icon('layout-dashboard')} Resumen</button>
+  ${MODULES.map(m=>`<button class="nav-btn" id="tab-${m.key}" onclick="showSection('${m.key}')">${icon(m.lucide || 'circle')} ${m.label}</button>`).join('\n  ')}
+  <button class="nav-btn" id="tab-bdd" onclick="showSection('bdd')">${icon('git-branch')} Gherkin (BDD)</button>
+  <button class="nav-btn" id="tab-testsets" onclick="showSection('testsets')">${icon('folder-kanban')} Test Sets</button>
+  <button class="nav-btn" id="tab-pnfanalysis" onclick="showSection('pnfanalysis')">${icon('bar-chart-3')} Análisis Estadístico PNF</button>
 </nav>
 
 <!-- ── Content ──────────────────────────────────────────── -->
@@ -2835,14 +2964,20 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   <section id="sec-overview">
     <p class="section-title">Resumen Ejecutivo</p>
 
-    <div class="exec-hero" id="exec-hero-root">
+    <div class="exec-hero animate__animated animate__fadeInUp" id="exec-hero-root" style="--animate-duration:.5s">
       <div class="exec-hero-main" style="--hero-color:${globalColor}">
         <div class="exec-hero-ring">
           ${donut(globalRate, globalColor)}
           <div class="exec-hero-pct">${totals.tests > 0 ? globalRate + '%' : '—'}</div>
         </div>
         <div class="exec-hero-text">
-          <div class="exec-hero-status">${totals.tests === 0 ? '⏳ Sin datos' : globalOk ? '✅ Todo en orden' : '⚠️ Requiere atención'}</div>
+          <div class="exec-hero-status">
+            ${totals.tests === 0
+              ? icon('clock') + ' Sin datos'
+              : globalOk
+                ? `<span class="hero-lottie" id="hero-success-lottie" aria-hidden="true"></span> Todo en orden`
+                : icon('alert-triangle') + ' Requiere atención'}
+          </div>
           <div class="exec-hero-narrative">${esc(globalDiag.narrative)}</div>
         </div>
       </div>
@@ -2863,6 +2998,20 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   </section>
 
   ${sections}
+
+  <!-- Gherkin (BDD) — informativo, NO es un tipo de prueba con pass/fail/% propio.
+       Es la narración en lenguaje natural del mismo flujo de UI ya evaluado por
+       ui-chromium/firefox/webkit — por eso no lleva mod-stats-row con porcentaje,
+       a diferencia de las secciones generadas desde MODULES arriba. -->
+  <section id="sec-bdd" class="mod-section-wrap" style="display:none">
+    <div class="mod-header" style="--accent:#22c55e">
+      <div class="mod-title">${icon('git-branch')} Gherkin (BDD)</div>
+      <div class="mod-stats-row">
+        <span class="ms-item">📖 Documentación en lenguaje natural — no es un tipo de prueba independiente, describe el mismo flujo de UI ya evaluado en las pestañas anteriores.</span>
+      </div>
+    </div>
+    ${bddSectionContent}
+  </section>
 
   <!-- Test Sets section -->
   <section id="sec-testsets" class="mod-section-wrap" style="display:none">
@@ -2909,24 +3058,81 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
 
 <script>
   /* ── Tema claro/oscuro ── */
+  /* ── Íconos Lucide (reemplazan <i data-lucide> por <svg> inline) ── */
+  function renderIcons() {
+    if (typeof lucide !== 'undefined') lucide.createIcons();
+  }
+  renderIcons();
+
+  /* ── Resaltado de sintaxis: Prism.js (JSON/XML de API) + Highlight.js (logs/errores) ──
+     Ambos son mejoras puramente visuales — si el CDN no cargó (sin internet), el texto
+     escapado (formatBody()/renderErrorMsg()) ya es legible sin resaltar, no se rompe nada. */
+  if (typeof Prism !== 'undefined') { try { Prism.highlightAllUnder(document); } catch (e) {} }
+  if (typeof hljs !== 'undefined')  { try { hljs.highlightAll(); } catch (e) {} }
+
+  /* ── Lottie: micro-animación de "pulso" verde junto al estado del hero cuando todo pasó ──
+     JSON mínimo propio (sin dependencia de assets externos) — un círculo que pulsa suavemente. */
+  (function initHeroLottie() {
+    const el = document.getElementById('hero-success-lottie');
+    if (!el || typeof lottie === 'undefined') return;
+    try {
+      lottie.loadAnimation({
+        container: el, renderer: 'svg', loop: true, autoplay: true,
+        animationData: {
+          v: '5.7.4', fr: 30, ip: 0, op: 60, w: 60, h: 60, nm: 'pulse-ok', ddd: 0, assets: [],
+          layers: [{
+            ddd: 0, ind: 1, ty: 4, nm: 'dot', sr: 1, ao: 0,
+            ks: {
+              o: { a: 0, k: 100 }, r: { a: 0, k: 0 }, p: { a: 0, k: [30, 30, 0] }, a: { a: 0, k: [0, 0, 0] },
+              s: { a: 1, k: [
+                { t: 0,  s: [60, 60, 100],  e: [100, 100, 100], o: { x: [0.167], y: [0.167] }, i: { x: [0.833], y: [0.833] } },
+                { t: 30, s: [100, 100, 100], e: [60, 60, 100],  o: { x: [0.167], y: [0.167] }, i: { x: [0.833], y: [0.833] } },
+                { t: 60, s: [60, 60, 100] },
+              ] },
+            },
+            shapes: [{
+              ty: 'gr',
+              it: [
+                { ty: 'el', p: { a: 0, k: [0, 0] }, s: { a: 0, k: [40, 40] }, nm: 'circle' },
+                { ty: 'fl', c: { a: 0, k: [0.063, 0.725, 0.506, 1] }, o: { a: 0, k: 100 }, nm: 'fill' },
+                { ty: 'tr', p: { a: 0, k: [0, 0] }, a: { a: 0, k: [0, 0] }, s: { a: 0, k: [100, 100] }, r: { a: 0, k: 0 }, o: { a: 0, k: 100 } },
+              ],
+              nm: 'circle group',
+            }],
+            ip: 0, op: 60, st: 0, bm: 0,
+          }],
+        },
+      });
+    } catch (e) { /* degradación tolerante: el hero se ve bien sin la animación */ }
+  })();
+
   function applyThemeButtonIcon() {
     const btn = document.getElementById('themeToggleBtn');
-    if (btn) btn.textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+    if (!btn) return;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    btn.innerHTML = '<i data-lucide="' + (isDark ? 'sun' : 'moon') + '" class="ic" aria-hidden="true"></i>';
+    renderIcons();
   }
   function toggleTheme() {
-    const isLight = document.documentElement.getAttribute('data-theme') === 'light';
-    if (isLight) document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', 'light');
-    try { localStorage.setItem('qaPortalTheme', isLight ? 'dark' : 'light'); } catch (e) {}
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (isDark) document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.setAttribute('data-theme', 'dark');
+    try { localStorage.setItem('qaPortalTheme', isDark ? 'light' : 'dark'); } catch (e) {}
     applyThemeButtonIcon();
+    reThemeCharts();
   }
   applyThemeButtonIcon();
 
-  /* ── Navegación de secciones ── */
+  /* ── Navegación de secciones (con fade ligero al cambiar de pestaña) ── */
   function showSection(key) {
     document.querySelectorAll('main > section').forEach(s => s.style.display = 'none');
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('sec-' + key).style.display = '';
+    const target = document.getElementById('sec-' + key);
+    target.style.display = '';
+    target.classList.remove('animate__fadeIn');
+    void target.offsetWidth; // fuerza reflow para poder re-disparar la animación
+    target.classList.add('animate__animated', 'animate__fadeIn');
+    target.style.setProperty('--animate-duration', '.35s');
     const tab = document.getElementById('tab-' + key);
     if (tab) tab.classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3025,12 +3231,19 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
               cap:'#7C3AED', pos:'#16A34A', neg:'#DC2626',
               zoneOk:'#16A34A', zoneCaution:'#F59E0B', zoneRisk:'#DC2626' };
 
+  /* Colores de ejes/leyendas de Chart.js según el tema activo (dark/light) */
+  function chartTheme() {
+    const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return { muted: dark ? '#8891a8' : '#5c6478', grid: dark ? 'rgba(255,255,255,.05)' : 'rgba(15,23,42,.07)' };
+  }
+
   /* Inicializa todos los gráficos cuando se activa el tab */
   const _pnfChartInstances = {};
 
   function initPnfCharts() {
     if (typeof Chart === 'undefined' || typeof NF_ANALYSIS_DATA === 'undefined') return;
     const analyses = NF_ANALYSIS_DATA.analyses || [];
+    const CT = chartTheme();
 
     analyses.forEach((a, i) => {
       if (_pnfChartInstances['reg_' + i])  { _pnfChartInstances['reg_' + i].destroy(); }
@@ -3075,14 +3288,14 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
           options: {
             responsive:true, animation:{duration:600},
             plugins:{
-              legend:{ labels:{ color:'#94a3b8', font:{size:11} } },
+              legend:{ labels:{ color:CT.muted, font:{size:11} } },
               tooltip:{ callbacks:{ label: ctx => ctx.dataset.label + ': ' + (+ctx.parsed.y).toFixed(2) + ' TPS' } }
             },
             scales:{
-              x:{ type:'linear', title:{ display:true, text:'Usuarios Concurrentes', color:'#64748b' },
-                  ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' } },
-              y:{ title:{ display:true, text:'TPS', color:'#64748b' },
-                  ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' }, min:0 }
+              x:{ type:'linear', title:{ display:true, text:'Usuarios Concurrentes', color:CT.muted },
+                  ticks:{ color:CT.muted }, grid:{ color:CT.grid } },
+              y:{ title:{ display:true, text:'TPS', color:CT.muted },
+                  ticks:{ color:CT.muted }, grid:{ color:CT.grid }, min:0 }
             }
           }
         });
@@ -3103,11 +3316,11 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
           }]},
           options:{
             responsive:true, animation:{duration:600},
-            plugins:{ legend:{ labels:{ color:'#94a3b8', font:{size:11} } } },
+            plugins:{ legend:{ labels:{ color:CT.muted, font:{size:11} } } },
             scales:{
-              x:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' } },
-              y:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' },
-                  title:{ display:true, text:'TPS', color:'#64748b' } }
+              x:{ ticks:{ color:CT.muted }, grid:{ color:CT.grid } },
+              y:{ ticks:{ color:CT.muted }, grid:{ color:CT.grid },
+                  title:{ display:true, text:'TPS', color:CT.muted } }
             }
           }
         });
@@ -3133,13 +3346,13 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
           options:{
             responsive:true, animation:{duration:600},
             plugins:{
-              legend:{ labels:{ color:'#94a3b8', font:{size:11} } },
+              legend:{ labels:{ color:CT.muted, font:{size:11} } },
               tooltip:{ callbacks:{ label: ctx => 'TPS: ' + (+ctx.parsed.y).toFixed(2) } }
             },
             scales:{
-              x:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' } },
-              y:{ ticks:{ color:'#64748b' }, grid:{ color:'rgba(255,255,255,.05)' },
-                  title:{ display:true, text:'TPS', color:'#64748b' }, min:0 }
+              x:{ ticks:{ color:CT.muted }, grid:{ color:CT.grid } },
+              y:{ ticks:{ color:CT.muted }, grid:{ color:CT.grid },
+                  title:{ display:true, text:'TPS', color:CT.muted }, min:0 }
             }
           }
         });
@@ -3165,12 +3378,15 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
   });
 
   /* Gráfico de tendencia (% de éxito) en la pestaña Resumen — visible desde el primer render */
+  let _trendChartInstance = null;
   function initTrendChart() {
     if (typeof Chart === 'undefined' || !window.__TREND_HISTORY__) return;
     const ctx = document.getElementById('chart-trend');
     if (!ctx) return;
+    if (_trendChartInstance) { _trendChartInstance.destroy(); }
     const hist = window.__TREND_HISTORY__;
-    new Chart(ctx, {
+    const CT = chartTheme();
+    _trendChartInstance = new Chart(ctx, {
       type: 'line',
       data: {
         labels: hist.map(h => h.label || h.date),
@@ -3188,12 +3404,18 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
           tooltip: { callbacks: { label: ctx => ctx.parsed.y + '% de éxito' } },
         },
         scales: {
-          x: { ticks: { color: '#64748b', font: { size: 10 } }, grid: { display: false } },
-          y: { min: 0, max: 100, ticks: { color: '#64748b', font: { size: 10 }, stepSize: 25 },
-               grid: { color: 'rgba(255,255,255,.05)' } },
+          x: { ticks: { color: CT.muted, font: { size: 10 } }, grid: { display: false } },
+          y: { min: 0, max: 100, ticks: { color: CT.muted, font: { size: 10 }, stepSize: 25 },
+               grid: { color: CT.grid } },
         },
       },
     });
+  }
+
+  /* Re-dibuja los charts activos con los colores del tema recién elegido */
+  function reThemeCharts() {
+    if (_trendChartInstance) initTrendChart();
+    if (_pnfChartsReady) initPnfCharts();
   }
 
   /* ── PDF del Resumen Ejecutivo (portada + hero + módulos) ──────── */
@@ -3214,7 +3436,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       if (wasHidden) root.style.display = '';
 
       const canvas = await html2canvas(root, {
-        backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#0d0f1a',
+        backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#f7f8fb',
         scale: 1.6, useCORS: true, logging: false, windowWidth: 1280,
       });
 
@@ -3289,7 +3511,7 @@ function buildPortalHTML(groups, totals, generatedAt, features, allSuites, stati
       if (wasHidden) aiBody.style.display = '';
 
       const canvas = await html2canvas(root, {
-        backgroundColor: '#111827',
+        backgroundColor: getComputedStyle(document.body).getPropertyValue('--bg').trim() || '#f7f8fb',
         scale: 1.6,
         useCORS: true,
         logging: false,

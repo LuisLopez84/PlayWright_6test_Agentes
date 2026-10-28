@@ -6,9 +6,31 @@ Aquí se declaran **sets de datos** (`.csv`, `.txt` o `.xlsx`) para ejecutar el 
 
 - **Nombre del archivo = nombre exacto de la suite** (el mismo nombre del recording / carpeta en `GenerateTest/tests/`).
   Ej: `Homebanking_TransferenciasTestingQA.csv` alimenta la suite `Homebanking_TransferenciasTestingQA`.
-- **Un solo archivo por suite**, compartido entre UI y API — las mismas columnas alimentan lo que cada tipo de prueba necesite.
+- **Por defecto, un solo archivo por suite**, compartido entre UI y API — las mismas columnas alimentan lo que cada tipo de prueba necesite.
 - **Primera fila = encabezados** (nombre de columna). Cada fila siguiente = una ejecución.
 - Formatos soportados: `.csv`, `.txt` (separador detectado automáticamente: coma, tabulación o `;`) y `.xlsx` (primera hoja, primera fila = encabezados).
+
+### Sets de datos separados por tipo de prueba (opcional)
+
+Si necesitas que UI, REST y SOAP usen **datos distintos** para la misma suite (columnas diferentes, o los mismos nombres de columna pero valores que no deben mezclarse), agrega un sufijo al nombre del archivo:
+
+| Sufijo | Tipo de prueba | Ejemplo |
+|---|---|---|
+| `_Web` o `_UI` | Solo UI | `Homebanking_Tarjeta_Virtual_Web.csv` |
+| `_REST` | Solo API REST | `Homebanking_Tarjeta_Virtual_REST.csv` |
+| `_SOAP` | Solo API SOAP | `Homebanking_Tarjeta_Virtual_SOAP.csv` |
+| `_API` | API REST **y** SOAP (compartido entre ambos, distinto de UI) | `Homebanking_Tarjeta_Virtual_API.csv` |
+| *(sin sufijo)* | Compartido entre UI, REST y SOAP | `Homebanking_Tarjeta_Virtual.csv` |
+
+**Orden de búsqueda**: cada tipo de prueba busca primero su archivo específico y, si no existe, cae automáticamente al archivo sin sufijo. Puedes mezclar: por ejemplo, tener solo `_Web.csv` y `_SOAP.csv` (como en el ejemplo de abajo) y dejar que REST, si algún día lo necesita, use el archivo sin sufijo si existiera, o simplemente no tenga datos variables si no existe ninguno de los dos.
+
+**Ejemplo real (`Homebanking_Tarjeta_Virtual`)**:
+```
+BoxTestData/
+├── Homebanking_Tarjeta_Virtual_Web.csv    ← Usuario,Contraseña       (solo UI)
+└── Homebanking_Tarjeta_Virtual_SOAP.csv   ← intA,intB                (solo SOAP)
+```
+`npm run generate` genera 2 ejecuciones del flujo UI con Usuario/Contraseña, y 2 ejecuciones del test "SOAP Add - Éxito" con intA/intB — completamente independientes entre sí, sin que las columnas de uno interfieran con el otro.
 
 ## Cómo se usan los datos (sin tocar código)
 
@@ -19,7 +41,13 @@ Aquí se declaran **sets de datos** (`.csv`, `.txt` o `.xlsx`) para ejecutar el 
    ```typescript
    import { loadSuiteTestData } from '../../../../ConfigurationTest/tests/utils/data-file-parser';
 
+   // Sin tercer argumento: busca solo el archivo sin sufijo (comportamiento histórico).
    const data = loadSuiteTestData('Homebanking_TransferenciasTestingQA');
+
+   // Con tercer argumento ('ui' | 'rest' | 'soap'): busca primero la variante con
+   // sufijo de ese tipo y cae al archivo sin sufijo si no existe — igual que hacen
+   // internamente el generador de UI y el de BoxAPIsExecute.
+   const soapData = loadSuiteTestData('Homebanking_Tarjeta_Virtual', undefined, 'soap');
 
    for (const [i, row] of data.entries()) {
      test(`POST /transferencias - fila ${i + 1}`, async ({ request }) => {

@@ -20,7 +20,13 @@ if (suites.length === 0) {
 }
 
 const links = suites.map(suite => {
-  return `<li><a href="${suite}/index.html" target="_blank">${suite}</a></li>`;
+  // playwright-smart-reporter escribe smart-report/<suite>/smart-report.html (fuera de reports/,
+  // ver playwright.config.ts) — el enlace solo aparece si ese archivo existe.
+  const smartRel  = path.join('smart-report', suite, 'smart-report.html');
+  const smartLink = fs.existsSync(path.join(process.cwd(), smartRel))
+    ? ` <a class="smart" href="../${smartRel.replace(/\\/g, '/')}" target="_blank">Smart Report</a>`
+    : '';
+  return `<li><a href="${suite}/index.html" target="_blank">${suite}</a>${smartLink}</li>`;
 }).join('\n');
 
 const html = `<!DOCTYPE html>
@@ -36,6 +42,8 @@ const html = `<!DOCTYPE html>
     li { margin: 10px 0; }
     a { text-decoration: none; background: #007bff; color: white; padding: 10px 20px; border-radius: 5px; display: inline-block; transition: 0.3s; }
     a:hover { background: #0056b3; }
+    a.smart { background: #1b7a72; margin-left: 8px; }
+    a.smart:hover { background: #135750; }
   </style>
 </head>
 <body>

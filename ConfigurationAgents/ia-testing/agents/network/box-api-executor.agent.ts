@@ -17,8 +17,9 @@ import path from 'path';
 import type OpenAI from 'openai';
 import { openai as sharedOpenai, hasOpenAI } from '../../utils/openai-client';
 import { ensureDir } from '../../utils/fs-utils';
-import { loadSuiteTestData, DataRow } from '../../../../ConfigurationTest/tests/utils/data-file-parser';
+import { loadSuiteTestData, DataRow, DataKind } from '../../../../ConfigurationTest/tests/utils/data-file-parser';
 import { bindApiColumns } from '../core/data-binding.agent';
+import { mapWithConcurrency } from '../../utils/concurrency';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -745,11 +746,17 @@ export async function processBoxAPIsExecute(
   const SOLO_API_DIR = 'Solo_test_API';
   const collectedSpecs: BoxApiSpec[] = []; // Risk 9: acumular para SOAP_BODIES
 
-  for (const filePath of specFiles) {
+  // Cada archivo de BoxAPIsExecute/ es independiente (lee su propio spec, escribe su
+  // propio archivo de salida) — se procesan en paralelo con concurrencia acotada para
+  // no saturar la API de OpenAI. Configurable vía GENERATE_CONCURRENCY (misma variable
+  // que usa run-agents.ts para las suites).
+  const FILE_CONCURRENCY = Math.max(1, parseInt(process.env.GENERATE_CONCURRENCY ?? '4', 10) || 4);
+
+  await mapWithConcurrency(specFiles, FILE_CONCURRENCY, async (filePath) => {
     console.log(`\n🔍 Procesando: ${path.relative(projectRoot, filePath)}`);
 
     const spec = parseBoxApiFile(filePath);
-    if (!spec) continue;
+    if (!spec) return;
 
     // Matching de suite
     let suite = findMatchingSuite(spec.fileName, suiteNames);
@@ -759,8 +766,11 @@ export async function processBoxAPIsExecute(
     spec.suiteName = targetSuite;
     console.log(suite ? `✅ Suite detectada: "${suite}"` : `📁 Sin suite → "${SOLO_API_DIR}"`);
 
-    // ── Datos variables (DDT) — BoxTestData/<targetSuite>.csv|.txt|.xlsx ──────
-    const ddtRows = loadSuiteTestData(targetSuite);
+    // ── Datos variables (DDT) — BoxTestData/<targetSuite>_REST|_SOAP.csv|.txt|.xlsx ──
+    // kind='rest'/'soap': prueba primero el archivo exclusivo de ese tipo de
+    // servicio y solo si no existe cae al <targetSuite> sin sufijo (compartido).
+    const ddtKind: DataKind = spec.serviceType === 'SOAP' ? 'soap' : 'rest';
+    const ddtRows = loadSuiteTestData(targetSuite, undefined, ddtKind);
     let ddt: DdtApiInfo | undefined;
     if (ddtRows.length > 0) {
       const bodyKeys  = extractBodyKeys(spec);
@@ -800,7 +810,7 @@ export async function processBoxAPIsExecute(
     console.log(`📄 Feature generado: ${path.relative(projectRoot, featurePath)}`);
 
     collectedSpecs.push(spec); // Risk 9: acumular
-  }
+  });
 
   // Risk 2: no sobreescribir api-generated.steps.ts si tiene contenido customizado
   ensureDir(stepsDir);

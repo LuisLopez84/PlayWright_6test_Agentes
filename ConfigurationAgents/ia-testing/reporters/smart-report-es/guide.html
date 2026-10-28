@@ -1,0 +1,269 @@
+<!-- Guía en español del Smart Reporter. La inyecta inject.js dentro de <template id="smart-es-guide">.
+     Se edita como HTML normal; las secciones son <details> para que se pueda recorrer rápido. -->
+
+<details class="es-sec" id="es-s1" open>
+  <summary><h3>1. ¿Para qué sirve este reporte?</h3></summary>
+  <div class="es-body">
+    <p>
+      <b>Smart Reporter</b> es un reporte HTML <b>adicional</b> de Playwright. El reporte nativo cuenta qué pasó en <i>una</i> corrida;
+      este además <b>compara la corrida actual con las anteriores</b> (su historial) para responder preguntas de diagnóstico:
+    </p>
+    <ul>
+      <li>¿Qué falló y cuál fue, probablemente, la causa?</li>
+      <li>¿Qué fallas son en realidad el mismo problema repetido?</li>
+      <li>¿Qué pruebas no son confiables (a veces pasan y a veces fallan)?</li>
+      <li>¿Qué pruebas se volvieron más lentas que antes?</li>
+      <li>¿Qué tan sana está la suite y hacia dónde va?</li>
+    </ul>
+    <div class="es-callout">
+      <b>Relación con el Portal QA (<code>portal.html</code>)</b><br>
+      El Portal muestra los resultados por tipo de prueba (UI, API, Performance, Seguridad, Accesibilidad, Visual, No funcional) con su % de éxito:
+      es la vista para negocio. El Smart Reporter es la <b>vista de diagnóstico</b> para QA e ingeniería: causas, tendencias y estabilidad.
+      Ambos salen de la misma ejecución y no se reemplazan entre sí.
+    </div>
+    <p><b>De dónde salen los datos.</b> El reporte se genera solo al ejecutar <code>npm run test</code>, <code>npm run test:suite</code> o
+      <code>npx playwright test</code>. Cada suite guarda su propio historial en <code>smart-report/&lt;Suite&gt;/test-history.json</code>
+      (hasta 20 corridas). La IA del reporte está <b>apagada</b>: no se envía ningún dato a proveedores externos.</p>
+    <p class="es-note"><b>Ojo:</b> muchas métricas necesitan historial. Con pocas corridas verás «historial insuficiente» o «Nueva»;
+      es normal y se completa a medida que se repiten las ejecuciones.</p>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s2">
+  <summary><h3>2. Barra superior</h3></summary>
+  <div class="es-body">
+    <table class="es-tbl">
+      <thead><tr><th>Elemento</th><th>Qué significa</th></tr></thead>
+      <tbody>
+        <tr><td>Nombre y fecha</td><td>Identifica la corrida (fecha y hora de inicio). Si corre en CI, también muestra rama, commit y build.</td></tr>
+        <tr><td>Contadores: fallidas · aprobadas · intermitentes · omitidas</td><td>Cada prueba cuenta <b>una sola vez</b>, así que los contadores suman el total. Una prueba que falló en esta corrida cuenta como fallida aunque su historial sea inestable. Al hacer clic se abre la lista correspondiente.</td></tr>
+        <tr><td>Duración</td><td>Tiempo total de la corrida (de reloj, no la suma de las pruebas: corren en paralelo).</td></tr>
+        <tr><td>Buscar (Ctrl+K)</td><td>Paleta de comandos: busca pruebas, vistas, filtros y acciones.</td></tr>
+        <tr><td>Exportar</td><td>Descarga los resultados (CSV, JSON y la tarjeta resumen).</td></tr>
+        <tr><td>Tema</td><td>Modo (sistema, claro, oscuro, alto contraste) y color de acento. Se recuerda en tu navegador.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s3">
+  <summary><h3>3. Menú lateral: las vistas</h3></summary>
+  <div class="es-body">
+    <table class="es-tbl">
+      <thead><tr><th>Vista</th><th>Qué muestra</th></tr></thead>
+      <tbody>
+        <tr><td><b>Fallas</b></td><td>Pruebas que fallaron en esta corrida, <b>agrupadas por causa</b> (grupos de fallas). Es el punto de partida para diagnosticar.</td></tr>
+        <tr><td><b>Intermitentes</b></td><td>Pruebas que pasaron al reintentar en esta corrida, o que el historial marca como inestables (flaky).</td></tr>
+        <tr><td><b>Regresiones</b></td><td>Pruebas que pasan pero que ahora tardan <b>≥ 20 % y ≥ 250 ms más</b> que la mediana de sus corridas aprobadas (necesita ≥ 4 corridas aprobadas), o que en la corrida anterior.</td></tr>
+        <tr><td><b>En cuarentena</b></td><td>Pruebas aisladas a propósito (archivo de cuarentena) para que no bloqueen; hoy no hay ninguna configurada.</td></tr>
+        <tr><td><b>Todas las pruebas</b></td><td>Todas, agrupadas por archivo.</td></tr>
+        <tr><td><b>Resumen (Insights)</b></td><td>Vista de entrada: métricas de la corrida y paneles de resumen (ver sección 4).</td></tr>
+        <tr><td><b>Historial</b></td><td>Tendencias, mapa de confiabilidad y comparación entre corridas (ver sección 8).</td></tr>
+        <tr><td><b>Galería</b></td><td>Capturas, videos y trazas de toda la corrida en un solo lugar.</td></tr>
+        <tr><td><b>En vivo</b></td><td>Progreso mientras la suite corre (requiere activarlo; hoy está desactivado).</td></tr>
+        <tr><td><b>Matriz</b></td><td>Compara el resultado de cada prueba entre proyectos/navegadores (aparece con 2 o más proyectos).</td></tr>
+      </tbody>
+    </table>
+    <p class="es-note">Cobertura de código y Accesibilidad (axe) del propio reporter son opcionales y están desactivadas aquí; las pruebas de accesibilidad del framework se ven en la vista «Todas las pruebas» y en el Portal QA.</p>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s4">
+  <summary><h3>4. Resumen (Insights): tarjetas y paneles</h3></summary>
+  <div class="es-body">
+    <h4>Tarjetas superiores</h4>
+    <table class="es-tbl">
+      <thead><tr><th>Métrica</th><th>Qué mide</th><th>Cómo interpretarla</th></tr></thead>
+      <tbody>
+        <tr><td><b>Fallidas</b></td><td>Pruebas que fallaron; debajo, cuántas son <b>nuevas</b> (no fallaban en la corrida anterior).</td><td>Una falla «nueva» suele indicar un cambio reciente; las recurrentes, un problema sin resolver.</td></tr>
+        <tr><td><b>Tasa de aprobación</b></td><td>Aprobadas ÷ pruebas ejecutadas. Las omitidas no cuentan.</td><td>100 % = sin fallas. Se compara con la corrida base en «Historial → Comparar».</td></tr>
+        <tr><td><b>Duración</b></td><td>Tiempo total de la corrida.</td><td>Súbitas alzas apuntan a esperas, timeouts o sitio lento.</td></tr>
+        <tr><td><b>Pruebas</b></td><td>Total de pruebas; debajo, cuántas son nuevas respecto a la corrida base.</td><td>Sirve para detectar si la suite creció o perdió pruebas.</td></tr>
+        <tr><td><b>Intermitentes</b></td><td>Pruebas que pasaron solo tras reintentar, o con resultados que cambian entre corridas.</td><td>Son las pruebas «poco confiables»: conviene estabilizarlas.</td></tr>
+        <tr><td><b>Salud (A–F)</b></td><td>Una letra que resume la suite combinando <b>aprobación</b> (pass), <b>estabilidad</b> (stability) y <b>rendimiento</b> (perf), visibles debajo de la letra.</td><td>Por defecto: A ≥ 90, B ≥ 80, C ≥ 70, D ≥ 60, F por debajo de 60.</td></tr>
+      </tbody>
+    </table>
+    <p>Bajo las tarjetas, la <b>barra de resultados</b> muestra el reparto aprobadas / fallidas / intermitentes / omitidas.</p>
+
+    <h4>Paneles</h4>
+    <table class="es-tbl">
+      <thead><tr><th>Panel</th><th>Qué contiene</th></tr></thead>
+      <tbody>
+        <tr><td><b>Resumen de IA</b></td><td>Resumen en lenguaje natural de la salud de la suite. Está apagado en este proyecto (no se envían datos a ninguna IA).</td></tr>
+        <tr><td><b>Control de calidad</b></td><td>Evalúa la corrida contra reglas (por ejemplo máximo de fallas o tasa mínima de aprobación) y dice si «pasa» o «bloquea». Hoy no hay reglas configuradas.</td></tr>
+        <tr><td><b>Grupos de fallas</b></td><td>Fallas con la misma causa se agrupan. Cada grupo indica cuántas pruebas afecta, una etiqueta de evolución (<b>Nueva</b>, <b>Recurrente N corridas</b>, <b>Regresada</b>) y una tendencia (cuántas pruebas lo sufrieron en cada corrida). Ver sección 7.</td></tr>
+        <tr><td><b>Grupos resueltos</b></td><td>Grupos de fallas de la corrida base que ya desaparecieron, con las pruebas que ahora pasan.</td></tr>
+        <tr><td><b>En riesgo</b></td><td>Pronóstico de intermitencia: pruebas que <i>pasaron hoy</i> pero cuyo historial muestra señales de inestabilidad (resultados que oscilan, necesidad de reintentos, tiempos cada vez más variables o lentos). Es orientativo: nunca falla un control ni pone nada en cuarentena. Necesita ≥ 5 corridas.</td></tr>
+        <tr><td><b>Eficiencia</b></td><td>Dónde se fue el tiempo de la corrida:
+          <ul>
+            <li><b>Tiempo perdido en reintentos</b>: tiempo de los intentos que Playwright tuvo que repetir (todos menos el último). Aquí <code>retries = 2</code>, así que una prueba que falla consume hasta 3 intentos.</li>
+            <li><b>Más lentas 5 % / 10 %</b> («cola larga»): qué parte del tiempo total consumen las pruebas más lentas. Si es alta, pocas pruebas dominan la duración.</li>
+            <li><b>Preparación antes de la primera prueba</b>: tiempo desde que inicia la corrida hasta que arranca la primera prueba (setup global, servidor web, inicio de workers).</li>
+            <li><b>Uso de workers</b>: porcentaje de tiempo que los workers (procesos paralelos) estuvieron trabajando frente a inactivos, con el detalle de cada worker (intentos, ocupado, inactivo).</li>
+          </ul></td></tr>
+        <tr><td><b>Regresiones</b></td><td>Pruebas que pasan pero se volvieron más lentas (criterio de la vista «Regresiones»).</td></tr>
+        <tr><td><b>Más lentas</b></td><td>Las pruebas que más tardaron en esta corrida.</td></tr>
+        <tr><td><b>Más inestables</b></td><td>Pruebas intermitentes o inestables ordenadas por puntaje, con el porcentaje de corridas afectadas (por ejemplo «45 % de 11 corridas»).</td></tr>
+        <tr><td><b>Corregidas</b></td><td>Pruebas que fallaban en la corrida base y ahora pasan.</td></tr>
+        <tr><td><b>Pruebas nuevas</b></td><td>Pruebas que no existían en la corrida base.</td></tr>
+        <tr><td><b>Cuarentena</b> y <b>Responsables</b></td><td>Pruebas en cuarentena y reparto de pruebas por responsable (CODEOWNERS o git), si está configurado.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s5">
+  <summary><h3>5. Lista y detalle de una prueba</h3></summary>
+  <div class="es-body">
+    <p><b>La lista.</b> Cada fila muestra el estado, la ruta (proyecto › suite › prueba), el archivo y línea, los intentos (<code>×3</code> = tres intentos), la duración y, como máximo, un marcador:
+      <i>Falla nueva</i>, <i>Regresión</i>, <i>Intermitente</i>, <i>En cuarentena</i> o <i>Lenta</i>. Se puede agrupar por grupo de falla, archivo, proyecto, suite, etiqueta, estado, calificación, responsable, worker o shard.</p>
+    <p><b>El detalle</b> (al seleccionar una prueba) sigue el orden en que conviene diagnosticar; las secciones sin datos no aparecen:</p>
+    <table class="es-tbl">
+      <thead><tr><th>Sección</th><th>Qué muestra</th></tr></thead>
+      <tbody>
+        <tr><td><b>Encabezado</b></td><td>Ruta, archivo:línea, proyecto, duración, intentos, <b>calificación A–F</b> de estabilidad, responsables y etiquetas. Botones: <i>Copiar resumen de la falla</i>, <i>Copiar prompt para IA</i> y <i>Abrir traza</i>.</td></tr>
+        <tr><td><b>Error</b></td><td>Mensaje y pila de la falla (las pilas largas se pliegan).</td></tr>
+        <tr><td><b>Esperado y recibido</b></td><td>Comparación de los valores cuando la aserción los trae.</td></tr>
+        <tr><td><b>Código fuente</b></td><td>Fragmento de código de la línea donde falló.</td></tr>
+        <tr><td><b>Línea de tiempo</b></td><td>Pasos, peticiones de red y consola de la prueba fallida sobre <b>un mismo eje de tiempo</b>; arrastrando el cursor ves qué pasaba en cada instante. Sugiere la <b>primera anomalía posible</b>: el primer evento raro antes de la falla (respuesta de red ≥ 500 o petición caída, <code>console.error</code>/excepción de la página, o un paso mucho más lento que su promedio). Es una pista heurística, <b>no un diagnóstico</b>.</td></tr>
+        <tr><td><b>Análisis de IA</b></td><td>Sugerencia de causa por IA (apagado aquí). <i>Copiar prompt para IA</i> sí funciona: copia el error, el log y el código para pegarlo en cualquier asistente.</td></tr>
+        <tr><td><b>Intentos</b></td><td>Cada intento con estado, duración y primer error; indica en qué paso divergieron los intentos (por ejemplo «el intento 1 falló en el paso X; el 2 lo superó»). En pruebas intermitentes compara paso a paso y, si hay trazas, qué peticiones o errores de consola difieren.</td></tr>
+        <tr><td><b>Pasos</b></td><td>Cada paso con una barra de duración; el paso que falló aparece marcado.</td></tr>
+        <tr><td><b>Red</b> y <b>Consola</b></td><td>Peticiones (método, estado, ruta, duración) y mensajes de consola extraídos de la traza.</td></tr>
+        <tr><td><b>Adjuntos</b></td><td>Capturas y videos (se abren en un visor), trazas (Abrir/Descargar) y otros archivos adjuntos.</td></tr>
+        <tr><td><b>Historial</b></td><td>Franja con los resultados de las últimas corridas, cuántas aprobó, mediana de duración de las corridas aprobadas, <b>intermitencia con intervalo de confianza del 95 %</b> (o «historial insuficiente» con menos de 5 corridas), calificación y mini gráfico de duración.</td></tr>
+      </tbody>
+    </table>
+    <p class="es-note">En este proyecto video, captura y traza están en «siempre», por eso casi cada prueba trae sus tres adjuntos.</p>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s6">
+  <summary><h3>6. Intermitencia (flaky) y estabilidad</h3></summary>
+  <div class="es-body">
+    <p>Una prueba <b>intermitente</b> (flaky) es la que a veces pasa y a veces falla sin que cambie el código. Smart Reporter la mide <b>a lo largo de varias corridas</b>, no solo dentro de una:</p>
+    <table class="es-tbl">
+      <thead><tr><th>Indicador</th><th>Cuándo aparece</th></tr></thead>
+      <tbody>
+        <tr><td>🔴 <b>Intermitente (Flaky)</b></td><td>Pasó tras reintentar en esta corrida, o su inestabilidad es ≥ 0,3.</td></tr>
+        <tr><td>🟡 <b>Inestable</b></td><td>Inestabilidad ≥ 0,1.</td></tr>
+        <tr><td>🟢 <b>Estable</b></td><td>Inestabilidad menor y la prueba pasó en esta corrida.</td></tr>
+        <tr><td>🔴 <b>Fallando</b></td><td>Falló en todas las corridas (o falló hoy con inestabilidad baja): es una falla real, no intermitencia.</td></tr>
+        <tr><td>⚪ <b>Historial insuficiente</b></td><td>Menos de 5 corridas registradas.</td></tr>
+        <tr><td>⚪ <b>Nueva / Omitida</b></td><td>Sin historial, o la prueba se omitió.</td></tr>
+      </tbody>
+    </table>
+    <p>«Inestabilidad» cuenta cuántas veces el resultado <i>cambió</i> entre pasa y falla de una corrida a la siguiente, más las corridas que pasaron solo con reintento, dividido entre el número de corridas. Una prueba que estuvo rota y luego se arregló cambió una vez y <b>no</b> es intermitente.</p>
+    <p>La <b>calificación A–F</b> de cada prueba resume su estabilidad combinando intermitencia, rendimiento y confiabilidad.</p>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s7">
+  <summary><h3>7. Grupos de fallas</h3></summary>
+  <div class="es-body">
+    <p>Las fallas con la <b>misma huella</b> forman un grupo. La huella combina: la clase de error (o el verificador, por ejemplo <code>toBeVisible</code>), el mensaje sin números, URLs ni identificadores, el archivo donde falla y el primer localizador citado. Así, dos timeouts sobre localizadores distintos son dos grupos, y una aserción que falla con números distintos es un solo grupo.</p>
+    <table class="es-tbl">
+      <thead><tr><th>Etiqueta</th><th>Significado</th></tr></thead>
+      <tbody>
+        <tr><td><b>Nueva</b></td><td>Ninguna corrida del historial tuvo este grupo de falla.</td></tr>
+        <tr><td><b>Recurrente, N corridas</b></td><td>Ya fallaba en las corridas previas; N cuenta las corridas seguidas desde que apareció (esta incluida).</td></tr>
+        <tr><td><b>Regresada</b></td><td>El grupo había desaparecido y volvió en esta corrida.</td></tr>
+        <tr><td>(sin etiqueta)</td><td>No hay historial suficiente para saber si es nuevo o viejo (primera corrida).</td></tr>
+      </tbody>
+    </table>
+    <p>Cada grupo tiene además una <b>tendencia</b>: cuántas pruebas fallaron por esa causa en cada corrida del historial y en la actual.</p>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s8">
+  <summary><h3>8. Historial: Tendencias, Confiabilidad y Comparar</h3></summary>
+  <div class="es-body">
+    <table class="es-tbl">
+      <thead><tr><th>Pestaña</th><th>Qué muestra</th></tr></thead>
+      <tbody>
+        <tr><td><b>Tendencias</b></td><td>Barras por corrida de: tasa de aprobación, duración, pruebas intermitentes y pruebas lentas. La <b>línea</b> es el promedio de tres corridas; un <b>punto</b> marca una corrida atípica (a más de dos desviaciones estándar de la media).</td></tr>
+        <tr><td><b>Confiabilidad</b></td><td>Mapa de calor «prueba × corrida» con el resultado de cada prueba que no pasó al menos una vez (hasta 100, las más inestables primero). Permite ver patrones: fallas que aparecen en la misma corrida, o pruebas que oscilan.</td></tr>
+        <tr><td><b>Comparar</b></td><td>La corrida actual frente a la <b>corrida base</b> (por defecto, la anterior): variación de tasa de aprobación (en puntos), duración, número de pruebas e intermitentes; y las listas de fallas nuevas, regresiones de rendimiento, corregidas, mejoras de rendimiento, pruebas nuevas y pruebas que no estaban en la corrida base.</td></tr>
+      </tbody>
+    </table>
+    <p class="es-note">Una prueba que no se ejecutó en la corrida base (por ejemplo porque se corrió con <code>--grep</code>) aparece como «no estaba en la corrida base», no como nueva ni corregida.</p>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s9">
+  <summary><h3>9. Galería, Matriz y En vivo</h3></summary>
+  <div class="es-body">
+    <ul>
+      <li><b>Galería</b>: todas las capturas, videos y trazas de la corrida, con filtros por tipo y conteos. Capturas y videos se abren en un visor; las trazas, en el visor de trazas de Playwright.</li>
+      <li><b>Matriz</b>: lista las pruebas cuyo resultado <b>no es igual en todos los proyectos</b> (por ejemplo, pasa en Chromium y falla en Firefox). Arriba, los «hallazgos del entorno» señalan fallas ligadas a un solo proyecto, navegador o worker, que apuntan a un problema de entorno y no de la prueba.</li>
+      <li><b>En vivo</b>: avance durante la ejecución (tiempo, progreso, contadores y fallas apenas ocurren). Requiere activar <code>live: { enabled: true }</code> y servir el reporte con <code>npx playwright-smart-reporter-serve --live</code>.</li>
+    </ul>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s10">
+  <summary><h3>10. Filtros, agrupación y atajos de teclado</h3></summary>
+  <div class="es-body">
+    <p><b>Filtros.</b> La barra de filtros acepta texto libre y fragmentos con prefijo. Mismo prefijo = «o»; prefijos distintos = «y». Los valores con espacios van entre comillas.</p>
+    <table class="es-tbl">
+      <thead><tr><th>Prefijo</th><th>Filtra por</th><th>Ejemplo</th></tr></thead>
+      <tbody>
+        <tr><td><code>status:</code></td><td>estado (failed, passed, flaky, skipped, timedOut, interrupted)</td><td><code>status:failed</code></td></tr>
+        <tr><td><code>project:</code></td><td>proyecto de Playwright</td><td><code>project:ui-firefox</code></td></tr>
+        <tr><td><code>file:</code></td><td>parte de la ruta del archivo</td><td><code>file:security</code></td></tr>
+        <tr><td><code>suite:</code></td><td>bloque describe</td><td><code>suite:"Brute force"</code></td></tr>
+        <tr><td><code>tag:</code></td><td>etiqueta</td><td><code>tag:@UI</code></td></tr>
+        <tr><td><code>grade:</code></td><td>calificación A–F</td><td><code>grade:D</code></td></tr>
+        <tr><td><code>signal:</code></td><td>new-failure, regression, flaky, quarantined, slow, fixed, new</td><td><code>signal:regression</code></td></tr>
+        <tr><td><code>owner:</code></td><td>responsable</td><td><code>owner:@equipo</code></td></tr>
+      </tbody>
+    </table>
+    <p>Cada vista, filtro, agrupación y prueba seleccionada queda en la URL: puedes <b>copiar el enlace</b> para compartir exactamente lo que ves.</p>
+    <table class="es-tbl es-keys">
+      <thead><tr><th>Teclas</th><th>Acción</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>j</kbd> / <kbd>k</kbd> (o ↓ / ↑)</td><td>Prueba siguiente / anterior</td></tr>
+        <tr><td><kbd>↵</kbd></td><td>Abrir prueba</td></tr>
+        <tr><td><kbd>[</kbd> / <kbd>]</kbd> · <kbd>f</kbd></td><td>Falla anterior / siguiente · siguiente falla</td></tr>
+        <tr><td><kbd>n</kbd></td><td>Siguiente prueba intermitente</td></tr>
+        <tr><td><kbd>Esc</kbd></td><td>Cerrar, o volver a la lista</td></tr>
+        <tr><td><kbd>g</kbd> <kbd>f</kbd> · <kbd>g</kbd> <kbd>l</kbd> · <kbd>g</kbd> <kbd>i</kbd> · <kbd>g</kbd> <kbd>h</kbd></td><td>Ir a Fallas · Intermitentes · Resumen · Historial</td></tr>
+        <tr><td><kbd>1</kbd> – <kbd>5</kbd></td><td>Fallas, Todas las pruebas, Resumen, Historial, Galería</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>K</kbd> · <kbd>/</kbd></td><td>Paleta de comandos · filtrar pruebas</td></tr>
+        <tr><td><kbd>c</kbd> · <kbd>e</kbd></td><td>Copiar resumen de la falla · tarjeta resumen</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>B</kbd> · <kbd>?</kbd></td><td>Mostrar u ocultar barra lateral · lista completa de atajos</td></tr>
+      </tbody>
+    </table>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s11">
+  <summary><h3>11. Glosario</h3></summary>
+  <div class="es-body">
+    <dl class="es-dl">
+      <dt>Corrida base (baseline)</dt><dd>La corrida contra la que se compara la actual; por defecto, la anterior.</dd>
+      <dt>Intermitente (flaky)</dt><dd>Prueba cuyo resultado cambia sin que cambie el código, o que solo pasa al reintentar.</dd>
+      <dt>Reintento (retry)</dt><dd>Nueva ejecución automática de una prueba fallida. Aquí se permiten 2, por lo que verás «×3» en pruebas que fallan siempre.</dd>
+      <dt>Regresión de rendimiento</dt><dd>Prueba que sigue pasando pero ahora tarda notablemente más que antes.</dd>
+      <dt>Grupo de fallas (cluster)</dt><dd>Conjunto de fallas con la misma causa aparente.</dd>
+      <dt>Primera anomalía</dt><dd>Primer evento sospechoso antes de la falla en la línea de tiempo; una pista, no un diagnóstico.</dd>
+      <dt>Traza (trace)</dt><dd>Grabación paso a paso de la prueba (DOM, red, consola, capturas) que se abre en el visor de trazas.</dd>
+      <dt>Cuarentena</dt><dd>Aislar una prueba inestable para que no bloquee mientras se corrige.</dd>
+      <dt>Worker</dt><dd>Proceso que ejecuta pruebas en paralelo.</dd>
+      <dt>Salud (health)</dt><dd>Calificación A–F de toda la suite.</dd>
+    </dl>
+  </div>
+</details>
+
+<details class="es-sec" id="es-s12">
+  <summary><h3>12. Cómo leerlo en este proyecto</h3></summary>
+  <div class="es-body">
+    <ul>
+      <li><b>Proyectos.</b> Cada tipo de prueba del framework aparece como un <i>proyecto</i>: <code>ui-chromium</code>, <code>ui-firefox</code>, <code>ui-webkit</code>, <code>api</code>, <code>performance</code>, <code>accessibility</code>, <code>visual</code>, <code>security</code> y <code>non-functional</code>. La <b>Matriz</b> sirve para comparar los tres navegadores de UI.</li>
+      <li><b>«Fila 1/1»</b> en el nombre de una prueba indica una ejecución data-driven: la fila de <code>BoxTestData/</code> con la que corrió.</li>
+      <li><b>Muchas fallas con «Timeout» a la vez</b> (UI, API y accesibilidad en la misma corrida) suelen indicar que el sitio probado estuvo lento o caído, no que el código falle: revisa la <b>línea de tiempo</b> y la <b>Matriz</b> antes de investigar cada prueba.</li>
+      <li><b>Pruebas «Intermitentes» por pasar al reintentar</b>: son las primeras candidatas a estabilizar; el panel «En riesgo» anticipa cuáles pueden serlo pronto.</li>
+      <li><b>Un historial por suite.</b> Cambiar el nombre de una suite empieza un historial nuevo; por eso aparecen «Nueva» e «historial insuficiente» al principio.</li>
+    </ul>
+  </div>
+</details>

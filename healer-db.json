@@ -1,6 +1,10 @@
 {
   "page.getByRole('button', { name: 'Confirmar' })": {
     "selector": "button:has-text(\"TRANSFERIR\")",
-    "savedAt": 1784133606585
+    "savedAt": 1793139871359
+  },
+  "Usuario": {
+    "selector": "text=Error",
+    "savedAt": 1793192132237
   }
 }

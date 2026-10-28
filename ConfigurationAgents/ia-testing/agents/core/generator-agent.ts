@@ -69,6 +69,11 @@ export async function buildFeature(name: string, rawActions: Action[]): Promise<
         steps.push(`And ingresa "${value}" en "${target}"`);
         break;
       case 'navigate': {
+        // El page_load inicial de la grabación trae la URL en `url`, no en `target`, y
+        // action-normalizer le pone el placeholder 'elemento' (la URL va en metadata y el Given
+        // "el usuario está en la aplicación" ya navega): sin este guard salía el paso basura
+        // `hace clic en "elemento"`, que hacía fallar el escenario bdd-ui.
+        if (!action.target || action.target === 'elemento') break;
         const isRealUrl = target.startsWith('http') || target.startsWith('/') ||
                           target.includes('.com') || target.includes('localhost');
         if (isRealUrl) steps.push(`When navega a "${target}"`);
@@ -95,6 +100,7 @@ export async function buildFeature(name: string, rawActions: Action[]): Promise<
   }
 
   return `
+@UI
 Feature: ${name}
 
 Scenario: Flujo ${name}

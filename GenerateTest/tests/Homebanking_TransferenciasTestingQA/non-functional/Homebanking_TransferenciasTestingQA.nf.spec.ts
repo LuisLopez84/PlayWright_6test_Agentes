@@ -2,7 +2,7 @@
  * Homebanking_TransferenciasTestingQA.nf.spec.ts
  *
  * Prueba NO FUNCIONAL (Carga / Rendimiento) — Homebanking_TransferenciasTestingQA
- * Targets: 3 | SOAP Calculator — INCREMENTAL (incremental), SOAP Calculator — PICOS (spike), Homebanking_TransferenciasTestingQA (incremental)
+ * Targets: 4 | SOAP Calculator — INCREMENTAL (incremental), SOAP Calculator — PICOS (spike), REST Transferencias Dashboard — PICOS (spike), REST Transferencias Dashboard — INCREMENTAL (incremental)
  *
  * AUTO-GENERADO por:
  *   npx ts-node GenerateTest/non-functional/generator/generate-nf-tests.ts
@@ -33,10 +33,12 @@ const NF_TARGET_0: LoadTarget = {
     "SOAPAction": "http://tempuri.org/Add"
   },
   body: `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 <soap:Body>
-<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
-</ListOfContinentsByName>
+<Add xmlns="http://tempuri.org/">
+<intA>5</intA>
+<intB>2</intB>
+</Add>
 </soap:Body>
 </soap:Envelope>`,
   type: 'api',
@@ -81,10 +83,12 @@ const NF_TARGET_1: LoadTarget = {
     "SOAPAction": "http://tempuri.org/Add"
   },
   body: `<?xml version="1.0" encoding="utf-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+<soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
 <soap:Body>
-<ListOfContinentsByName xmlns="http://www.oorsprong.org/websamples.countryinfo">
-</ListOfContinentsByName>
+<Add xmlns="http://tempuri.org/">
+<intA>5</intA>
+<intB>2</intB>
+</Add>
 </soap:Body>
 </soap:Envelope>`,
   type: 'api',
@@ -129,14 +133,67 @@ const NF_PARAMS_1 = {
     ]
   }; // spike
 
-// ─── Target 3: Homebanking_TransferenciasTestingQA [RECORDING] — INCREMENTAL ────
+// ─── Target 3: REST Transferencias Dashboard — PICOS [API] — SPIKE ────
 const NF_TARGET_2: LoadTarget = {
-  name: 'Homebanking_TransferenciasTestingQA',
-  url: 'https://homebanking-demo-tests.netlify.app',
+  name: 'REST Transferencias Dashboard — PICOS',
+  url: 'https://homebanking-demo.onrender.com/transferencias/',
   method: 'GET',
-  headers: {},
+  headers: {
+    "accept": "application/json"
+  },
   body: undefined,
-  type: 'recording',
+  type: 'api',
+  testType: 'spike',
+  incremental: {
+    "scenarios": 3,
+    "initialThreads": 10,
+    "finalThreads": 50,
+    "durationPerScenarioSeconds": 30
+  },
+  spike: {
+    "threadsPerScenario": [
+      1,
+      8,
+      4,
+      10,
+      3
+    ],
+    "durationPerScenarioSeconds": [
+      5,
+      5,
+      5,
+      5,
+      5
+    ]
+  },
+};
+const NF_PARAMS_2 = {
+    "threadsPerScenario": [
+      1,
+      8,
+      4,
+      10,
+      3
+    ],
+    "durationPerScenarioSeconds": [
+      5,
+      5,
+      5,
+      5,
+      5
+    ]
+  }; // spike
+
+// ─── Target 4: REST Transferencias Dashboard — INCREMENTAL [API] — INCREMENTAL ────
+const NF_TARGET_3: LoadTarget = {
+  name: 'REST Transferencias Dashboard — INCREMENTAL',
+  url: 'https://homebanking-demo.onrender.com/transferencias/',
+  method: 'GET',
+  headers: {
+    "accept": "application/json"
+  },
+  body: undefined,
+  type: 'api',
   testType: 'incremental',
   incremental: {
     "scenarios": 5,
@@ -161,7 +218,7 @@ const NF_TARGET_2: LoadTarget = {
     ]
   },
 };
-const NF_PARAMS_2 = {
+const NF_PARAMS_3 = {
     "scenarios": 5,
     "initialThreads": 1,
     "finalThreads": 5,
@@ -176,29 +233,36 @@ test('Non-Functional — Homebanking_TransferenciasTestingQA', async () => {
 
   console.log('\n' + '═'.repeat(60));
   console.log('  🚀 Prueba No Funcional: Homebanking_TransferenciasTestingQA');
-  console.log('  📋 Targets: 3 | SOAP Calculator — INCREMENTAL (incremental) + SOAP Calculator — PICOS (spike) + Homebanking_TransferenciasTestingQA (incremental)');
+  console.log('  📋 Targets: 4 | SOAP Calculator — INCREMENTAL (incremental) + SOAP Calculator — PICOS (spike) + REST Transferencias Dashboard — PICOS (spike) + REST Transferencias Dashboard — INCREMENTAL (incremental)');
   console.log('═'.repeat(60));
 
-  // ── [1/3] SOAP Calculator — INCREMENTAL — INCREMENTAL ─────────────────────
+  // ── [1/4] SOAP Calculator — INCREMENTAL — INCREMENTAL ─────────────────────
   console.log('\n' + '─'.repeat(60));
   console.log('  📡 SOAP Calculator — INCREMENTAL | http://www.dneonline.com/calculator.asmx');
   console.log('  📋 Tipo: INCREMENTAL');
   const summaries_0 = await runIncrementalTest(NF_TARGET_0, NF_PARAMS_0, NFConfig.assertions);
   printSummaryTable(NF_TARGET_0, summaries_0, 'incremental');
 
-  // ── [2/3] SOAP Calculator — PICOS — SPIKE ─────────────────────
+  // ── [2/4] SOAP Calculator — PICOS — SPIKE ─────────────────────
   console.log('\n' + '─'.repeat(60));
   console.log('  📡 SOAP Calculator — PICOS | http://www.dneonline.com/calculator.asmx');
   console.log('  📋 Tipo: SPIKE');
   const summaries_1 = await runSpikeTest(NF_TARGET_1, NF_PARAMS_1, NFConfig.assertions);
   printSummaryTable(NF_TARGET_1, summaries_1, 'spike');
 
-  // ── [3/3] Homebanking_TransferenciasTestingQA — INCREMENTAL ─────────────────────
+  // ── [3/4] REST Transferencias Dashboard — PICOS — SPIKE ─────────────────────
   console.log('\n' + '─'.repeat(60));
-  console.log('  📡 Homebanking_TransferenciasTestingQA | https://homebanking-demo-tests.netlify.app');
+  console.log('  📡 REST Transferencias Dashboard — PICOS | https://homebanking-demo.onrender.com/transferencias/');
+  console.log('  📋 Tipo: SPIKE');
+  const summaries_2 = await runSpikeTest(NF_TARGET_2, NF_PARAMS_2, NFConfig.assertions);
+  printSummaryTable(NF_TARGET_2, summaries_2, 'spike');
+
+  // ── [4/4] REST Transferencias Dashboard — INCREMENTAL — INCREMENTAL ─────────────────────
+  console.log('\n' + '─'.repeat(60));
+  console.log('  📡 REST Transferencias Dashboard — INCREMENTAL | https://homebanking-demo.onrender.com/transferencias/');
   console.log('  📋 Tipo: INCREMENTAL');
-  const summaries_2 = await runIncrementalTest(NF_TARGET_2, NF_PARAMS_2, NFConfig.assertions);
-  printSummaryTable(NF_TARGET_2, summaries_2, 'incremental');
+  const summaries_3 = await runIncrementalTest(NF_TARGET_3, NF_PARAMS_3, NFConfig.assertions);
+  printSummaryTable(NF_TARGET_3, summaries_3, 'incremental');
 
   console.log('\n  ✅ Prueba no funcional completada: Homebanking_TransferenciasTestingQA\n');
 });

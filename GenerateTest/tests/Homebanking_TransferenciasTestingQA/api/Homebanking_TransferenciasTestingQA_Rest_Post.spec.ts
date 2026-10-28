@@ -1,28 +1,14 @@
 import { test, expect } from '@playwright/test';
 import { restRequest } from '../../../../ConfigurationTest/tests/utils/api-helper';
 
-test.describe('Homebanking_TransferenciasTestingQA_POST_REST', () => {
+test.describe('Homebanking_TransferenciasTestingQA_Rest_Post', () => {
 
-  // Datos variables cargados desde BoxTestData/ — 3 fila(s)
+  // Datos variables cargados desde BoxTestData/ — 1 fila(s)
   const DDT_BODIES: any[] = [
   {
     "cuenta_destino": "ACC002",
     "cuenta_origen": "ACC001",
     "monto": "500",
-    "motivo": "Varios",
-    "tipo": "propia"
-  },
-  {
-    "cuenta_destino": "ACC002",
-    "cuenta_origen": "ACC001",
-    "monto": "1200",
-    "motivo": "Varios",
-    "tipo": "propia"
-  },
-  {
-    "cuenta_destino": "ACC002",
-    "cuenta_origen": "ACC001",
-    "monto": "2500",
     "motivo": "Varios",
     "tipo": "propia"
   }
