@@ -19,10 +19,10 @@
 11. [Tipos de prueba generados](#tipos-de-prueba-generados)
 12. [Arquitectura y agentes IA](#arquitectura-y-agentes-ia)
 13. [Auto-healing de 6 capas](#auto-healing-de-6-capas)
-
 14. [Estructura de carpetas](#estructura-de-carpetas)
 15. [Scripts de package.json](#scripts-de-packagejson)
 16. [Solución de problemas](#solución-de-problemas)
+17. [Documentación del proyecto](#documentación-del-proyecto)
 
 ---
 
@@ -39,9 +39,15 @@ A partir de una **grabación de Playwright codegen** genera automáticamente:
 | **Security** | Headers HTTP, XSS, SQL injection, fuerza bruta, HTTPS enforcement |
 | **Visual** | Regresión visual por comparación de capturas de pantalla |
 | **Non-Functional** | Pruebas de carga estilo JMeter: incremental y spike con métricas TPS |
-| **BDD** | Escenarios Gherkin (`.feature`) + step definitions auto-generados por IA |
+| **BDD (informativo)** | Escenarios Gherkin (`.feature`) + step definitions auto-generados por IA. Narra el flujo de UI; **no es un tipo de prueba independiente** (sin % de éxito propio) |
 
-Todo aparece en un **único reporte HTML de Playwright** agrupado por suite.
+Cada ejecución produce **tres informes complementarios**:
+
+| Informe | Para quién | Dónde |
+|---|---|---|
+| **Portal QA** | Negocio y QA: resultado por tipo de prueba, % de éxito, evidencias (video/trazas/capturas), datos usados | `playwright-report/portal.html` |
+| **Reporte HTML de Playwright** | Ingeniería: detalle técnico estándar por suite | `reports/<Suite>/index.html` |
+| **Smart Report** (en español) | QA e ingeniería: causas agrupadas, intermitencia, tendencias, regresiones de rendimiento y salud A–F | `smart-report/<Suite>/smart-report.html` |
 
 ---
 
@@ -421,6 +427,36 @@ Abre un servidor local en `http://localhost:9323` con:
 - Videos, trazas y capturas de pantalla de cada test
 - Resultados de non-functional con la grilla JMeter integrada
 
+### Portal QA (`portal.html`)
+
+```bash
+npm run portal   # regenera playwright-report/portal.html desde test-results/results.xml (no ejecuta pruebas)
+```
+
+Una pestaña por tipo de prueba (UI, API, Performance, Security, Accessibility, Visual, No funcional) con % de éxito, evidencias y, si usas datos variables, los valores de cada fila. Incluye además:
+
+- **Gherkin (BDD)** — pestaña **informativa**: muestra qué se probó en lenguaje natural y el estado de cada escenario. No es un tipo de prueba (sin porcentaje). Las features de API toman su estado del proyecto `api`; las de suites que no se ejecutaron dicen «Fuera de esta corrida».
+- **Test Sets** — el detalle de cada spec ejecutado.
+- **Accesibilidad en español** — las violaciones de axe-core se muestran en español, con severidades CRÍTICA / GRAVE / MODERADA / MENOR.
+- Botón **Smart Report** en el encabezado, junto a CSV y Resumen Ejecutivo (PDF).
+
+### Smart Report (`playwright-smart-reporter`, en español)
+
+Informe adicional que **compara cada corrida con el historial de las anteriores** y responde: ¿qué falló y por qué?, ¿qué fallas son la misma causa?, ¿qué pruebas son intermitentes?, ¿qué se volvió más lento?, ¿qué tan sana está la suite?
+
+```
+smart-report/<Suite>/smart-report.html     ← ábrelo con doble clic
+smart-report/<Suite>/test-history.json     ← historial (hasta 20 corridas) por suite
+```
+
+- **Interfaz en español**, con un apartado visible **«Sobre este reporte»** (resumen para stakeholders: qué es, qué aporta frente al reporte estándar, métricas, por qué importa) y un botón **«Guía del reporte»** con la explicación de cada tarjeta, panel y métrica.
+- **Métricas:** tasa de aprobación, grupos de fallas (nueva / recurrente / regresada), salud A–F, intermitencia (flaky), pruebas en riesgo, regresiones de rendimiento, tiempo perdido en reintentos, uso de workers, tendencias, comparación con la corrida base, línea de tiempo causal y matriz entre navegadores.
+- **La IA del reporte está apagada:** no se envía ningún dato a proveedores externos.
+- Se genera solo al ejecutar `npm run test`, `npm run test:suite` o `npx playwright test` (no corre en el pipeline de CI, que fija sus propios reporters).
+- `npm run smart-report:es` vuelve a aplicar la traducción a reportes ya generados, sin ejecutar pruebas.
+
+> **Importante — una ejecución a la vez.** Cada ejecución de Playwright vacía `test-results/` y `playwright-report/` (borra `portal.html` y las evidencias de la corrida anterior). No lances dos ejecuciones en paralelo ni «pruebas rápidas» mientras revisas un reporte; si quieres verificar algo sin tocar esas carpetas usa `npx playwright test … --reporter=list --output=<carpeta temporal>`.
+
 ### Reportes por suite
 
 Después de `npm run test`, cada suite genera su propio reporte en:
@@ -449,11 +485,11 @@ npm run report          # abre el último reporte HTML
 | API | `api` | `tests/<suite>/api/` | REST 200/400/404 auto-detectados del tráfico |
 | API manual | `api` | `api-testing-rest-soap/rest/` o `soap/` | Endpoints y payloads definidos por el tester |
 | Performance | `performance` | `tests/<suite>/performance/` | LCP, FID, CLS, tiempo de carga |
-| Accessibility | `accessibility` | `tests/<suite>/accessibility/` | axe-core WCAG 2.1 AA |
+| Accessibility | `accessibility` | `tests/<suite>/accessibility/` | axe-core WCAG 2.1 AA — violaciones en español |
 | Security | `security` | `tests/<suite>/security/` | Headers, XSS, SQLi, brute-force, HTTPS |
 | Visual | `visual` | `tests/<suite>/visual/` | Screenshot diff pixel-by-pixel |
 | Non-Functional | `non-functional` | `tests/<suite>/non-functional/` | Carga incremental y spike estilo JMeter |
-| BDD | `bdd-ui` | `features/` + `steps/` | Escenarios Gherkin con login compartido |
+| BDD (informativo) | `bdd-ui` | `features/` + `steps/` | Escenarios Gherkin (`@UI`) que narran el flujo de UI; se ejecutan en una corrida acotada por suite |
 
 ---
 
@@ -470,6 +506,8 @@ ConfigurationAgents/ia-testing/
     │               security-agent, visual-agent
     network/      ← api-discovery, api-test-generator
     recorder/     ← recorder-parser-agent (normaliza steps)
+  mcp/server.ts ← servidor MCP (canal interactivo con asistentes de IA)
+  reporters/    ← Smart Reporter en español (envoltorio + diccionario + guía)
   scripts/
     run-agents.ts ← orquestador principal
         │
@@ -542,8 +580,12 @@ playwright-enterprise-template/
 │       │   ├── network/               ← api-discovery.agent, box-api-executor.agent
 │       │   └── recorder/              ← parser de grabaciones .ts → steps normalizados
 │       ├── mcp/server.ts              ← servidor MCP (delega en el CLI de @playwright/mcp)
-│       ├── scripts/                   ← run-agents.ts (orquestador), generate-portal.js, monitor.ts
-│       └── utils/                     ← openai-client, helpers
+│       ├── reporters/                 ← Smart Reporter en español
+│       │   ├── smart-reporter-es.ts   ← reporter que usa playwright.config.ts
+│       │   └── smart-report-es/       ← inject.js, client.js (diccionario), guide.html, about.html, styles.css
+│       ├── scripts/                   ← run-agents.ts (orquestador), split-reports.js, test-suite.ts, generate-portal.js,
+│       │                                heal-specs.ts, localize-smart-report.js, monitor.ts
+│       └── utils/                     ← openai-client, concurrency, helpers
 │
 ├── ConfigurationTest/
 │   └── tests/
@@ -580,7 +622,10 @@ playwright-enterprise-template/
 │           ├── visual/
 │           └── non-functional/
 │
-├── playwright.config.ts               ← configuración global + proyectos
+├── Documentation/                     ← documentación (ver sección «Documentación del proyecto»)
+├── .features-gen/                     ← specs BDD compilados por playwright-bdd (auto-generado)
+├── smart-report/                      ← salida del Smart Report por suite (ignorada por git)
+├── playwright.config.ts               ← configuración global + proyectos + reporters
 ├── package.json                       ← scripts npm
 ├── tsconfig.json                      ← path aliases @utils, @pages, @config
 ├── learning-db.json                   ← aprendizaje de selectores (auto-generado)
@@ -599,14 +644,16 @@ playwright-enterprise-template/
 | `npm run generate:nf` | Genera specs de pruebas no funcionales dentro de las suites |
 | `npm run generate:nf -- --suite=<Nombre>` / `npm run generate:nf:suite -- --suite=<Nombre>` | Genera las pruebas de carga de **solo** esa suite |
 | `npm run generate:api` | Genera tests de API a partir del tráfico capturado en la última ejecución |
-| `npm run test` | Flujo completo: generate + bdd + ejecución + reportes por suite |
+| `npm run test` | Flujo completo: generate + bdd + ejecución (principal + `bdd-ui` acotado) + reportes por suite + Portal QA + Smart Report |
 | `npm run test:suite -- --suite=<Nombre>` | Genera y ejecuta el pipeline completo de **una sola** suite |
 | `npm run bdd` | Solo transpila features BDD a tests |
 | `npm run test:smoke` | Ejecuta solo tests con tag `@smoke` |
 | `npm run test:api` | Genera y ejecuta solo el proyecto `api`, luego reportes |
 | `npm run mcp:server` | Arranca el servidor MCP (delega en el CLI de `@playwright/mcp`) — `HEADLESS=false` para modo visual, `MCP_PORT` para transporte HTTP/SSE |
 | `npm run report` | Abre el último reporte HTML |
-| `npm run reports-index` | Genera el índice global de reportes multi-suite |
+| `npm run reports-index` | Genera el índice global de reportes multi-suite (con botón al Smart Report de cada suite) |
+| `npm run portal` | Regenera `playwright-report/portal.html` sin ejecutar pruebas |
+| `npm run smart-report:es` | Aplica (o re-aplica) la traducción al español a los `smart-report/**/smart-report.html` ya generados, sin ejecutar pruebas |
 
 ---
 
@@ -623,7 +670,7 @@ Al ejecutar `npm run generate`, el agente `box-api-executor.agent.ts` detecta el
 
 ## Pruebas con datos variables (Data-Driven Testing)
 
-Para ejecutar el mismo flujo UI o el mismo test de API con varias filas de datos (ej. distintos usuarios, montos, descripciones), coloca un archivo `.csv`, `.txt` o `.xlsx` en `BoxTestData/` con el **mismo nombre exacto que la suite** (ver ejemplo en `BoxTestData/Homebanking_TransferenciasTestingQA.csv`).
+Para ejecutar el mismo flujo UI o el mismo test de API con varias filas de datos (ej. distintos usuarios, montos, descripciones), coloca un archivo `.csv`, `.txt` o `.xlsx` en `BoxTestData/` con el **mismo nombre exacto que la suite**. Si necesitas datos **distintos por tipo de prueba**, agrega un sufijo: `<Suite>_Web.csv` (UI), `<Suite>_REST.csv` o `<Suite>_SOAP.csv` (API); sin sufijo, el archivo se comparte entre UI y API. Ver `BoxTestData/README.md`.
 
 - El encabezado de cada columna se compara (localmente y, si hace falta, con IA) contra las etiquetas de los campos del flujo grabado o contra las claves del body/tags del curl pegado.
 - Al ejecutar `npm run generate`, si existe un archivo de datos para la suite, el spec generado repite el test una vez por fila (UI: todo el flujo; API: solo el caso "Éxito").
@@ -646,6 +693,11 @@ Para ejecutar el mismo flujo UI o el mismo test de API con varias filas de datos
 | `Non-functional: 100% errores` | El endpoint puede requerir autenticación. Añade `Authorization: 'Bearer TOKEN'` en `headers` del target en `nf-config.ts`. |
 | `Tests duplicados` | Ejecuta `npm run generate` para regenerar limpio. Los archivos en `GenerateTest/tests/` se sobreescriben. |
 | `BDD: no encuentra steps` | Verifica que `playwright.config.ts` apunte a `GenerateTest/steps/**/*.ts`. Ejecuta `npm run bdd` primero. |
+| `El portal muestra «SIN DATOS» en todos los módulos` | `test-results/results.xml` quedó con una corrida aislada (otra ejecución de Playwright lo sobreescribió). Ejecuta de nuevo la suite completa: `npm run test:suite -- --suite=<Suite>`. |
+| `Los videos/fotos del portal no se reproducen` | Los archivos de `test-results/` ya no existen porque otra ejecución de Playwright los borró. Vuelve a ejecutar la suite y no lances otra corrida hasta que termine. |
+| `En «Gherkin (BDD)» una feature dice «Fuera de esta corrida»` | Es una feature de una suite que no se ejecutó (por ejemplo, un `.feature` viejo de una suite renombrada). No es un error. |
+| `El escenario BDD falla con «Elemento no visible para click: Usuario»` | Defecto conocido pendiente: el `Given el usuario está en la aplicación` no navega a la app. La UI real sí se valida en `ui-chromium/firefox/webkit`. |
+| `El Smart Report sigue en inglés` | Ejecuta `npm run smart-report:es` o vuelve a ejecutar la suite. |
 | `El servidor MCP no arranca` | Ejecuta `npx playwright install chromium` si falta el navegador. Verifica `npm ci` si falta `@playwright/mcp`. |
 
 ---
@@ -666,6 +718,14 @@ USER=usuario
 PASS=contraseña
 ```
 
+Variables opcionales que fijan los scripts del pipeline (normalmente no hace falta tocarlas):
+
+| Variable | Efecto |
+|---|---|
+| `SMART_REPORT_DIR` | Carpeta de salida del Smart Report (`smart-report/<Suite>` por suite; `smart-report` por defecto) |
+| `SMART_REPORT_DISABLE=1` | Omite el Smart Report en esa ejecución (se usa en la corrida acotada de `bdd-ui`) |
+| `PLAYWRIGHT_JUNIT_OUTPUT_FILE` | Redirige el XML JUnit de esa ejecución. El nombre correcto es este; `..._OUTPUT_NAME` **no existe** |
+
 ---
 
 ## Notas importantes
@@ -673,9 +733,27 @@ PASS=contraseña
 - `GenerateTest/tests/` se **sobreescribe** con cada `npm run generate`. No edites los archivos generados ahí.
 - Los tests de API manuales en `GenerateTest/api-testing-rest-soap/` son seguros para editar.
 - Los specs no funcionales en `GenerateTest/tests/<Suite>/non-functional/` se sobreescriben con `npm run generate:nf`.
-- `learning-db.json` y `healer-db.json` persisten entre ejecuciones y mejoran el healing con el tiempo.
+- `learning-db.json` y `healer-db.json` persisten entre ejecuciones y mejoran el healing con el tiempo. Están versionados: revisa `git diff` antes de confirmar y evita subir lo aprendido en una corrida con un flujo incompleto.
+- **Una ejecución de Playwright a la vez:** cada una vacía `test-results/` y `playwright-report/` (ver sección «Reportes»).
+- `npm audit` reporta hallazgos en dependencias de **desarrollo** (`playwright-bdd`/`@cucumber`, `braces`, `uuid` y, desde el Smart Reporter, `@modelcontextprotocol/sdk` y `adm-zip`); ninguno afecta al código de las pruebas. Detalle en `Documentation/DOCUMENTACION_COMPLETA.md` (Sección 13).
 - El proyecto `bdd-ui` requiere haber ejecutado el proyecto `setup` previamente (genera `storage/auth.json`).
 - `playwright.config.ts` — consultar antes de modificar (ver `CLAUDE.md`).
+
+---
+
+## Documentación del proyecto
+
+| Documento | Para quién | Contenido |
+|---|---|---|
+| [`Documentation/DOCUMENTACION_COMPLETA.md`](Documentation/DOCUMENTACION_COMPLETA.md) | Ingeniería | Referencia completa: arquitectura, comandos, variables, configuración de cada tipo de prueba, Smart Report, solución de problemas y registro de cambios |
+| [`Documentation/Manual_de_Usuario_Testers.docx`](Documentation/Manual_de_Usuario_Testers.docx) | Testers sin conocimientos de programación | Guía paso a paso: grabar, generar, ejecutar y leer los reportes |
+| [`Documentation/Manual_Tecnico_Ingenieros_Automatizacion.docx`](Documentation/Manual_Tecnico_Ingenieros_Automatizacion.docx) | Ingenieros de automatización | Diseño interno de agentes, generadores, motor de datos, MCP, reportes y pipeline |
+| [`Documentation/Presentacion_Framework.html`](Documentation/Presentacion_Framework.html) | Stakeholders y COE de Testing | Presentación interactiva (se abre en el navegador, 34 diapositivas): uso de IA, agentes y MCP, auto-reparación, tipos de prueba, informes, alcance, riesgos, calculadora de ahorro y propuesta de adopción en 3 fases |
+| [`Documentation/Arquitectura_Framework.drawio`](Documentation/Arquitectura_Framework.drawio) | Todos | Diagrama (draw.io) de carpetas y componentes del proyecto |
+| [`Documentation/MCP_Agentes_IA.drawio`](Documentation/MCP_Agentes_IA.drawio) | Stakeholders | Diagrama de qué hacen el MCP, los agentes y la IA (7 puntos de intervención de IA) |
+| [`Documentation/Tipos_de_Prueba.drawio`](Documentation/Tipos_de_Prueba.drawio) | Stakeholders | Diagrama de los tipos de prueba que se generan y ejecutan |
+
+Los archivos `.drawio` se abren en [app.diagrams.net](https://app.diagrams.net) o con el plugin de draw.io de tu IDE.
 
 ---
 

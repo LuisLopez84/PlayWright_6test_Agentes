@@ -21,6 +21,7 @@
 11. [Solución de problemas](#11-solución-de-problemas)
 12. [Glosario](#12-glosario)
 13. [Notas de auditoría del repositorio](#13-notas-de-auditoría-del-repositorio)
+14. [Registro de cambios recientes](#14-registro-de-cambios-recientes)
 
 ---
 
@@ -39,9 +40,15 @@ A partir de `BoxRecordings/recordings/<Suite>.ts` (una grabación cruda de Playw
 | **Security** | ¿Tiene los headers de seguridad correctos? ¿Es vulnerable a XSS, SQL injection, fuerza bruta? ¿Fuerza HTTPS? |
 | **Visual** | ¿La interfaz se ve igual que en la última ejecución aprobada (comparación de capturas)? |
 | **Non-Functional** | ¿Cómo se comporta el servicio bajo carga incremental o picos de tráfico? (estilo JMeter, con proyección estadística de saturación) |
-| **BDD** | El mismo flujo, expresado en Gherkin (`.feature`) legible por negocio |
+| **BDD (informativo)** | El mismo flujo, expresado en Gherkin (`.feature`) legible por negocio. **No es un tipo de prueba independiente**: no tiene % de éxito propio, es la narración del flujo de UI ya evaluado (ver Sección 9.12) |
 
-Todo el resultado converge en **un único reporte HTML de Playwright**, agrupado por suite y tipo de prueba.
+Cada ejecución produce **tres informes complementarios** (ver Sección 4.6):
+
+| Informe | Para quién | Dónde |
+|---|---|---|
+| **Portal QA** (`portal.html`) | Negocio y QA: resultado por tipo de prueba con % de éxito, evidencias, datos usados, análisis estadístico de carga | `playwright-report/portal.html` |
+| **Reporte HTML de Playwright** | Ingeniería: detalle técnico estándar de Playwright por suite | `reports/<Suite>/index.html` |
+| **Smart Report** (en español) | QA e ingeniería: causas agrupadas, intermitencia, tendencias, regresiones de rendimiento y eficiencia, con un apartado «Sobre este reporte» para stakeholders | `smart-report/<Suite>/smart-report.html` |
 
 ---
 
@@ -87,13 +94,18 @@ El proyecto ya trae `.env-example` en la raíz como plantilla (`OPENAI_API_KEY="
     └── non-functional/ (tras npm run generate:nf)
     │
     ▼  npx playwright test   (o  npm run test  para el flujo completo)
- playwright-report/  +  test-results/  +  reports/<Suite>/
+ playwright-report/  +  test-results/  +  reports/<Suite>/  +  smart-report/<Suite>/
     │
     ▼
- npx playwright show-report
+ playwright-report/portal.html  (Portal QA)   ·   smart-report/<Suite>/smart-report.html  (Smart Report)
 ```
 
 `npm run test` encadena: `generate` → `bdd` → ejecución por suite (`split-reports.js`) → `generate:api` (tests API desde tráfico capturado) → `portal` (portal HTML) → `heal:specs` (aplica selectores curados de vuelta a los specs).
+
+Dentro de la ejecución por suite (`split-reports.js` o, para una sola suite, `test-suite.ts`) ocurren **dos invocaciones de Playwright**, no una:
+
+1. **Corrida principal** — `npx playwright test "GenerateTest/tests/<Suite>"` con todos los proyectos (UI ×3 navegadores, API, performance, accessibility, visual, security, non-functional). Escribe `test-results/results.xml`, el reporte HTML y el Smart Report de la suite.
+2. **Corrida de BDD acotada** — `npx playwright test --project=bdd-ui --grep "(?=.*@UI)(?=.*<Suite>)"`. Los specs BDD viven en `.features-gen/`, fuera de `GenerateTest/tests/<Suite>/`, por lo que el filtro de ruta de la corrida principal nunca los alcanza. Esta segunda corrida usa su **propia** carpeta de salida (`test-results/<Suite>/_bdd`) y su **propio** XML (`PLAYWRIGHT_JUNIT_OUTPUT_FILE`), que luego se fusiona con el de la corrida principal (ver Sección 4.6).
 
 ---
 
@@ -248,6 +260,27 @@ Cuando `smartClick` / `smartFill` / `smartSelect` no encuentran el elemento con 
 | 5 | OpenAI (gpt-4o-mini) analiza el HTML y propone un nuevo selector | Sí (`OPENAI_API_KEY`) |
 | 6 | `ForceReveal` — elimina overlays, force-click, expande collapses de Bootstrap vía JS | No |
 
+> **Advertencia — aprendizaje contaminado.** El framework da por «exitoso» cualquier clic que no lanza error. Si una prueba se ejecuta con un spec al que le falta un paso (por ejemplo, el botón «Confirmar» todavía no existe en pantalla), el healer puede resolverlo con *otro* botón visible (p. ej. `button:has-text("TRANSFERIR")`) y guardarlo en `learning-db.json` / `healer-db.json` como válido; en la siguiente corrida ese selector equivocado se prefiere por tener mejor historial. **Síntoma:** una prueba hace clic en un elemento incorrecto aunque el spec esté bien. **Solución:** borrar las entradas erróneas de ambos archivos (clave `url|acción|texto`) o, en último caso, eliminarlos para que se reconstruyan. Ambos están versionados en git, así que `git diff` muestra qué aprendió el framework en cada ejecución.
+
+### 4.6 Reportes y carpetas de salida de ejecución
+
+| Salida | La escribe | Notas |
+|---|---|---|
+| `test-results/results.xml` | Reporter `junit` de Playwright | Es la **fuente de datos del Portal QA** (`generate-portal.js` solo lee este archivo). Una invocación posterior de Playwright lo sobreescribe |
+| `test-results/<Suite>/…` | Playwright (`--output`) | Videos, capturas y trazas de cada prueba. El Portal los enlaza con la ruta relativa `../test-results/<Suite>/…` |
+| `test-results/<Suite>/_bdd/…` | Playwright (corrida `bdd-ui`) | Evidencias del escenario BDD, en carpeta propia (ver regla 2 abajo) |
+| `test-results/<Suite>.bdd.results.xml` | Reporter `junit` (corrida `bdd-ui`) | XML aparte que luego se fusiona con el principal |
+| `playwright-report/` | Reporter `html` de Playwright | Se mueve a `reports/<Suite>/` al final de cada suite; `portal.html` y `report.csv` se generan aquí **después** |
+| `smart-report/<Suite>/` | Smart Report (`smart-reporter-es.ts`) | `smart-report.html` + `test-history.json` (historial de hasta 20 corridas) + `traces/` |
+
+**Reglas que evitan perder evidencias** (cada una corresponde a un error real ya corregido — ver Sección 14):
+
+1. **El nombre correcto de la variable es `PLAYWRIGHT_JUNIT_OUTPUT_FILE`.** `PLAYWRIGHT_JUNIT_OUTPUT_NAME` *no existe* y Playwright la ignora en silencio: el reporter cae al `outputFile` fijo de `playwright.config.ts` y la corrida «acotada» sobrescribe el `results.xml` real (el portal mostraba «SIN DATOS» en todos los módulos). Ver `node_modules/playwright/lib/reporters/base.js`, función `resolveOutputFile()`.
+2. **Cada invocación de Playwright vacía su carpeta de salida al arrancar.** Dos invocaciones con la misma `--output` borran las evidencias de la primera. Por eso la corrida de `bdd-ui` usa `<Suite>/_bdd`.
+3. **Cada invocación de Playwright vacía también `test-results/` y `playwright-report/`** (reporters `html` y salida por defecto). Ejecutar *cualquier* prueba, aunque sea una sola, borra `portal.html` y las evidencias de la última corrida completa. **No ejecutes dos pipelines a la vez** ni «pruebas rápidas» mientras revisas un reporte; para verificar algo sin tocar esas carpetas usa `npx playwright test … --reporter=list --output=<carpeta temporal>`.
+4. **Una corrida aislada no debe sobrescribir el Smart Report de la suite**: los scripts fijan `SMART_REPORT_DIR=smart-report/<Suite>` en la corrida principal y `SMART_REPORT_DISABLE=1` en la de `bdd-ui`.
+5. **Video a resolución completa.** `playwright.config.ts` define `video: { mode: 'on', size: { width: 1280, height: 720 } }`. Sin `size`, Playwright escala el video para caber en 800×800 (queda 800×450, borroso) aunque el viewport sea 1280×720 (los tres navegadores usan 1280×720 con `devices[...]`).
+
 ---
 
 ## 5. Estructura completa de carpetas
@@ -276,8 +309,13 @@ playwright-enterprise-template_UI_API_Performance3/
 │   │   ├── generators/                   ← ui, performance, accessibility, security, visual (agent.ts)
 │   │   ├── network/                      ← api-discovery, api-test-generator, box-api-executor, network-sniffer
 │   │   └── recorder/                     ← recorder-parser-agent.ts
-│   ├── scripts/                          ← run-agents.ts (orquestador) + utilidades de reportes
-│   └── utils/                            ← openai-client, fs-utils, selector-builder, url-extractor
+│   ├── mcp/server.ts                     ← servidor MCP (delega en @playwright/mcp)
+│   ├── reporters/                        ← Smart Reporter en español (envoltorio + diccionario + guía) — ver Sección 10.1
+│   │   ├── smart-reporter-es.ts          ← reporter que usa playwright.config.ts
+│   │   └── smart-report-es/              ← inject.js, client.js (diccionario), guide.html, about.html, styles.css
+│   ├── scripts/                          ← run-agents.ts (orquestador), split-reports.js, test-suite.ts, generate-portal.js,
+│   │                                       heal-specs.ts, localize-smart-report.js (npm run smart-report:es)…
+│   └── utils/                            ← openai-client, fs-utils, selector-builder, url-extractor, concurrency
 │
 ├── ConfigurationTest/tests/
 │   ├── utils/                            ← smart-actions, navigation-helper, api-helper, modal-handler, test-data-resolver, data-file-parser
@@ -304,14 +342,19 @@ playwright-enterprise-template_UI_API_Performance3/
 │           ├── ui/  ├── api/  ├── performance/  ├── accessibility/
 │           ├── security/  ├── visual/  └── non-functional/
 │
-├── Documentation/                        ← este documento
+├── Documentation/                        ← este documento + manuales .docx + diagramas draw.io
+│   ├── DOCUMENTACION_COMPLETA.md
+│   ├── Manual_de_Usuario_Testers.docx    ← para personas sin conocimientos de programación
+│   ├── Manual_Tecnico_Ingenieros_Automatizacion.docx
+│   └── Arquitectura_Framework.drawio · MCP_Agentes_IA.drawio · Tipos_de_Prueba.drawio
+├── .features-gen/                        ← specs BDD compilados por playwright-bdd (auto-generado)
 ├── playwright.config.ts                  ← configuración global + proyectos (⚠️ preguntar antes de tocar)
 ├── package.json                          ← scripts npm
 ├── tsconfig.json                         ← path aliases @utils, @pages, @config
 ├── .env-example / .env                   ← variables de entorno
 ├── learning-db.json                      ← aprendizaje de selectores (auto-generado, no editar)
 ├── healer-db.json                        ← caché de healing (auto-generado, no editar)
-├── playwright-report/  test-results/  reports/  ← salidas de ejecución
+├── playwright-report/  test-results/  reports/  smart-report/  ← salidas de ejecución (todas ignoradas por git)
 └── .github/workflows/playwright.yml      ← pipeline de CI
 ```
 
@@ -335,7 +378,8 @@ playwright-enterprise-template_UI_API_Performance3/
 | `npm run test:api` | Genera y ejecuta solo el proyecto `api` |
 | `npm run test:suite -- --suite=<Nombre>` | Genera y ejecuta el pipeline completo de **una sola** suite |
 | `npm run heal:specs` | Aplica selectores curados (de `healer-db.json`/`learning-db.json`) de vuelta a los `*.spec.ts` |
-| `npm run portal` | Regenera `playwright-report/portal.html` |
+| `npm run portal` | Regenera `playwright-report/portal.html` (lee `test-results/results.xml`; no ejecuta pruebas) |
+| `npm run smart-report:es` | Aplica (o re-aplica) la capa en español a los `smart-report/**/smart-report.html` ya generados, **sin volver a ejecutar pruebas**; útil tras editar el diccionario o la guía (Sección 10.1) |
 | `npm run reports-index` | Regenera el índice global de `reports/` |
 | `npm run report` | Abre el último reporte HTML (`npx playwright show-report`) |
 | `npm run pw:record` | Alias directo a `npx playwright codegen` |
@@ -352,6 +396,8 @@ npx playwright test --grep "Transferencia"             # filtro por nombre
 npx playwright test --ui                               # modo interactivo
 npx playwright test --update-snapshots --project=visual  # regenerar baseline visual
 ```
+
+> **Antes de ejecutar pruebas, lee la regla 3 de la Sección 4.6:** cada ejecución de Playwright vacía `test-results/` y `playwright-report/`.
 
 Proyectos definidos en `playwright.config.ts`: `setup`, `ui-chromium`, `ui-firefox`, `ui-webkit`, `bdd-ui`, `performance`, `visual`, `accessibility`, `api`, `security`, `non-functional`.
 
@@ -385,6 +431,7 @@ Se definen en un archivo `.env` en la raíz del proyecto (usar `.env-example` co
 | `PARALLEL_SUITES` | `split-reports.js` | `false` | `true` ejecuta las suites en paralelo en lugar de secuencial |
 | `SMART_REPORT_DIR` | `playwright.config.ts` | `smart-report` | Carpeta donde `playwright-smart-reporter` escribe `smart-report.html` y `test-history.json`. `split-reports.js` y `test-suite.ts` lo fijan a `smart-report/<Suite>` |
 | `SMART_REPORT_DISABLE` | `playwright.config.ts` | (vacío) | `1` omite el smart-reporter en esa corrida (los scripts lo usan en la corrida acotada de `bdd-ui`) |
+| `PLAYWRIGHT_JUNIT_OUTPUT_FILE` | Playwright (reporter `junit`); la fijan `split-reports.js` y `test-suite.ts` | `test-results/results.xml` (de `playwright.config.ts`) | Redirige el XML de esa invocación. **No existe `PLAYWRIGHT_JUNIT_OUTPUT_NAME`**: se ignora en silencio (Sección 4.6) |
 
 > Estas variables **no requieren volver a ejecutar `npm run generate`** — se leen en tiempo de ejecución de los tests (`process.env.X`). Cámbialas en `.env` o expórtalas antes de correr `npx playwright test`.
 
@@ -444,6 +491,8 @@ Existen **dos formas** de configurar un test, y la forma correcta depende de si 
 **Genera:** `ConfigurationAgents/ia-testing/agents/generators/ui-agent.ts`
 **Salida:** `GenerateTest/tests/<Suite>/ui/<Suite>.spec.ts`
 **Ejemplo real:** [`GenerateTest/tests/Homebanking_TransferenciasTesting/ui/Homebanking_TransferenciasTesting.spec.ts`](../GenerateTest/tests/Homebanking_TransferenciasTesting/ui/Homebanking_TransferenciasTesting.spec.ts)
+
+> **Pasos repetidos del mismo botón se conservan.** `enhanceFlow` (`smart-flow-engine.ts`) renombra algunos `click` a `confirm` (botones «Confirmar», «Transferir», «Aceptar»…) y `navigate_section` (ítems de menú). `ui-agent.ts` deduplica pasos con la misma acción+selector+valor **excepto** las acciones de la lista `NON_DEDUP_ACTIONS`; `confirm` y `navigate_section` están en esa lista. Antes no lo estaban y se perdía el segundo clic al mismo botón (en un flujo «Transferir → llenar monto → Transferir → Confirmar → Salir → Confirmar» se omitían el envío del formulario y la confirmación del cierre de sesión, y la prueba fallaba esperando el mensaje de éxito).
 
 El spec de UI se regenera **siempre**, por lo que su única configuración persistente es vía variables de entorno, embebidas así en cada spec generado (`ui-agent.ts:120-123`):
 
@@ -655,6 +704,8 @@ const budget = 5000;
 **Genera:** `ConfigurationAgents/ia-testing/agents/generators/accessibility-agent.ts`
 **Salida:** `GenerateTest/tests/<Suite>/accessibility/<Suite>-accessibility.spec.ts` — **NO se sobreescribe si ya existe**
 **Ejemplo real:** [`GenerateTest/tests/Homebanking_TransferenciasTesting/accessibility/Homebanking_TransferenciasTesting-accessibility.spec.ts`](../GenerateTest/tests/Homebanking_TransferenciasTesting/accessibility/Homebanking_TransferenciasTesting-accessibility.spec.ts)
+
+> **Violaciones en español.** El spec generado carga el idioma español de axe-core: lee `axe-core/axe.min.js` y le agrega `axe.configure({ locale: <axe-core/locales/es.json> })`, y se lo pasa a `new AxeBuilder({ page, axeSource })` (la versión instalada de `AxeBuilder` **no** expone `configure()`). Así la descripción de cada regla violada sale en español en la consola y en el Portal QA. El Portal además traduce las severidades que muestra (`CRITICAL`→CRÍTICA, `SERIOUS`→GRAVE, `MODERATE`→MODERADA, `MINOR`→MENOR); las claves del log (`[SERIOUS] regla: texto`) no cambian porque `extractA11yMetrics` las parsea. Como este spec **no se sobreescribe** si ya existe, una suite generada antes de este cambio conserva su versión en inglés: bórrala y ejecuta `npm run generate -- --suite=<Suite>` para regenerarla.
 
 Usa `@axe-core/playwright` contra las reglas WCAG 2.1 AA. No tiene variables de entorno — toda su configuración se hace editando directamente el archivo ya generado (seguro, no se pierde):
 
@@ -1050,6 +1101,24 @@ for (const [i, row] of data.entries()) {
 
 **Archivos involucrados:** `ConfigurationTest/tests/utils/data-file-parser.ts` (parser CSV/TXT/XLSX, sin dependencias para CSV/TXT; usa `xlsx` — instalada desde el CDN oficial de SheetJS para evitar la vulnerabilidad conocida de la versión publicada en npm — solo para `.xlsx`), `ConfigurationAgents/ia-testing/agents/core/data-binding.agent.ts` (emparejamiento columna↔campo), y los generadores `ui-agent.ts` / `box-api-executor.agent.ts` (loop de ejecución).
 
+### 9.12 BDD / Gherkin — informativo, no es un tipo de prueba
+
+**Genera:** `generator-agent.ts` (`buildFeature()`) → `GenerateTest/features/<Suite>.feature` y `GenerateTest/steps/<Suite>.steps.ts`; `npm run bdd` los compila a `.features-gen/` (`playwright-bdd`).
+
+**Qué es:** la narración en lenguaje natural del **mismo** flujo de UI que ya evalúan `ui-chromium`/`ui-firefox`/`ui-webkit`. Por eso el Portal QA **no lo trata como un tipo de prueba**: no está en el arreglo `MODULES` de `generate-portal.js`, no tiene tarjeta en «Módulos de Prueba» ni porcentaje de éxito propio. Tiene su propia pestaña informativa **«Gherkin (BDD)»** que muestra qué se probó, con el estado de cada escenario.
+
+**Reglas importantes:**
+
+| Tema | Comportamiento |
+|---|---|
+| Etiqueta `@UI` | `buildFeature()` escribe `@UI` sobre `Feature:`. El proyecto `bdd-ui` filtra por `grep: /@UI/`, así que **un `.feature` sin `@UI` nunca se ejecuta**. |
+| Cómo se ejecuta | Solo con la corrida acotada de `bdd-ui` de `split-reports.js` / `test-suite.ts` (ver Sección 3), con su propia carpeta de salida. No forma parte de la corrida principal porque sus specs viven en `.features-gen/`. |
+| Pasos genéricos | `GenerateTest/steps/common.steps.ts` (clic, ingresar, completar, seleccionar, `page_load`, verificación final). Los pasos específicos de cada suite van en `<Suite>.steps.ts`. |
+| Paso `hace clic en "elemento"` | Era un paso basura generado por el `page_load` inicial de la grabación (`action-normalizer` le pone el placeholder `'elemento'` porque la URL viaja en `url`, no en `target`). `buildFeature()` ahora lo omite (`if (!action.target \|\| action.target === 'elemento') break;`). |
+| Features de API (`<X>_api.feature`) | Las genera `box-api-executor.agent.ts`. **`bdd-ui` no las ejecuta**; su resultado real es el del spec `api/<X>.spec.ts` del proyecto `api`. El Portal toma el estado de ahí: escenarios «Petición exitosa» → casos *Éxito*; «Error técnico…» → *Error técnico*; «datos inválidos» → *Error de datos*. |
+| Estado «Fuera de esta corrida» | Features cuyo nombre no pertenece a ninguna suite ejecutada (por ejemplo `.feature` viejos que quedaron en disco tras renombrar una suite). `npm run generate -- --suite=<X>` no limpia huérfanos; solo `npm run generate` completo lo hace. |
+| Coincidencia de resultados | playwright-bdd nombra el testcase `"<Feature> › <Escenario>"` y compila a `*.feature.spec.js` (no `.spec.ts`). `renderBDD()` indexa por nombre completo, por escenario y por nombre de archivo (`.spec.(ts\|js)`). |
+
 ---
 
 ## 10. Integración continua (GitHub Actions)
@@ -1081,7 +1150,9 @@ Reporte HTML **adicional** (dependencia de desarrollo `playwright-smart-reporter
 | Con `npm run test` / `npm run test:suite` | Un reporte e historial por suite (los scripts fijan `SMART_REPORT_DIR=smart-report/<Suite>`) |
 | Con `npx playwright test` directo | `smart-report/smart-report.html` |
 | `bdd-ui` | Se excluye (`SMART_REPORT_DISABLE=1`) en su corrida acotada: es informativo y de 1 prueba, y ensuciaría el historial |
+| Acceso desde el Portal QA | Botón **«Smart Report»** en el encabezado de `portal.html` (junto a «CSV» y «Resumen Ejecutivo (PDF)»); aparece solo si `smart-report/<Suite>/smart-report.html` existe. Con varias suites, un botón por suite |
 | Acceso desde el índice | `npm run reports-index` agrega un botón «Smart Report» junto a cada suite que lo tenga |
+| Dependencia | `playwright-smart-reporter` (devDependency). Su instalación sumó 3 hallazgos de `npm audit` de severidad alta (el propio paquete, `@modelcontextprotocol/sdk` y `adm-zip`), todos de desarrollo: `adm-zip` solo lee las trazas que genera el propio framework |
 | IA | **Apagada** (`enableAIRecommendations: false`): el reporter no envía datos a ningún proveedor |
 | Trace viewer embebido | `npx playwright-smart-reporter-serve smart-report/<Suite>/smart-report.html` |
 | Idioma | **Español**: interfaz traducida + botón flotante **«Guía del reporte»** (abajo a la derecha) con la introducción y la explicación de cada tarjeta, panel, métrica y vista. La guía se abre sola la primera vez que se abre un reporte en un navegador |
@@ -1124,6 +1195,14 @@ Para quitarlo sin tocar nada más: `npm uninstall playwright-smart-reporter`, el
 | Falsos positivos en Visual por fuentes/animaciones | Sube `VISUAL_WAIT_MS`, o agrega el selector del elemento dinámico a `STABILITY_CSS` (Sección 9.7) |
 | Falsos positivos en Accessibility por widgets de terceros | Agrega el selector a `EXCLUDE_SELECTORS` (Sección 9.5) |
 | `BDD: no encuentra steps` | Verifica que `playwright.config.ts` apunte a `GenerateTest/steps/**/*.ts`; ejecuta `npm run bdd` primero |
+| El Portal muestra **«SIN DATOS»** en todos los módulos | `test-results/results.xml` solo contiene una corrida aislada (p. ej. la de `bdd-ui`) porque otra invocación de Playwright lo sobreescribió. Revisa la Sección 4.6 (reglas 1 y 3) y vuelve a ejecutar la suite completa: `npm run test:suite -- --suite=<Suite>` |
+| Videos, fotos o trazas del Portal **no se reproducen** | Los archivos ya no existen en `test-results/` (otra invocación de Playwright los borró). Vuelve a ejecutar la suite; no lances otra corrida hasta que termine el reporte (Sección 4.6, reglas 2 y 3) |
+| Dos terminales ejecutaron pruebas a la vez y el reporte quedó incompleto | Comparten `test-results/` y `playwright-report/`; la segunda corrida borra lo de la primera. Ejecuta una sola y espera a que termine |
+| En la pestaña **Gherkin (BDD)** una feature aparece «Sin ejecutar» o «Fuera de esta corrida» | «Fuera de esta corrida»: la feature es de una suite que no se ejecutó (resto de una suite renombrada). «Sin ejecutar» en una `@UI`: falta la corrida acotada de `bdd-ui` (usa `npm run test` o `npm run test:suite`, no solo `npx playwright test`). Ver Sección 9.12 |
+| El escenario BDD falla con «Elemento no visible para click: Usuario» | El escenario no abre la aplicación antes del primer clic (el `Given el usuario está en la aplicación` no navega). Es un defecto conocido pendiente de corrección; la UI real sí se valida en `ui-chromium/firefox/webkit` |
+| Una prueba hace clic en un elemento equivocado tras una corrida con el flujo incompleto | `learning-db.json`/`healer-db.json` aprendieron un selector equivocado (Sección 4.5, advertencia). Borra esas entradas y vuelve a ejecutar |
+| El Smart Report sigue en inglés | Genera la capa con `npm run smart-report:es`, o ejecuta de nuevo la suite. Si aun así no cambia, revisa que `playwright.config.ts` use `./ConfigurationAgents/ia-testing/reporters/smart-reporter-es.ts` y no `'playwright-smart-reporter'` directamente |
+| No aparece el botón «Smart Report» en el Portal | El portal solo lo muestra si existe `smart-report/<Suite>/smart-report.html`. Ejecuta la suite y regenera el portal (`npm run portal`) |
 
 ---
 
@@ -1138,6 +1217,12 @@ Para quitarlo sin tocar nada más: `npm uninstall playwright-smart-reporter`, el
 | **Budget (presupuesto)** | Umbral máximo aceptable para una métrica de performance (ej. `PERF_BUDGET`) |
 | **Breakpoint (punto de quiebre)** | En pruebas no funcionales, el nivel de carga donde el servicio empieza a degradarse, calculado por regresión logística |
 | **Target** | En `nf-config.ts`, una URL o endpoint sometido a prueba de carga |
+| **Smart Report** | Informe adicional (`playwright-smart-reporter`, en español) que compara la corrida con el historial: causas agrupadas, intermitencia, regresiones de rendimiento, eficiencia y salud A–F |
+| **Intermitente (flaky)** | Prueba que a veces pasa y a veces falla sin cambios de código, o que solo pasa al reintentar |
+| **Corrida base (baseline)** | Corrida contra la que el Smart Report compara la actual; por defecto, la anterior |
+| **Grupo de fallas (cluster)** | Fallas con la misma causa aparente (huella: clase de error + mensaje sin números + archivo + primer localizador) |
+| **Gherkin / BDD** | Lenguaje natural (`Given/When/Then`) que narra el flujo de UI; en el Portal es informativo, no un tipo de prueba |
+| **Portal QA** | `playwright-report/portal.html`: vista por tipo de prueba, con evidencias, pensada para negocio y QA |
 | **Metadata (`<Suite>.metadata.json`)** | Archivo auto-generado con `{name, baseURL}` de cada suite, usado por UI/BDD y por non-functional para resolver la URL |
 
 ---
@@ -1151,6 +1236,27 @@ Hallazgos verificados durante la elaboración de este documento, útiles para qu
 3. **`.env` con clave real presente:** el archivo `.env` en la raíz contiene una `OPENAI_API_KEY` con valor real (no solo la plantilla de `.env-example`). Se verificó que `.env` está correctamente listado en `.gitignore` (línea 11), por lo que no se versiona — no requiere acción.
 4. **⚠️ `captcha-solver.ts` — servicio externo de resolución de captchas, uso bajo autorización explícita:** ver el aviso completo en la Sección 4.2.1 (justo después de la tabla de `agents/core/`). Resumen: requiere `TWO_CAPTCHA_API_KEY` (inactivo si no está definida), solo debe usarse contra aplicativos propios/autorizados, y esa clave debe tratarse con el mismo cuidado que `OPENAI_API_KEY` (nunca commitear, solo `.env`/secrets de CI).
 5. **17 errores de `npx tsc --noEmit` corregidos (resuelto):** el proyecto tenía 17 errores de compilación TypeScript preexistentes. Se corrigieron 16 sin cambiar comportamiento (casts de tipo, imports de tipo, reemplazo de `axios`/`express` por `fetch`/`http` nativos de Node en `captcha-solver.ts` y `monitor.ts`, tipado explícito en `customFixtures.ts` y `captcha-handler.ts`, `String(v)` en `api-helper.ts`). El 17º era el servidor MCP (`ConfigurationAgents/ia-testing/mcp/server.ts`), que importaba `createPlaywrightServer` — una función que no existe en `@playwright/mcp`. Se resolvió reescribiendo el archivo para delegar en el **CLI propio de `@playwright/mcp`** (`cli.js`, resuelto vía `require.resolve('@playwright/mcp/package.json')` ya que el `exports` del paquete no permite importar `cli.js` como subpath directo) mediante `child_process.spawn()`, en vez de envolver el SDK (`@modelcontextprotocol/sdk`) manualmente — evitando así depender de un paquete cuyas versiones publicadas tienen todas alguna vulnerabilidad conocida. El comando `npm run mcp:server` ahora arranca un Chromium real (verificado en vivo) y `npx tsc --noEmit` reporta **0 errores** en todo el proyecto. Variables nuevas: `MCP_PORT` (activa transporte SSE/HTTP en vez de stdio) y `MCP_ALLOWED_HOSTS` (lista de hosts permitidos si se expone `MCP_HOST` fuera de `localhost`).
+6. **`npm audit` (octubre 2026):** 12 hallazgos (1 baja, 4 moderadas, 7 altas). 9 ya existían (`playwright-bdd`/`@cucumber/*`, `uuid`, `braces`/`micromatch`/`fast-glob`, `esbuild`); 3 altas llegaron con `playwright-smart-reporter` (el propio paquete, `@modelcontextprotocol/sdk` fijado en 1.31.0 y `adm-zip`). Todos son de desarrollo. Para quitar el Smart Reporter ver Sección 10.1.
+7. **`.claude/scheduled_tasks.lock`** se versionó por error y cambiaba en cada sesión; ya está en `.gitignore` y fuera del índice.
+8. **Aprendizaje persistente versionado:** `learning-db.json` y `healer-db.json` están en git. Cada ejecución puede modificarlos; revisa `git diff` antes de confirmar y evita subir entradas aprendidas de una corrida con un flujo incompleto (Sección 4.5, advertencia).
+
+---
+
+## 14. Registro de cambios recientes
+
+| Tema | Qué cambió | Dónde |
+|---|---|---|
+| Smart Report | `playwright-smart-reporter` integrado como reporter adicional, **en español**, con apartado «Sobre este reporte» y guía completa; un reporte e historial por suite | `playwright.config.ts`, `ConfigurationAgents/ia-testing/reporters/`, Sección 10.1 |
+| Portal sin datos | La variable para redirigir el JUnit era `PLAYWRIGHT_JUNIT_OUTPUT_NAME` (inexistente) en vez de `PLAYWRIGHT_JUNIT_OUTPUT_FILE`; la corrida de `bdd-ui` sobrescribía el `results.xml` real | `split-reports.js`, `test-suite.ts`, Sección 4.6 |
+| Evidencias rotas | `bdd-ui` compartía `--output` con la corrida principal y borraba videos/capturas/trazas; ahora usa `<Suite>/_bdd` | `split-reports.js`, `test-suite.ts` |
+| BDD ejecutable | Los `.feature` generados no llevaban `@UI`, por lo que `bdd-ui` nunca los seleccionaba; ahora sí, con corrida acotada por suite | `generator-agent.ts`, Sección 9.12 |
+| BDD en el Portal | Deja de ser un «tipo de prueba» con %; pestaña informativa. Las features de API toman su estado del proyecto `api`; las de suites ajenas muestran «Fuera de esta corrida» | `generate-portal.js` |
+| Paso basura en BDD | Se omite `hace clic en "elemento"` | `generator-agent.ts` |
+| Pasos de UI perdidos | `confirm` y `navigate_section` ya no se deduplican | `ui-agent.ts`, Sección 9.2 |
+| Accesibilidad en español | `axe-core` con locale `es` vía `axeSource` y severidades traducidas en el Portal | `accessibility-agent.ts`, `generate-portal.js`, Sección 9.5 |
+| Video nítido | `video.size` = 1280×720 (antes se reducía a 800×450) | `playwright.config.ts` |
+| Datos variables | Archivos `<Suite>_Web`/`_REST`/`_SOAP` por tipo de prueba en `BoxTestData/` | Sección 9.11 |
+| Documentación | Tres diagramas draw.io, README y manuales actualizados | `Documentation/` |
 
 ---
 
